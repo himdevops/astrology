@@ -135,11 +135,12 @@ def degree_to_sign(degree: float) -> Tuple[str, float]:
 def format_planet_position(name: str, degree: float, speed: float) -> Dict[str, object]:
     sign, degree_in_sign = degree_to_sign(degree)
     return {
-        "planet": name,
-        "longitude": round(normalize_degree(degree), 6),
-        "sign": sign,
-        "degree_in_sign": degree_in_sign,
-        "retrograde": speed < 0,
+        "planet":        name,
+        "longitude":     round(normalize_degree(degree), 6),
+        "sign":          sign,
+        "degree_in_sign":degree_in_sign,
+        "retrograde":    speed < 0,
+        "speed":         round(speed, 6),   # degrees per day (negative = retrograde)
     }
 
 

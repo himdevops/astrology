@@ -240,8 +240,9 @@ def _d9_financial_note(planet: str, sign: str) -> str:
 
 # ──────────────────────────────────────────────────────────────
 # D10 — Dashamsha Chart (Career & Profession)
-# Odd signs: 1st half (0-15°) → same sign; 2nd half (15-30°) → 9th from it
-# Even signs: 1st half → 9th from it; 2nd half → same sign
+# Odd signs: start from the same sign and move forward by degree/3 parts.
+# Even signs: start from the 9th sign from the natal sign, then move forward.
+# Each sign is divided into 10 parts of 3° each.
 # ──────────────────────────────────────────────────────────────
 def calc_d10_dashamsha(planets: List[Dict], ascendant: Dict) -> Dict:
     """
@@ -255,14 +256,11 @@ def calc_d10_dashamsha(planets: List[Dict], ascendant: Dict) -> Dict:
         long = p["longitude"] % 360.0
         sign_idx = int(long / 30)
         deg_in_sign = long % 30
-        part = int(deg_in_sign / 3.0)  # 0-9
-        is_odd = sign_idx % 2 == 0  # Aries=0 is odd
-
-        if is_odd:
-            d10_sign_idx = (sign_idx + part) % 12
+        division = int(deg_in_sign / 3.0)  # 0-9
+        if sign_idx % 2 == 0:  # odd sign in traditional astrology (Aries=0, Gemini=2, ...)
+            d10_sign_idx = (sign_idx + division) % 12
         else:
-            d10_sign_idx = (sign_idx + 9 + part) % 12
-
+            d10_sign_idx = (sign_idx + 8 + division) % 12
         d10_sign = SIGNS[d10_sign_idx]
         dash_planets.append({
             "planet":        p["planet"],
@@ -277,8 +275,10 @@ def calc_d10_dashamsha(planets: List[Dict], ascendant: Dict) -> Dict:
     asc_sign_idx = int(ascendant["longitude"] / 30)
     asc_deg = ascendant["longitude"] % 30
     asc_part = int(asc_deg / 3.0)
-    is_odd_asc = asc_sign_idx % 2 == 0
-    d10_asc_idx = ((asc_sign_idx + asc_part) if is_odd_asc else (asc_sign_idx + 9 + asc_part)) % 12
+    if asc_sign_idx % 2 == 0:
+        d10_asc_idx = (asc_sign_idx + asc_part) % 12
+    else:
+        d10_asc_idx = (asc_sign_idx + 8 + asc_part) % 12
 
     sun_d10    = next((p for p in dash_planets if p["planet"] == "Sun"),     None)
     saturn_d10 = next((p for p in dash_planets if p["planet"] == "Saturn"),  None)
