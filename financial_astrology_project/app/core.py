@@ -143,7 +143,12 @@ def format_planet_position(name: str, degree: float, speed: float) -> Dict[str, 
     }
 
 
-def calculate_ascendant(jd_ut: float, latitude: float, longitude: float) -> Dict[str, object]:
+def calculate_ascendant(jd_ut: float, latitude: float, longitude: float, ayanamsa: str) -> Dict[str, object]:
+    ayanamsa_key = ayanamsa.lower()
+    if ayanamsa_key not in AYANAMSA_MAP:
+        raise ValueError(f"Unsupported ayanamsa: {ayanamsa}. Supported: {', '.join(AYANAMSA_MAP)}")
+
+    swe.set_sid_mode(AYANAMSA_MAP[ayanamsa_key])
     houses, ascmc = swe.houses_ex(jd_ut, latitude, longitude, b'P', swe.FLG_SIDEREAL)
     ascendant = ascmc[0]
     sign, degree_in_sign = degree_to_sign(ascendant)
@@ -154,8 +159,14 @@ def calculate_ascendant(jd_ut: float, latitude: float, longitude: float) -> Dict
     }
 
 
-def build_house_cusps(jd_ut: float, latitude: float, longitude: float) -> List[Dict[str, object]]:
+def build_house_cusps(jd_ut: float, latitude: float, longitude: float, ayanamsa: str) -> List[Dict[str, object]]:
+    ayanamsa_key = ayanamsa.lower()
+    if ayanamsa_key not in AYANAMSA_MAP:
+        raise ValueError(f"Unsupported ayanamsa: {ayanamsa}. Supported: {', '.join(AYANAMSA_MAP)}")
+
+    swe.set_sid_mode(AYANAMSA_MAP[ayanamsa_key])
     houses, _ = swe.houses_ex(jd_ut, latitude, longitude, b'P', swe.FLG_SIDEREAL)
+
     output = []
     for i in range(12):
         cusp = houses[i]
@@ -175,7 +186,7 @@ def calculate_planets(jd_ut: float, ayanamsa: str) -> List[Dict[str, object]]:
         raise ValueError(f"Unsupported ayanamsa: {ayanamsa}. Supported: {', '.join(AYANAMSA_MAP)}")
 
     swe.set_sid_mode(AYANAMSA_MAP[ayanamsa_key])
-    flags = swe.FLG_SIDEREAL | swe.FLG_SPEED
+    flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
 
     planets = []
     rahu_degree = None

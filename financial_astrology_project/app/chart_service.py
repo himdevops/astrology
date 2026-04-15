@@ -23,8 +23,18 @@ def calculate_birth_chart(payload: BirthInput) -> dict:
     jd_ut = to_julian_day_utc(local_dt, resolved.timezone_offset_minutes)
 
     planets = calculate_planets(jd_ut, payload.ayanamsa)
-    ascendant = calculate_ascendant(jd_ut, resolved.latitude, resolved.longitude)
-    houses = build_house_cusps(jd_ut, resolved.latitude, resolved.longitude)
+    ascendant = calculate_ascendant(
+         jd_ut,
+        resolved.latitude,
+        resolved.longitude,
+        payload.ayanamsa,
+   )
+    houses = build_house_cusps(
+        jd_ut,
+        resolved.latitude,
+        resolved.longitude,
+        payload.ayanamsa,
+    )
 
     return {
         "type": "birth_chart",
