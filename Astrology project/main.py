@@ -13,6 +13,7 @@ from app.chart_service import (
     calculate_transits,
     calculate_dasha,
     calculate_divisional,
+    calculate_sarvatobhadra,
     calculate_ashtakavarga,
     calculate_yogas,
     calculate_transit_alerts,
@@ -23,6 +24,7 @@ from app.schemas import (
     TransitInput,
     DashaInput,
     DivisionalInput,
+    SarvatobhadraInput,
     AshtakavargaInput,
     YogaInput,
     TransitAlertInput,
@@ -67,6 +69,7 @@ def home() -> dict:
             "transits":        "POST /transits",
             "dasha":           "POST /dasha",
             "divisional":      "POST /divisional",
+            "sarvatobhadra":  "POST /sarvatobhadra",
             "ashtakavarga":    "POST /ashtakavarga",
             "yogas":           "POST /yogas",
             "transit_alerts":  "POST /transit-alerts",
@@ -132,6 +135,19 @@ def divisional(payload: DivisionalInput) -> dict:
     """
     try:
         return calculate_divisional(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ─── Sarvatobhadra Chakra ───────────────────────────────────────
+@app.post("/sarvatobhadra", tags=["Charts"], summary="Sarvatobhadra Chakra Casting")
+def sarvatobhadra(payload: SarvatobhadraInput) -> dict:
+    """
+    Sarvatobhadra Chakra casting based on natal Moon nakshatra and ascending sign.
+    Returns chakra cells, planet placements, and moon nakshatra details.
+    """
+    try:
+        return calculate_sarvatobhadra(payload)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

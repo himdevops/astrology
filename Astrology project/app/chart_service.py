@@ -21,6 +21,7 @@ from app.schemas import (
     DashaInput,
     DivisionalInput,
     FullPredictionInput,
+    SarvatobhadraInput,
     TransitAlertInput,
     TransitInput,
     YogaInput,
@@ -28,6 +29,7 @@ from app.schemas import (
 from app.nakshatra import get_all_planet_nakshatras, get_moon_nakshatra_signal
 from app.dasha import calculate_vimshottari_dasha, get_current_dasha
 from app.divisional import calculate_all_divisional
+from app.sarvatobhadra import calculate_sarvatobhadra as cast_sarvatobhadra
 from app.ashtakavarga import calc_sarvashtakavarga, calc_transit_dates_with_ashtakavarga
 from app.yoga_detector import detect_all_yogas
 from app.transit_alerts import generate_transit_alerts
@@ -173,6 +175,10 @@ def calculate_divisional(payload: DivisionalInput) -> dict:
         "ascendant":  ascendant,
         "charts":     divisional_charts,
     }
+
+
+def calculate_sarvatobhadra(payload: SarvatobhadraInput) -> dict:
+    return cast_sarvatobhadra(payload)
 
 
 # ─────────────────────────────────────────────────────────────

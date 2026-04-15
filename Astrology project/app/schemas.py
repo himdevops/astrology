@@ -65,6 +65,26 @@ class DivisionalInput(BaseModel):
     )
 
 
+class SarvatobhadraInput(BirthInput):
+    """Input for Sarvatobhadra Chakra casting with full transit analysis."""
+    # Optional transit date for Vedha/Latta analysis
+    # If omitted, today's planetary positions are used
+    transit_date: Optional[str] = Field(
+        default=None,
+        example="2026-04-15",
+        description="Date for transit SBC analysis. Defaults to today."
+    )
+    transit_time: Optional[str] = Field(
+        default="09:15",
+        example="09:15",
+        description="Time for transit planets (IST). Defaults to 09:15 (NSE open)."
+    )
+    transit_place: Optional[str] = Field(
+        default="Mumbai, Maharashtra, India",
+        description="Location for transit planet calculation."
+    )
+
+
 class AshtakavargaInput(BaseModel):
     """Input for Ashtakavarga + transit date prediction."""
     name: str  = Field(...,  example="Himanshu")
