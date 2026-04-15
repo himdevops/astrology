@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Astrology UI</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Financial Astrology Engine</h1>
+      <p class="subtitle">Enter birth details and calculate chart</p>
+
+      <form id="chartForm">
+        <div class="grid">
+          <label>
+            <span>Name</span>
+            <input type="text" id="name" placeholder="Test User" required />
+          </label>
+
+          <label>
+            <span>Date</span>
+            <input type="date" id="date" required />
+          </label>
+
+          <label>
+            <span>Time</span>
+            <input type="text" id="time" placeholder="HH:MM (24h) e.g. 23:10" required/>
+          </label>
+
+          <label>
+            <span>Place</span>
+            <input type="text" id="place" placeholder="Ujjain, Madhya Pradesh, India" required />
+          </label>
+
+          <label>
+            <span>Ayanamsa</span>
+            <select id="ayanamsa">
+              <option value="lahiri" selected>Lahiri</option>
+              <option value="raman">Raman</option>
+              <option value="krishnamurti">Krishnamurti</option>
+            </select>
+          </label>
+
+          <label>
+            <span>API Base URL</span>
+            <input type="text" id="apiBase" placeholder="Defaults to current server or http://127.0.0.1:8001" />
+          </label>
+        </div>
+
+        <button type="submit" id="submitBtn">Calculate Chart</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Response</h2>
+      <div id="status" class="status"></div>
+      <pre id="output">Results will appear here...</pre>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
