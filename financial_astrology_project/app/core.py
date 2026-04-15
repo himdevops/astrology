@@ -19,7 +19,7 @@ PLANETS = {
     "Mars": swe.MARS,
     "Jupiter": swe.JUPITER,
     "Saturn": swe.SATURN,
-    "Rahu": swe.MEAN_NODE,
+    "Rahu": swe.TRUE_NODE,
 }
 
 SIGNS = [
