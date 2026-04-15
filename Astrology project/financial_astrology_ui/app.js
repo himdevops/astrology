@@ -6,7 +6,7 @@
 
 function getApiBase(inputId) {
   const val = document.getElementById(inputId)?.value?.trim().replace(/\/$/, '');
-  return val || (window.location.protocol === 'file:' ? 'http://127.0.0.1:8001' : window.location.origin);
+  return val || (window.location.protocol === 'file:' ? 'http://127.0.0.1:8010' : window.location.origin);
 }
 
 function setStatus(id, type, msg) {
@@ -669,7 +669,7 @@ document.getElementById('alertForm').addEventListener('submit', async (e) => {
   } catch (err) {
     setStatus('alertStatus', 'error', '❌ ' + err.message);
   } finally { hideLoading(); }
-}
+});
 
 function renderAlerts(data) {
   const el = document.getElementById('alertResults');
