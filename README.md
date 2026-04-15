@@ -1,0 +1,2 @@
+# astrology
+Financia astrology setup 
