@@ -1,11 +1,11 @@
 """
 himanshu_sarvatobhdra.py  —  Traditional Sarvatobhadra Chakra Grid Engine
-9×9 grid with correct traditional placement:
+9×9 grid with correct traditional placement (per Shyam S Kansal / Khemraj):
   Ring 1 (outer perimeter): 28 Nakshatras (27 + Abhijit) + 4 directional corners
-  Ring 2 (7×7 perimeter)  : 12 Rashis (2 cells each)
-  Ring 3 (5×5 perimeter)  : 30 Tithis (16 cells, spaced)
-  Ring 4 (3×3 perimeter)  : 7 Varas (weekdays)
-  Center (1 cell)         : Special anchor
+  Ring 2 (7×7 perimeter)  : 20 Consonant aksharas + 4 diagonal svaras
+  Ring 3 (5×5 perimeter)  : 12 Rashis (1 per rashi) + 4 diagonal svaras
+  Ring 4 (3×3 perimeter)  : 5 Vara cells (weekdays grouped by tithi type)
+  Center (1 cell)         : Brahma / Saturday / Poorna
 """
 from __future__ import annotations
 
@@ -52,6 +52,12 @@ RASHIS_12 = [
     "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces",
 ]
 
+RASHI_HINDI: Dict[str, str] = {
+    "Aries": "मेष", "Taurus": "वृष", "Gemini": "मिथुन", "Cancer": "कर्क",
+    "Leo": "सिंह", "Virgo": "कन्या", "Libra": "तुला", "Scorpio": "वृश्चिक",
+    "Sagittarius": "धनु", "Capricorn": "मकर", "Aquarius": "कुंभ", "Pisces": "मीन",
+}
+
 # 28 Nakshatras for SBC (includes Abhijit between Uttara Ashadha & Shravana)
 NAKSHATRAS_28 = [
     "Ashwini","Bharani","Krittika","Rohini","Mrigashira","Ardra","Punarvasu",
@@ -62,6 +68,76 @@ NAKSHATRAS_28 = [
 ]
 
 AKSHARAS_16 = ["A","Ka","Cha","Ta","Tha","Pa","Ya","Sha","Ra","La","Va","Sa","Ha","Ksha","Tra","Gya"]
+
+# ─────────────────────────────────────────────────────────────
+# Nakshatra Pada Sounds (syllables for each pada 1-4)
+# Traditional syllables used in naming; per Shyam S Kansal reference
+# ─────────────────────────────────────────────────────────────
+NAKSHATRA_PADA_SOUNDS: Dict[str, List[str]] = {
+    "Ashwini":            ["Chu", "Che", "Cho", "La"],
+    "Bharani":            ["Li",  "Lu",  "Le",  "Lo"],
+    "Krittika":           ["Aa",  "Ei",  "Ou",  "Ae"],
+    "Rohini":             ["O",   "Va",  "Vi",  "Vu"],
+    "Mrigashira":         ["Ve",  "Vo",  "Ka",  "Ki"],
+    "Ardra":              ["Ku",  "Gha", "Ng",  "Chha"],
+    "Punarvasu":          ["Ke",  "Ko",  "Ha",  "Hi"],
+    "Pushya":             ["Hu",  "He",  "Ho",  "Da"],
+    "Ashlesha":           ["Di",  "Du",  "De",  "Do"],
+    "Magha":              ["Ma",  "Mi",  "Mu",  "Me"],
+    "Purva Phalguni":     ["Mo",  "Ta",  "Ti",  "Tu"],
+    "Uttara Phalguni":    ["Te",  "To",  "Pa",  "Pi"],
+    "Hasta":              ["Pu",  "Sha", "Na",  "Tha"],
+    "Chitra":             ["Pe",  "Po",  "Ra",  "Ri"],
+    "Swati":              ["Ru",  "Re",  "Ro",  "Ta"],
+    "Vishakha":           ["Ti",  "Tu",  "Te",  "To"],
+    "Anuradha":           ["Na",  "Ni",  "Nu",  "Ne"],
+    "Jyeshtha":           ["No",  "Ya",  "Yi",  "Yu"],
+    "Mula":               ["Ye",  "Yo",  "Bha", "Bhi"],
+    "Purva Ashadha":      ["Bhu", "Dha", "Pha", "Dha"],
+    "Uttara Ashadha":     ["Bhe", "Bho", "Ja",  "Ji"],
+    "Abhijit":            ["Ju",  "Je",  "Jo",  "Gha"],
+    "Shravana":           ["Khi", "Khu", "Khe", "Kho"],
+    "Dhanishtha":         ["Ga",  "Gi",  "Gu",  "Ge"],
+    "Shatabhisha":        ["Go",  "Sa",  "Si",  "Su"],
+    "Purva Bhadrapada":   ["Se",  "So",  "Da",  "Di"],
+    "Uttara Bhadrapada":  ["Du",  "Tha", "Jha", "Da"],
+    "Revati":             ["De",  "Tho", "Cha", "Chi"],
+}
+
+# ─────────────────────────────────────────────────────────────
+# 16 Svaras (vowels) at diagonal corner positions (Shloka 5)
+# "अकारादि १६ स्वर ईशानादि चारों कोण दिशाओं के कोठों में"
+# Each diagonal has 4 vowels from outer corner inward to center.
+# ─────────────────────────────────────────────────────────────
+SVARAS_16 = ['अ','आ','इ','ई','उ','ऊ','ऋ','ॠ','ऌ','ॡ','ए','ऐ','ओ','औ','अं','अः']
+
+SVARA_POSITIONS: Dict[Tuple[int,int], str] = {
+    # ईशान (NE) diagonal — (0,0)→(1,1)→(2,2)→(3,3)
+    (0,0): 'अ',  (1,1): 'उ',  (2,2): 'ऌ',  (3,3): 'ओ',
+    # अग्नि (SE) diagonal — (0,8)→(1,7)→(2,6)→(3,5)
+    (0,8): 'आ',  (1,7): 'ऊ',  (2,6): 'ॡ',  (3,5): 'औ',
+    # नैऋत्य (SW) diagonal — (8,8)→(7,7)→(6,6)→(5,5)
+    (8,8): 'इ',  (7,7): 'ऋ',  (6,6): 'ए',  (5,5): 'अं',
+    # वायव्य (NW) diagonal — (8,0)→(7,1)→(6,2)→(5,3)
+    (8,0): 'ई',  (7,1): 'ॠ',  (6,2): 'ऐ',  (5,3): 'अः',
+}
+
+# ─────────────────────────────────────────────────────────────
+# 20 Consonant aksharas on the second ring (Shloka 7)
+# "अवकहड ये ५ पूर्व में; मटपरत ये ५ दक्षिण में;
+#  नयभजख ये ५ पश्चिम में; गसदचल ये ५ उत्तर में"
+# These replace rashi name labels at non-diagonal second-ring cells.
+# ─────────────────────────────────────────────────────────────
+CONSONANT_POSITIONS: Dict[Tuple[int,int], str] = {
+    # पूर्व / East (top row, second ring non-corner cells)
+    (1,2): 'अ',  (1,3): 'व',  (1,4): 'क',  (1,5): 'ह',  (1,6): 'ड',
+    # दक्षिण / South-Dakshin (right col, second ring non-corner cells)
+    (2,7): 'म',  (3,7): 'ट',  (4,7): 'प',  (5,7): 'र',  (6,7): 'त',
+    # पश्चिम / West (bottom row, second ring non-corner cells)
+    (7,6): 'न',  (7,5): 'य',  (7,4): 'भ',  (7,3): 'ज',  (7,2): 'ख',
+    # उत्तर / North (left col, second ring non-corner cells)
+    (6,1): 'ग',  (5,1): 'स',  (4,1): 'द',  (3,1): 'च',  (2,1): 'ल',
+}
 
 # ─────────────────────────────────────────────────────────────
 # Traditional outer-ring nakshatra positions (row, col) → name
@@ -97,61 +173,61 @@ ZONE_MAP: Dict[str, str] = {
 }
 
 # ─────────────────────────────────────────────────────────────
-# Second ring (7×7 perimeter) → Rashis
-# Clockwise from (1,1), 2 cells per rashi
+# Second ring (7×7 perimeter) — aksharas only (consonants + svaras)
+# Rashis are NOT placed here; the second ring has 20 consonants
+# at non-diagonal positions + 4 svaras at diagonal positions.
 # ─────────────────────────────────────────────────────────────
-def _second_ring_clockwise() -> List[Tuple[int,int]]:
-    """Return (row,col) list of 7×7 perimeter in clockwise order."""
-    cells = []
-    # top: (1,1)→(1,7)
-    for c in range(1, 8): cells.append((1, c))
-    # right: (2,7)→(7,7)
-    for r in range(2, 8): cells.append((r, 7))
-    # bottom: (7,6)→(7,1)
-    for c in range(6, 0, -1): cells.append((7, c))
-    # left: (6,1)→(2,1)
-    for r in range(6, 1, -1): cells.append((r, 1))
-    return cells  # 24 cells total
-
-# Assign rashis: 2 cells each × 12 = 24 cells exactly
-_SECOND_RING = _second_ring_clockwise()
-RASHI_CELL_MAP: Dict[Tuple[int,int], str] = {}
-for _i, _rashi in enumerate(RASHIS_12):
-    RASHI_CELL_MAP[_SECOND_RING[_i * 2]]     = _rashi
-    RASHI_CELL_MAP[_SECOND_RING[_i * 2 + 1]] = _rashi
 
 # ─────────────────────────────────────────────────────────────
-# Third ring (5×5 perimeter) → Tithis (16 cells, 15 tithis + Purnima/Amavasya)
+# Third ring (5×5 perimeter) → 12 Rashis at non-diagonal positions
+# Per Shyam S Kansal / Khemraj reference:
+#   East  (top):   Tau(2,3), Gem(2,4), Can(2,5)
+#   South (right): Leo(3,6), Vir(4,6), Lib(5,6)
+#   West  (bottom): Sco(6,5), Sag(6,4), Cap(6,3)
+#   North (left):  Aqu(5,2), Pis(4,2), Ari(3,2)
+# The 4 diagonal corners of 3rd ring (2,2), (2,6), (6,6), (6,2)
+# have svaras (ऌ, ॡ, ए, ऐ) — placed by _place_svaras().
 # ─────────────────────────────────────────────────────────────
-def _third_ring_clockwise() -> List[Tuple[int,int]]:
-    cells = []
-    for c in range(2, 7): cells.append((2, c))
-    for r in range(3, 7): cells.append((r, 6))
-    for c in range(5, 1, -1): cells.append((6, c))
-    for r in range(5, 2, -1): cells.append((r, 2))
-    return cells  # 16 cells
-
-_THIRD_RING = _third_ring_clockwise()
-TITHI_CELL_MAP: Dict[Tuple[int,int], str] = {}
-_SELECTED_TITHIS = [TITHIS_30[i] for i in [0,2,4,6,8,10,12,14,15,17,19,21,23,25,27,29]]
-for _i, _cell in enumerate(_THIRD_RING):
-    TITHI_CELL_MAP[_cell] = _SELECTED_TITHIS[_i % len(_SELECTED_TITHIS)]
+RASHI_CELL_MAP: Dict[Tuple[int,int], str] = {
+    # East / top of 3rd ring
+    (2,3): "Taurus",    (2,4): "Gemini",     (2,5): "Cancer",
+    # South / right of 3rd ring
+    (3,6): "Leo",       (4,6): "Virgo",      (5,6): "Libra",
+    # West / bottom of 3rd ring
+    (6,5): "Scorpio",   (6,4): "Sagittarius",(6,3): "Capricorn",
+    # North / left of 3rd ring
+    (5,2): "Aquarius",  (4,2): "Pisces",     (3,2): "Aries",
+}
 
 # ─────────────────────────────────────────────────────────────
-# Fourth ring (3×3 perimeter) → Varas (8 cells, 7 days + 1 repeat)
+# Fourth ring → Varas grouped by Tithi type (Shlokas 9-10)
+# "भौमादित्यौ च नन्दायां भद्रायां बुधशीतगु ।
+#  जयायां च गुरुःप्रोक्तो रिक्तायां भार्गवस्तथा ।
+#  पूर्णायां शनिवारश्च ।"
+# Each tithi group → direction → weekday(s):
+#   Nanda (1,6,11) → East  → Sun, Tue
+#   Bhadra (2,7,12) → Dakshin → Mon, Wed
+#   Jaya (3,8,13) → West  → Thu
+#   Rikta (4,9,14) → North → Fri
+#   Poorna (5,10,15/30) → Center → Sat
+# Corner cells of 3×3 ring have svaras (placed later by _place_svaras).
 # ─────────────────────────────────────────────────────────────
-def _fourth_ring_clockwise() -> List[Tuple[int,int]]:
-    cells = []
-    for c in range(3, 6): cells.append((3, c))
-    cells.append((4, 5)); cells.append((5, 5))
-    for c in range(4, 2, -1): cells.append((5, c))  # (5,4),(5,3)
-    cells.append((4, 3))
-    return cells  # 8 cells
+VARA_CELL_MAP: Dict[Tuple[int,int], List[str]] = {
+    (3,4): ["Sunday", "Tuesday"],       # Nanda   → East  (पूर्व)
+    (4,5): ["Monday", "Wednesday"],     # Bhadra  → Dakshin (दक्षिण)
+    (5,4): ["Thursday"],                # Jaya    → West  (पश्चिम)
+    (4,3): ["Friday"],                  # Rikta   → North (उत्तर)
+    (4,4): ["Saturday"],                # Poorna  → Center (मध्य)
+}
 
-_FOURTH_RING = _fourth_ring_clockwise()
-VARA_CELL_MAP: Dict[Tuple[int,int], str] = {}
-for _i, _cell in enumerate(_FOURTH_RING):
-    VARA_CELL_MAP[_cell] = WEEKDAYS[_i % 7]
+# Tithi group name + tithi numbers for each vara cell
+VARA_TITHI_GROUP: Dict[Tuple[int,int], Dict[str, str]] = {
+    (3,4): {"name": "Nanda",  "tithis": "1,6,11"},
+    (4,5): {"name": "Bhadra", "tithis": "2,7,12"},
+    (5,4): {"name": "Jaya",   "tithis": "3,8,13"},
+    (4,3): {"name": "Rikta",  "tithis": "4,9,14"},
+    (4,4): {"name": "Poorna", "tithis": "5,10,15/30"},
+}
 
 CENTER_CELL = (4, 4)
 
@@ -253,9 +329,9 @@ class SarvatobhadraChakra:
         self._place_nakshatras()
         self._place_corners()
         self._place_rashis()
-        self._place_tithis()
         self._place_varas()
         self._place_center()
+        self._place_svaras()  # Last: vowels override labels at diagonal positions
 
     def _register_entity(self, row: int, col: int, entity: ChakraEntity) -> None:
         self.grid[row][col].add_entity(entity)
@@ -264,8 +340,10 @@ class SarvatobhadraChakra:
 
     def _place_nakshatras(self) -> None:
         for (r, c), name in OUTER_NAK_POSITIONS.items():
+            pada_sounds = NAKSHATRA_PADA_SOUNDS.get(name, [])
             entity = ChakraEntity(name=name, entity_type=EntityType.NAKSHATRA,
-                                  meta={"direction": _cell_direction(r, c)})
+                                  meta={"direction": _cell_direction(r, c),
+                                        "pada_sounds": pada_sounds})
             self._register_entity(r, c, entity)
             self.grid[r][c].label = name
 
@@ -279,33 +357,59 @@ class SarvatobhadraChakra:
             self.grid[r][c].label = label
 
     def _place_rashis(self) -> None:
+        """Place 12 rashis in the 3rd ring (5×5 perimeter, non-diagonal cells)."""
         for (r, c), name in RASHI_CELL_MAP.items():
+            hindi = RASHI_HINDI.get(name, "")
             entity = ChakraEntity(name=name, entity_type=EntityType.RASHI,
-                                  meta={"rashi_index": RASHIS_12.index(name) + 1})
+                                  meta={"rashi_index": RASHIS_12.index(name) + 1,
+                                        "hindi": hindi})
             self._register_entity(r, c, entity)
-            if not self.grid[r][c].label:
-                self.grid[r][c].label = name
-
-    def _place_tithis(self) -> None:
-        for (r, c), name in TITHI_CELL_MAP.items():
-            entity = ChakraEntity(name=name, entity_type=EntityType.TITHI, meta={})
-            self._register_entity(r, c, entity)
-            if not self.grid[r][c].label:
-                self.grid[r][c].label = name[:12]
+            self.grid[r][c].label = name
 
     def _place_varas(self) -> None:
-        for (r, c), name in VARA_CELL_MAP.items():
-            entity = ChakraEntity(name=name, entity_type=EntityType.VARA, meta={})
-            self._register_entity(r, c, entity)
-            if not self.grid[r][c].label:
-                self.grid[r][c].label = name
+        for (r, c), days in VARA_CELL_MAP.items():
+            tithi_info = VARA_TITHI_GROUP.get((r, c), {})
+            for day in days:
+                entity = ChakraEntity(name=day, entity_type=EntityType.VARA,
+                                      meta={"tithi_group": tithi_info.get("name", ""),
+                                            "tithi_numbers": tithi_info.get("tithis", "")})
+                self._register_entity(r, c, entity)
+            # Label: "Sun,Tue" or single day
+            day_abbrs = ",".join(d[:3] for d in days)
+            group_name = tithi_info.get("name", "")
+            group_tithis = tithi_info.get("tithis", "")
+            self.grid[r][c].label = day_abbrs
+            # Store tithi group info in cell meta for frontend
+            self.grid[r][c].entities[-1].meta["display_label"] = day_abbrs
+            self.grid[r][c].entities[-1].meta["group_label"] = f"{group_name} {group_tithis}"
 
     def _place_center(self) -> None:
         r, c = CENTER_CELL
-        entity = ChakraEntity(name="Brahma (Center)", entity_type=EntityType.SPECIAL,
-                               meta={"description": "Central Brahma cell — most powerful position"})
+        entity = ChakraEntity(name="Brahma", entity_type=EntityType.SPECIAL,
+                               meta={"description": "Central Brahma cell — Poorna → Saturday"})
         self._register_entity(r, c, entity)
-        self.grid[r][c].label = "✦ Center"
+        self.grid[r][c].label = "Sat"
+
+    def _place_svaras(self) -> None:
+        """Place 16 svaras (vowels) at diagonal positions AND
+        20 consonant aksharas at non-diagonal second-ring positions.
+        These override the display label but preserve underlying entities."""
+        # 1) 16 svaras at diagonal corners
+        for (r, c), svara in SVARA_POSITIONS.items():
+            entity = ChakraEntity(name=svara, entity_type=EntityType.AKSHARA,
+                                  meta={"svara": True, "diagonal": True})
+            self.grid[r][c].entities.insert(0, entity)
+            key = (EntityType.AKSHARA, svara)
+            self.entity_index[key] = (r, c)
+            self.grid[r][c].label = svara
+        # 2) 20 consonant aksharas on second ring (replaces rashi name labels)
+        for (r, c), akshara in CONSONANT_POSITIONS.items():
+            entity = ChakraEntity(name=akshara, entity_type=EntityType.AKSHARA,
+                                  meta={"svara": False, "consonant": True})
+            self.grid[r][c].entities.insert(0, entity)
+            key = (EntityType.AKSHARA, akshara + f"_{r}_{c}")
+            self.entity_index[key] = (r, c)
+            self.grid[r][c].label = akshara
 
     # ── Lookup helpers ───────────────────────────────────────
 

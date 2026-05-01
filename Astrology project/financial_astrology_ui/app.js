@@ -536,8 +536,8 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
     }
 
     /* ── Zone / entity-type colour maps (Parashara's Light palette) */
-    const ZONE_BG   = { outer:'#d8c8f0', second:'#f5e6a3', third:'#f5c09a', fourth:'#a8e6a0', center:'#ffe0b0' };
-    const ZONE_TEXT  = { outer:'#3a2878', second:'#6b4e00', third:'#7a3a10', fourth:'#1a5a10', center:'#8b4513' };
+    const ZONE_BG   = { outer:'#d8c8f0', second:'#f5e6a3', third:'#f8f0a0', fourth:'#a8e6a0', center:'#ffe0b0' };
+    const ZONE_TEXT  = { outer:'#3a2878', second:'#6b4e00', third:'#6b4e00', fourth:'#1a5a10', center:'#8b4513' };
     const TYPE_BG    = { nakshatra:'#d8c8f0', rashi:'#f5e6a3', tithi:'#f5c09a', vara:'#a8e6a0', corner:'#e8e0d0', special:'#ffe0b0', empty:'#f8f4ee' };
     const TYPE_TEXT   = { nakshatra:'#3a2878', rashi:'#6b4e00', tithi:'#7a3a10', vara:'#1a5a10', corner:'#555', special:'#8b4513', empty:'#999' };
 
@@ -551,20 +551,54 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
         'ati_mitra':'#087f5b','parama_mitra':'#099268'
     };
 
-    /* ── Devanagari aksharas for traditional SBC positions ───── */
+    /* ── 16 Svaras (vowels) at diagonal positions per Khemraj Shloka 5 ─ */
+    /* ── 20 Consonant aksharas on second ring per Shloka 7 ───────────── */
     const SBC_AKSHARAS = {
-        '0,0':'अ', '0,8':'आ', '8,0':'ऊ', '8,8':'ॠ',
-        '1,1':'उ', '1,7':'ऊ', '7,1':'ज', '7,7':'ए',
-        '2,2':'ल', '2,6':'म', '3,3':'ओ', '3,5':'औ',
-        '4,3':'द', '4,5':'प', '5,3':'अः', '5,5':'अं',
-        '6,2':'ग', '6,6':'र', '4,4':'✦'
+        // ── 16 Svaras (vowels) at diagonals ──
+        '0,0':'अ', '1,1':'उ', '2,2':'ऌ', '3,3':'ओ',   // ईशान (NE)
+        '0,8':'आ', '1,7':'ऊ', '2,6':'ॡ', '3,5':'औ',   // अग्नि (SE)
+        '8,8':'इ', '7,7':'ऋ', '6,6':'ए', '5,5':'अं',   // नैऋत्य (SW)
+        '8,0':'ई', '7,1':'ॠ', '6,2':'ऐ', '5,3':'अः',   // वायव्य (NW)
+        '4,4':'✦',                                       // Brahma center
+        // ── 20 Consonants (second ring, replacing rashi names) ──
+        '1,2':'अ', '1,3':'व', '1,4':'क', '1,5':'ह', '1,6':'ड',  // East/पूर्व
+        '2,7':'म', '3,7':'ट', '4,7':'प', '5,7':'र', '6,7':'त',  // दक्षिण
+        '7,6':'न', '7,5':'य', '7,4':'भ', '7,3':'ज', '7,2':'ख',  // पश्चिम/West
+        '6,1':'ग', '5,1':'स', '4,1':'द', '3,1':'च', '2,1':'ल'   // उत्तर/North
+    };
+    /* Set of ALL akshara positions (svaras + consonants) */
+    const SBC_SVARA_SET = new Set(Object.keys(SBC_AKSHARAS));
+
+    /* ── Nakshatra Pada Sounds (syllables for each pada 1-4) ─── */
+    const PADA_SOUNDS = {
+        'Ashwini':['Chu','Che','Cho','La'], 'Bharani':['Li','Lu','Le','Lo'],
+        'Krittika':['Aa','Ei','Ou','Ae'], 'Rohini':['O','Va','Vi','Vu'],
+        'Mrigashira':['Ve','Vo','Ka','Ki'], 'Ardra':['Ku','Gha','Ng','Chha'],
+        'Punarvasu':['Ke','Ko','Ha','Hi'], 'Pushya':['Hu','He','Ho','Da'],
+        'Ashlesha':['Di','Du','De','Do'], 'Magha':['Ma','Mi','Mu','Me'],
+        'P.Phalguni':['Mo','Ta','Ti','Tu'], 'Purva Phalguni':['Mo','Ta','Ti','Tu'],
+        'U.Phalguni':['Te','To','Pa','Pi'], 'Uttara Phalguni':['Te','To','Pa','Pi'],
+        'Hasta':['Pu','Sha','Na','Tha'], 'Chitra':['Pe','Po','Ra','Ri'],
+        'Swati':['Ru','Re','Ro','Ta'], 'Vishakha':['Ti','Tu','Te','To'],
+        'Anuradha':['Na','Ni','Nu','Ne'], 'Jyeshtha':['No','Ya','Yi','Yu'],
+        'Mula':['Ye','Yo','Bha','Bhi'],
+        'P.Ashadha':['Bhu','Dha','Pha','Dha'], 'Purva Ashadha':['Bhu','Dha','Pha','Dha'],
+        'U.Ashadha':['Bhe','Bho','Ja','Ji'], 'Uttara Ashadha':['Bhe','Bho','Ja','Ji'],
+        'Abhijit':['Ju','Je','Jo','Gha'],
+        'Shravana':['Khi','Khu','Khe','Kho'], 'Dhanishtha':['Ga','Gi','Gu','Ge'],
+        'Shatabhisha':['Go','Sa','Si','Su'],
+        'P.Bhadrapada':['Se','So','Da','Di'], 'Purva Bhadrapada':['Se','So','Da','Di'],
+        'U.Bhadrapada':['Du','Tha','Jha','Da'], 'Uttara Bhadrapada':['Du','Tha','Jha','Da'],
+        'Revati':['De','Tho','Cha','Chi']
     };
 
     /* ── Outer-ring nakshatra order for info strips ──────────── */
     const TOP_NAK   = ['Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha'];
     const RIGHT_NAK = ['Magha','P.Phalguni','U.Phalguni','Hasta','Chitra','Swati','Vishakha'];
-    const BOT_NAK   = ['Anuradha','Jyeshtha','Mula','P.Ashadha','U.Ashadha','Abhijit','Shravana'];
-    const LEFT_NAK  = ['Dhanishtha','Shatabhisha','P.Bhadrapada','U.Bhadrapada','Revati','Ashwini','Bharani'];
+    /* Bottom row: grid col1=Shravana → col7=Anuradha (left to right) */
+    const BOT_NAK   = ['Shravana','Abhijit','U.Ashadha','P.Ashadha','Mula','Jyeshtha','Anuradha'];
+    /* Left col: grid row1=Bharani → row7=Dhanishtha (top to bottom) */
+    const LEFT_NAK  = ['Bharani','Ashwini','Revati','U.Bhadrapada','P.Bhadrapada','Shatabhisha','Dhanishtha'];
 
     /* ── Build a set of afflicted (row,col) for vedha ────────── */
     const afflictedSet = new Set();
@@ -641,30 +675,25 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
     }
 
     /* ── Build info strip HTML for a list of nakshatras ──────── */
+    /* Kansal-style with GRID ALIGNMENT:
+       - Spacer cells/rows for corner positions (grid cols 0,8 / rows 0,8)
+       - Each nak's 4 padas align exactly with its grid cell
+       Horizontal: 1 spacer col + 7×4 pada cols + 1 spacer col = matches 9 grid cols
+       Vertical:   1 spacer row + 7×4 pada rows + 1 spacer row = matches 9 grid rows */
     function buildInfoStrip(nakList, orientation, side){
         var isVert = orientation === 'vertical';
         var isLeft = side === 'left';
-        var isRight = side === 'right';
 
         if(isVert){
-            /* Vertical strips — Parashara's Light style:
-               Left side:  4 3 2 1 | T# | Nak  (padas closest to grid on right edge)
-               Right side: Nak | T# | 1 2 3 4  (padas closest to grid on left edge) */
-            var rows = '';
-            /* Header row */
-            rows += '<div class="sbc-strip-row-v sbc-strip-hdr-row">';
-            if(isLeft){
-                rows += '<div class="sbc-sv-hdr sbc-sv-ph">4</div><div class="sbc-sv-hdr sbc-sv-ph">3</div>';
-                rows += '<div class="sbc-sv-hdr sbc-sv-ph">2</div><div class="sbc-sv-hdr sbc-sv-ph">1</div>';
-                rows += '<div class="sbc-sv-hdr">T#</div><div class="sbc-sv-hdr">Nak</div>';
-            } else {
-                rows += '<div class="sbc-sv-hdr">Nak</div><div class="sbc-sv-hdr">T#</div>';
-                rows += '<div class="sbc-sv-hdr sbc-sv-ph">1</div><div class="sbc-sv-hdr sbc-sv-ph">2</div>';
-                rows += '<div class="sbc-sv-hdr sbc-sv-ph">3</div><div class="sbc-sv-hdr sbc-sv-ph">4</div>';
-            }
-            rows += '</div>';
+            /* ── Vertical strips — aligned with grid rows 1-7 ───── */
+            /* Each nak → 4 sub-rows. Spacer rows at top/bottom for corner rows. */
+            var numCols = isLeft ? 3 : 3; /* Nak | T# | Pada  OR  Pada | T# | Nak */
+            var html = '<table class="sbc-strip-vtable">';
 
-            /* 7 nakshatra rows */
+            /* Top spacer row — matches grid row 0 (corner) */
+            html += '<tr class="sbc-vstrip-spacer"><td colspan="'+numCols+'" style="height:calc(100%/9)"></td></tr>';
+
+            /* 7 nakshatras × 4 sub-rows each */
             nakList.forEach(function(nak){
                 var navInfo = getNavataraFor(nak);
                 var taraNum = navInfo ? (navInfo.tara_number || '—') : '—';
@@ -673,68 +702,98 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 var qColor = quality === 'auspicious' ? '#22aa22' : quality === 'inauspicious' ? '#dd3333' : '#aa8800';
                 var shortNak = nak.length > 9 ? nak.slice(0,8)+'.' : nak;
                 var isVedha = isNakVedhaAffected(nak);
-                var rowCls = isVedha ? ' sbc-sv-vedha' : '';
                 var taraSign = quality === 'auspicious' ? '+' : quality === 'inauspicious' ? '-' : '';
+                var padaSounds = PADA_SOUNDS[nak] || PADA_SOUNDS[NAK_FULL_NAMES[nak]] || ['1','2','3','4'];
+                var vedCls = isVedha ? ' sbc-sv-vedha' : '';
 
-                rows += '<div class="sbc-strip-row-v'+rowCls+'">';
-                if(isLeft){
-                    /* Padas 4,3,2,1 then T# then Nak */
-                    for(var p=4; p>=1; p--){
-                        var pCls = isVedha ? ' sbc-pada-hit' : '';
-                        rows += '<div class="sbc-sv-cell sbc-sv-pada'+pCls+'">'+p+'</div>';
+                for(var p = 0; p < 4; p++){
+                    var pCls = isVedha ? ' sbc-pada-hit' : '';
+                    html += '<tr class="sbc-sv-subrow'+vedCls+'">';
+                    if(isLeft){
+                        if(p === 0){
+                            html += '<td class="sbc-sv-nak" rowspan="4" title="'+nak+'">'+shortNak+'</td>';
+                            html += '<td class="sbc-sv-tara" rowspan="4" style="color:'+qColor+'" title="'+taraName+'">'+taraNum+taraSign+'</td>';
+                        }
+                        html += '<td class="sbc-sv-pada'+pCls+'" title="Pada '+(p+1)+'">'+padaSounds[p]+'</td>';
+                    } else {
+                        html += '<td class="sbc-sv-pada'+pCls+'" title="Pada '+(p+1)+'">'+padaSounds[p]+'</td>';
+                        if(p === 0){
+                            html += '<td class="sbc-sv-tara" rowspan="4" style="color:'+qColor+'" title="'+taraName+'">'+taraNum+taraSign+'</td>';
+                            html += '<td class="sbc-sv-nak" rowspan="4" title="'+nak+'">'+shortNak+'</td>';
+                        }
                     }
-                    rows += '<div class="sbc-sv-cell sbc-sv-tara" style="color:'+qColor+'" title="'+taraName+'">'+taraNum+taraSign+'</div>';
-                    rows += '<div class="sbc-sv-cell sbc-sv-nak" title="'+nak+'">'+shortNak+'</div>';
-                } else {
-                    /* Nak then T# then Padas 1,2,3,4 */
-                    rows += '<div class="sbc-sv-cell sbc-sv-nak" title="'+nak+'">'+shortNak+'</div>';
-                    rows += '<div class="sbc-sv-cell sbc-sv-tara" style="color:'+qColor+'" title="'+taraName+'">'+taraNum+taraSign+'</div>';
-                    for(var p=1; p<=4; p++){
-                        var pCls = isVedha ? ' sbc-pada-hit' : '';
-                        rows += '<div class="sbc-sv-cell sbc-sv-pada'+pCls+'">'+p+'</div>';
-                    }
+                    html += '</tr>';
                 }
-                rows += '</div>';
             });
-            /* Spacer for grid row 8 */
-            rows += '<div class="sbc-strip-spacer"></div>';
-            return '<div class="sbc-strip-col">'+rows+'</div>';
+
+            /* Bottom spacer row — matches grid row 8 (corner) */
+            html += '<tr class="sbc-vstrip-spacer"><td colspan="'+numCols+'" style="height:calc(100%/9)"></td></tr>';
+
+            html += '</table>';
+            return html;
         }
 
-        /* ── Horizontal strips (top/bottom) ───────────────────── */
-        /* Parashara's Light style: Nak row, Tara# row, then Pd 1-4 rows */
-        var html = '<table class="sbc-strip-table">';
+        /* ── Horizontal strips — aligned with grid cols 1-7 ───── */
+        /* Layout: 1 spacer col (for corner col 0) + 7×4 pada cols + 1 spacer col (corner col 8)
+           Total: 30 sub-cols. Spacer = 4/30 width, each pada = 1/30 width → alignment matches. */
+        var html = '<table class="sbc-strip-table sbc-strip-subcol">';
+
+        /* Colgroup for precise widths:
+           - 1 spacer col = 1/9 of width
+           - 28 pada cols = 7/9 of width (each = 1/36)
+           - 1 spacer col = 1/9 of width */
+        html += '<colgroup>';
+        html += '<col class="sbc-sh-spacer-col">';
+        for(var i = 0; i < 28; i++) html += '<col class="sbc-sh-pada-col">';
+        html += '<col class="sbc-sh-spacer-col">';
+        html += '</colgroup>';
 
         /* Nak header row */
-        html += '<tr><td class="sbc-sh-label"></td>';
+        html += '<tr>';
+        html += '<td class="sbc-sh-corner" rowspan="4"></td>';
         nakList.forEach(function(nak){
             var shortNak = nak.length > 9 ? nak.slice(0,8)+'.' : nak;
-            html += '<td class="sbc-sh-hdr sbc-sh-nak" title="'+nak+'">'+shortNak+'</td>';
+            html += '<td class="sbc-sh-hdr sbc-sh-nak" colspan="4" title="'+nak+'">'+shortNak+'</td>';
         });
+        html += '<td class="sbc-sh-corner" rowspan="4"></td>';
         html += '</tr>';
 
         /* Tara# row */
-        html += '<tr><td class="sbc-sh-label">Tara#</td>';
+        html += '<tr>';
         nakList.forEach(function(nak){
             var navInfo = getNavataraFor(nak);
             var taraNum = navInfo ? (navInfo.tara_number || '—') : '—';
             var quality = navInfo ? (navInfo.quality || 'neutral') : 'neutral';
             var qColor = quality === 'auspicious' ? '#22aa22' : quality === 'inauspicious' ? '#dd3333' : '#aa8800';
+            var taraName = navInfo ? (navInfo.tara || '') : '';
             var taraSign = quality === 'auspicious' ? '+' : quality === 'inauspicious' ? '-' : '';
-            html += '<td class="sbc-sh-cell sbc-sh-tara" style="color:'+qColor+'">'+taraNum+taraSign+'</td>';
+            html += '<td class="sbc-sh-cell sbc-sh-tara" colspan="4" style="color:'+qColor+'" title="'+taraName+'">'+taraNum+taraSign+'</td>';
         });
         html += '</tr>';
 
-        /* Pada rows (1-4) */
-        for(var p=1; p<=4; p++){
-            html += '<tr><td class="sbc-sh-label">Pd '+p+'</td>';
-            nakList.forEach(function(nak){
-                var isVedha = isNakVedhaAffected(nak);
+        /* Pada sound row */
+        html += '<tr>';
+        nakList.forEach(function(nak){
+            var isVedha = isNakVedhaAffected(nak);
+            var padaSounds = PADA_SOUNDS[nak] || PADA_SOUNDS[NAK_FULL_NAMES[nak]] || ['1','2','3','4'];
+            for(var p = 0; p < 4; p++){
                 var padaCls = isVedha ? ' sbc-pada-hit' : '';
-                html += '<td class="sbc-sh-cell sbc-sh-pada'+padaCls+'">'+p+'</td>';
-            });
-            html += '</tr>';
-        }
+                html += '<td class="sbc-sh-cell sbc-sh-pada'+padaCls+'" title="'+nak+' Pada '+(p+1)+'">'+padaSounds[p]+'</td>';
+            }
+        });
+        html += '</tr>';
+
+        /* Pada number row */
+        html += '<tr>';
+        nakList.forEach(function(nak){
+            var isVedha = isNakVedhaAffected(nak);
+            for(var p = 1; p <= 4; p++){
+                var padaCls = isVedha ? ' sbc-pada-hit' : '';
+                html += '<td class="sbc-sh-cell sbc-sh-padnum'+padaCls+'" title="Pada '+p+'">'+p+'</td>';
+            }
+        });
+        html += '</tr>';
+
         html += '</table>';
         return html;
     }
@@ -761,33 +820,30 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
             .sbc-strip-left{grid-column:1/2;grid-row:2/3;display:flex;align-items:stretch}
             .sbc-strip-right{grid-column:3/4;grid-row:2/3;display:flex;align-items:stretch}
 
-            /* Vertical strip (left/right) — Parashara's Light style */
-            .sbc-strip-col{display:grid;grid-template-rows:auto repeat(7,1fr) auto;width:100%;height:100%}
-            .sbc-strip-col .sbc-strip-row-v{display:grid;grid-template-columns:22px 22px 22px 22px 28px 68px;gap:0;align-items:center;border-bottom:1px solid rgba(212,168,67,0.12)}
-            .sbc-strip-left .sbc-strip-col .sbc-strip-row-v{grid-template-columns:22px 22px 22px 22px 28px 68px}
-            .sbc-strip-right .sbc-strip-col .sbc-strip-row-v{grid-template-columns:68px 28px 22px 22px 22px 22px}
-            .sbc-strip-col .sbc-strip-hdr-row{background:rgba(26,26,46,0.9);border-bottom:1px solid rgba(212,168,67,0.3)}
-            .sbc-strip-col .sbc-strip-spacer{}
-            .sbc-sv-hdr{font-size:0.6rem;font-weight:700;color:#d4a843;text-align:center;padding:3px 2px}
-            .sbc-sv-ph{font-size:0.6rem;font-weight:700;color:#d4a843;background:rgba(212,168,67,0.08)}
-            .sbc-sv-cell{font-size:0.65rem;padding:3px 2px;color:#c8b880;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-            .sbc-sv-nak{font-weight:600;color:#e0d8c0;padding:2px 4px;font-size:0.62rem}
+            /* Vertical strip (left/right) — aligned with grid rows */
+            .sbc-strip-vtable{border-collapse:collapse;border-spacing:0;width:auto;height:100%}
+            .sbc-strip-vtable td{padding:0px 2px;border:1px solid rgba(212,168,67,0.12);vertical-align:middle;line-height:1.15}
+            .sbc-vstrip-spacer td{border:none;background:transparent}
+            .sbc-sv-nak{font-weight:600;color:#e0d8c0;font-size:0.55rem;white-space:nowrap;padding:1px 3px;text-align:center}
             .sbc-strip-left .sbc-sv-nak{text-align:right}
             .sbc-strip-right .sbc-sv-nak{text-align:left}
-            .sbc-sv-tara{font-weight:700;font-size:0.65rem}
-            .sbc-sv-pada{font-size:0.65rem;color:#aaa;border:1px solid rgba(212,168,67,0.1);background:rgba(255,255,255,0.02);min-height:100%}
-            .sbc-sv-vedha{background:rgba(255,0,0,0.06)}
+            .sbc-sv-tara{font-weight:700;font-size:0.55rem;text-align:center;padding:1px 2px}
+            .sbc-sv-pada{font-size:0.52rem;color:#c8b880;background:rgba(255,255,255,0.02);text-align:center;padding:0px 2px;white-space:nowrap}
+            .sbc-sv-subrow{}
+            .sbc-sv-vedha td{background:rgba(255,0,0,0.06)}
             .sbc-pada-hit{background:rgba(255,50,50,0.2)!important;color:#ff6666!important;font-weight:700;border-color:rgba(255,60,60,0.3)!important}
 
-            /* Horizontal strip (top/bottom) — Parashara's Light style */
-            .sbc-strip-table{width:100%;border-collapse:collapse;border-spacing:0}
-            .sbc-strip-table td{padding:3px 2px;text-align:center;font-size:0.6rem;border:1px solid rgba(212,168,67,0.1)}
-            .sbc-sh-hdr{background:rgba(26,26,46,0.9);color:#d4a843;font-weight:700;font-size:0.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 3px}
-            .sbc-sh-nak{min-width:50px}
-            .sbc-sh-label{font-size:0.58rem;font-weight:700;color:#d4a843;background:rgba(26,26,46,0.8);padding:3px 5px;text-align:right;white-space:nowrap;width:40px}
-            .sbc-sh-cell{color:#c8b880;font-size:0.6rem}
-            .sbc-sh-tara{font-weight:700;font-size:0.62rem}
-            .sbc-sh-pada{color:#aaa;font-size:0.6rem;background:rgba(255,255,255,0.02)}
+            /* Horizontal strip (top/bottom) — aligned with grid cols via colgroup */
+            .sbc-strip-table{width:100%;border-collapse:collapse;border-spacing:0;table-layout:fixed}
+            .sbc-strip-table td{padding:2px 1px;text-align:center;font-size:0.55rem;border:1px solid rgba(212,168,67,0.1)}
+            .sbc-sh-spacer-col{width:calc(100% / 9)}
+            .sbc-sh-pada-col{width:calc(100% / 36)}
+            .sbc-sh-corner{border:none;background:transparent;padding:0}
+            .sbc-sh-hdr{background:rgba(26,26,46,0.9);color:#d4a843;font-weight:700;font-size:0.58rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:3px 1px}
+            .sbc-sh-cell{color:#c8b880;font-size:0.52rem}
+            .sbc-sh-tara{font-weight:700;font-size:0.55rem}
+            .sbc-sh-pada{color:#c8b880;font-size:0.50rem;background:rgba(255,255,255,0.02);padding:1px 0}
+            .sbc-sh-padnum{color:#888;font-size:0.46rem;background:rgba(212,168,67,0.05);padding:1px 0}
 
             /* ── Grid Wrapper ─────────────────────────────────── */
             .sbc-grid-wrap{position:relative;grid-column:2/3;grid-row:2/3}
@@ -862,7 +918,6 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 <div class="sbc-legend">
                     <span><span class="sbc-legend-dot" style="background:#d8c8f0"></span>Nakshatra</span>
                     <span><span class="sbc-legend-dot" style="background:#f5e6a3"></span>Rashi</span>
-                    <span><span class="sbc-legend-dot" style="background:#f5c09a"></span>Tithi</span>
                     <span><span class="sbc-legend-dot" style="background:#a8e6a0"></span>Vara</span>
                     <span><span class="sbc-legend-dot" style="background:#ffe0b0"></span>Center</span>
                     <span><span class="sbc-legend-dot" style="background:#1a8c1a"></span>Benefic</span>
@@ -1176,14 +1231,42 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
             /* Build cell inner HTML */
             var html = '';
 
-            /* Devanagari akshara overlay */
+            /* Devanagari svara/akshara — at diagonal positions, the vowel IS the main label */
             var aksharaKey = r+','+c;
-            if (SBC_AKSHARAS[aksharaKey]) {
-                html += '<div class="cell-akshara sbc-akshara-layer">'+SBC_AKSHARAS[aksharaKey]+'</div>';
-            }
+            var isSvaraCell = SBC_SVARA_SET.has(aksharaKey);
 
-            /* Cell name */
-            html += '<div class="cell-name" style="font-size:'+fs+';color:'+tc+'">'+nameShort+'</div>';
+            if (isSvaraCell && SBC_AKSHARAS[aksharaKey]) {
+                /* Akshara cell: show Devanagari character as the prominent main label */
+                var svara = SBC_AKSHARAS[aksharaKey];
+                html += '<div class="cell-name sbc-svara-main" style="font-size:0.82rem;font-weight:700;color:#8b1a1a">'+svara+'</div>';
+                /* Show underlying entity name below (nakshatra/corner etc) */
+                var subEnt2 = entities.find(function(e){ return e.entity_type !== 'akshara' && e.entity_type !== 'special' && e.entity_type !== 'corner'; });
+                var subName = subEnt2 ? shortenName(subEnt2.name) : '';
+                if (subName && subName !== svara) {
+                    html += '<div class="cell-sub" style="font-size:0.42rem;color:'+tc+';opacity:0.55">'+subName+'</div>';
+                }
+            } else if (type === 'rashi') {
+                /* Rashi cell (3rd ring): show abbreviated name + Hindi name */
+                var rashiEnt = entities.find(function(e){ return e.entity_type === 'rashi'; });
+                var rashiShort = shortenName(name);
+                var hindiName = (rashiEnt && rashiEnt.meta && rashiEnt.meta.hindi) || '';
+                html += '<div class="cell-name" style="font-size:0.7rem;font-weight:700;color:#6b4e00">'+rashiShort+'</div>';
+                if (hindiName) {
+                    html += '<div class="cell-sub" style="font-size:0.55rem;color:#6b4e00;font-weight:600;opacity:0.85">'+hindiName+'</div>';
+                }
+            } else if (type === 'vara') {
+                /* Vara cell: show weekday(s) + tithi group info */
+                var varaEnts = entities.filter(function(e){ return e.entity_type === 'vara'; });
+                var dayNames = varaEnts.map(function(e){ return e.name.substring(0,3); }).join(',');
+                var groupLabel = (varaEnts.length && varaEnts[varaEnts.length-1].meta) ? varaEnts[varaEnts.length-1].meta.group_label || '' : '';
+                html += '<div class="cell-name" style="font-size:0.62rem;font-weight:700;color:#1a5a10">'+dayNames+'</div>';
+                if (groupLabel) {
+                    html += '<div class="cell-sub" style="font-size:0.40rem;color:#1a5a10;opacity:0.7;line-height:1.1">'+groupLabel+'</div>';
+                }
+            } else {
+                /* Other cells: show name as before */
+                html += '<div class="cell-name" style="font-size:'+fs+';color:'+tc+'">'+nameShort+'</div>';
+            }
 
             /* Navatara tara number beneath name (for nakshatras) */
             if (type === 'nakshatra' && navInfo) {

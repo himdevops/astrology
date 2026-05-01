@@ -1116,78 +1116,45 @@ def get_vedha_lines(
 ) -> Dict:
     """
     Return vedha line segments for a planet at (row, col).
-    Per Khemraj Publishers traditional rules:
+    Per Khemraj Publishers traditional SBC rules:
 
-    ALL planets vedha in ALL 4 line types (H + V + D1 + D2).
+    Sun/Moon/Rahu/Ketu (3-Way) = ALL 3 directions:
+      D1 (main diagonal) + D2 (anti diagonal) + Sammukha (H or V straight line)
+      "सूर्य तथा चन्द्र सदा ही शीघ्रगामी होने से इन ४ ग्रहो का वेध
+       सदा तीनों ही ओर को एक सा होता है"
 
-    The vedha MODE determines line LENGTH:
-      3-Way / Sthana  → full line edge-to-edge (both directions)
-      Left  (fast)    → half-line from left/top edge to planet
-      Right (retro)   → half-line from planet to right/bottom edge
-      Front (normal)  → short segment: planet to nearest adjacent cell only
-
-    Line style hints for the UI:
-      3-Way : solid  |  Left : thick  |  Right : dashed
-      Front : dotted |  Sthana : double
+    Mars/Mercury/Jupiter/Venus/Saturn (variable) = DIAGONALS ONLY:
+      D1 + D2 (no H/V straight lines). Speed determines reach:
+      Sthana (stationary) → full diagonals, max strength
+      Right  (retrograde) → half-diagonals right/down
+      Left   (fast 25%+)  → half-diagonals left/up
+      Front  (normal)     → nearest diagonal neighbor only
     """
     vedha_info   = classify_vedha_type(planet_name, speed)
     vedha_mode   = vedha_info["vedha_mode"]   # "three_way","sthana","left","right","front"
     vedha_side   = vedha_info["vedha_side"]   # "both","left","right","front"
     last         = grid_size - 1
+    is_always_full = planet_name in ALWAYS_FULL_VEDHA_PLANETS
 
     lines: List[Dict] = []
 
     if vedha_mode == "front":
-        # ── FRONT VEDHA — nearest cell only in each direction ──
-        # Per Khemraj book Point 8: "सामने के वेध से केवल सामने के
-        # एक नक्षत्र को ही वेध होता है"
-        # Short segments from planet to immediate neighbor
+        # ── FRONT VEDHA — nearest diagonal neighbor only ──────
+        # Only for variable planets (Mars/Mercury/Jupiter/Venus/Saturn)
 
-        # Horizontal: left neighbor and right neighbor
-        if col > 0:
-            lines.append({"type": "horizontal", "from": [row, col - 1], "to": [row, col]})
-        if col < last:
-            lines.append({"type": "horizontal", "from": [row, col], "to": [row, col + 1]})
-        # Vertical: up neighbor and down neighbor
-        if row > 0:
-            lines.append({"type": "vertical", "from": [row - 1, col], "to": [row, col]})
-        if row < last:
-            lines.append({"type": "vertical", "from": [row, col], "to": [row + 1, col]})
-        # Diagonal ↘: top-left neighbor and bottom-right neighbor
+        # Diagonal ↘: top-left and bottom-right neighbors
         if row > 0 and col > 0:
             lines.append({"type": "diagonal_main", "from": [row - 1, col - 1], "to": [row, col]})
         if row < last and col < last:
             lines.append({"type": "diagonal_main", "from": [row, col], "to": [row + 1, col + 1]})
-        # Diagonal ↗: top-right neighbor and bottom-left neighbor
+        # Diagonal ↗: top-right and bottom-left neighbors
         if row > 0 and col < last:
             lines.append({"type": "diagonal_anti", "from": [row - 1, col + 1], "to": [row, col]})
         if row < last and col > 0:
             lines.append({"type": "diagonal_anti", "from": [row, col], "to": [row + 1, col - 1]})
 
     else:
-        # ── LEFT / RIGHT / FULL (three_way, sthana) ──────────
-        # Per Khemraj book Point 8: "दाहिनी ओर के वेध से तथा बाई
-        # ओर के वेध से तो जो अक्षरादि वेध की सीध मे (लाइन मे)
-        # अवेगे उन सभी को वेध हो जाता है"
-        # Full line (or half-line) in all 4 directions
-
-        # ── Horizontal ──────────────────────────────────────
-        if vedha_side == "left":
-            h_line = {"type": "horizontal", "from": [row, 0], "to": [row, col]}
-        elif vedha_side == "right":
-            h_line = {"type": "horizontal", "from": [row, col], "to": [row, last]}
-        else:
-            h_line = {"type": "horizontal", "from": [row, 0], "to": [row, last]}
-        lines.append(h_line)
-
-        # ── Vertical ────────────────────────────────────────
-        if vedha_side == "left":
-            v_line = {"type": "vertical", "from": [0, col], "to": [row, col]}
-        elif vedha_side == "right":
-            v_line = {"type": "vertical", "from": [row, col], "to": [last, col]}
-        else:
-            v_line = {"type": "vertical", "from": [0, col], "to": [last, col]}
-        lines.append(v_line)
+        # ── FULL / HALF DIAGONALS ────────────────────────────
 
         # ── Diagonal ↘ (main) ───────────────────────────────
         step_tl = min(row, col)
@@ -1217,10 +1184,21 @@ def get_vedha_lines(
             d2_line = {"type": "diagonal_anti", "from": [d2_r0, d2_c0], "to": [d2_r1, d2_c1]}
         lines.append(d2_line)
 
+        # ── Sammukha / Straight line — ONLY for Sun/Moon/Rahu/Ketu ──
+        # These 4 planets always vedha in ALL 3 directions including
+        # the straight line (horizontal or vertical through their cell)
+        if is_always_full:
+            # Horizontal full line
+            lines.append({"type": "horizontal", "from": [row, 0], "to": [row, last]})
+            # Vertical full line
+            lines.append({"type": "vertical", "from": [0, col], "to": [last, col]})
+
     strength_mult = VEDHA_STRENGTH_MULTIPLIER.get(vedha_info["type"], 1.0)
 
-    # All planets now vedha in all 4 directions
-    active_dirs = ["diagonal1", "diagonal2", "horizontal", "vertical"]
+    # Direction list
+    active_dirs = ["diagonal1", "diagonal2"]
+    if is_always_full and vedha_mode != "front":
+        active_dirs.extend(["horizontal", "vertical"])
 
     return {
         "planet":              planet_name,
@@ -1229,7 +1207,7 @@ def get_vedha_lines(
         "vedha_type":          vedha_info["type"],
         "vedha_mode":          vedha_mode,
         "vedha_side":          vedha_side,
-        "is_three_way":        True,   # ALL planets now 3-way per Khemraj book
+        "is_three_way":        True,
         "strength":            vedha_info["strength"],
         "strength_multiplier": strength_mult,
         "line_style":          vedha_info["line_style"],
@@ -1364,30 +1342,31 @@ def get_vedha_cells(
 ) -> Dict[str, List[Tuple[int,int]]]:
     """
     Return cells under vedha from position (row, col).
-    Per Khemraj book rules:
+    Per Khemraj Publishers SBC rules:
 
-    ALL planets vedha in all 4 line types (H + V + D1 + D2).
+    Sun/Moon/Rahu/Ketu (3-Way) = D1 + D2 + H + V (all 3 directions + straight)
+    Variable planets = D1 + D2 only (diagonals, no H/V)
 
     The vedha MODE determines which cells are hit:
-      3-Way / Sthana  → full line in both directions
-      Left  (fast)    → left/up half only
-      Right (retro)   → right/down half only
-      Front (normal)  → nearest adjacent cell only in each direction
+      3-Way   → full diagonals + full H/V (Sun/Moon/Rahu/Ketu only)
+      Sthana  → full diagonals (variable planets, stationary)
+      Left    → half-diagonals top-left (fast planets)
+      Right   → half-diagonals bottom-right (retrograde)
+      Front   → nearest diagonal neighbor only (normal speed)
     """
     vedha_info = classify_vedha_type(planet, speed)
-    vedha_mode = vedha_info["vedha_mode"]   # "three_way","sthana","left","right","front"
+    vedha_mode = vedha_info["vedha_mode"]
     vedha_side = vedha_info["vedha_side"]
+    is_always_full = planet in ALWAYS_FULL_VEDHA_PLANETS
+
+    # H/V only for Sun/Moon/Rahu/Ketu (3-way planets)
+    horizontal = []
+    vertical   = []
 
     if vedha_mode == "front":
-        # ── FRONT VEDHA — nearest neighbor only ─────────────
-        horizontal = []
-        vertical   = []
-        diag1      = []
-        diag2      = []
-        if col > 0:             horizontal.append((row, col - 1))
-        if col < grid_size - 1: horizontal.append((row, col + 1))
-        if row > 0:             vertical.append((row - 1, col))
-        if row < grid_size - 1: vertical.append((row + 1, col))
+        # ── FRONT VEDHA — nearest diagonal neighbor only ─────
+        diag1 = []
+        diag2 = []
         if row > 0 and col > 0:
             diag1.append((row - 1, col - 1))
         if row < grid_size - 1 and col < grid_size - 1:
@@ -1397,22 +1376,7 @@ def get_vedha_cells(
         if row < grid_size - 1 and col > 0:
             diag2.append((row + 1, col - 1))
     else:
-        # ── LEFT / RIGHT / FULL ─────────────────────────────
-        # Horizontal
-        if vedha_side == "left":
-            horizontal = [(row, c) for c in range(col)]
-        elif vedha_side == "right":
-            horizontal = [(row, c) for c in range(col + 1, grid_size)]
-        else:
-            horizontal = [(row, c) for c in range(grid_size) if c != col]
-
-        # Vertical
-        if vedha_side == "left":
-            vertical = [(r, col) for r in range(row)]
-        elif vedha_side == "right":
-            vertical = [(r, col) for r in range(row + 1, grid_size)]
-        else:
-            vertical = [(r, col) for r in range(grid_size) if r != row]
+        # ── DIAGONALS (all non-front modes) ──────────────────
 
         # Diagonal 1: ↘ main diagonal
         diag1 = []
@@ -1436,8 +1400,16 @@ def get_vedha_cells(
             while r < grid_size and c >= 0:
                 diag2.append((r, c)); r += 1; c -= 1
 
-    # All planets now vedha in all 4 directions
-    active_dirs = ["diagonal1", "diagonal2", "horizontal", "vertical"]
+        # ── H/V straight lines — ONLY for Sun/Moon/Rahu/Ketu ──
+        # "इन ४ ग्रहो का वेध सदा तीनों ही ओर को एक सा होता है"
+        if is_always_full:
+            horizontal = [(row, c) for c in range(grid_size) if c != col]
+            vertical   = [(r, col) for r in range(grid_size) if r != row]
+
+    # Direction list
+    active_dirs = ["diagonal1", "diagonal2"]
+    if is_always_full and vedha_mode != "front":
+        active_dirs.extend(["horizontal", "vertical"])
 
     return {
         "horizontal":        horizontal,
@@ -1448,7 +1420,7 @@ def get_vedha_cells(
         "vedha_type":        vedha_info["type"],
         "vedha_mode":        vedha_mode,
         "vedha_side":        vedha_side,
-        "is_three_way":      True,   # ALL planets are 3-way per Khemraj book
+        "is_three_way":      True,
         "active_directions": sorted(active_dirs),
     }
 
