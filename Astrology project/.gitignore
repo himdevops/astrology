@@ -1,0 +1,6 @@
+
+# Large files & virtual env
+project.tar
+.venv/
+*.tar
+*.tar.gz
