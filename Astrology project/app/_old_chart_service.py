@@ -22,18 +22,35 @@ from app.schemas import (
     DivisionalInput,
     FullPredictionInput,
     SarvatobhadraInput,
+    StrengthCalendarInput,
     TransitAlertInput,
     TransitInput,
     YogaInput,
+    ShadbalaInput,
+    BhavaChalitInput,
+    KPAnalysisInput,
+    PanchangInput,
+    PanchangCalendarInput,
+    BacktestInput,
 )
 from app.nakshatra import get_all_planet_nakshatras, get_moon_nakshatra_signal
 from app.dasha import calculate_vimshottari_dasha, get_current_dasha
 from app.divisional import calculate_all_divisional
 from app.sarvatobhadra import calculate_sarvatobhadra as cast_sarvatobhadra
 from app.ashtakavarga import calc_sarvashtakavarga, calc_transit_dates_with_ashtakavarga
+from app.ashtakavarga_strength import (
+    calc_daily_strength,
+    calc_monthly_strength,
+    calc_yearly_strength,
+)
 from app.yoga_detector import detect_all_yogas
 from app.transit_alerts import generate_transit_alerts
 from app.prediction_engine import generate_market_prediction
+from app.shadbala import calculate_shadbala, calculate_bhava_chalit
+from app.kp_system import calculate_kp_analysis
+from app.panchang import calculate_panchang, calculate_panchang_calendar
+from app.market_data import get_current_prices, get_historical_data, get_sector_performance
+from app.backtesting import backtest_moon_nakshatra, backtest_planetary_transits, backtest_composite
 
 
 # ─────────────────────────────────────────────────────────────
@@ -365,3 +382,219 @@ def calculate_full_prediction(payload: FullPredictionInput) -> dict:
         "transit_alerts":  transit_alert_data,
         "prediction":      prediction,
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# Ashtakavarga Strength Calendar
+# ─────────────────────────────────────────────────────────────
+
+def calculate_strength_calendar(payload: StrengthCalendarInput) -> dict:
+    """
+    Calculate Ashtakavarga strength calendar (daily/monthly/yearly).
+    Shows which planets are strong and best/worst days for activities.
+    """
+    resolved, local_dt = resolve_location_and_time(
+        place=payload.place,
+        date_str=payload.date,
+        time_str=payload.time,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        timezone_offset_minutes=payload.timezone_offset_minutes,
+    )
+    jd_ut = to_julian_day_utc(local_dt, resolved.timezone_offset_minutes)
+    planets = calculate_planets(jd_ut, payload.ayanamsa)
+    ascendant = calculate_ascendant(jd_ut, resolved.latitude, resolved.longitude, payload.ayanamsa)
+
+    calendar_type = payload.calendar_type.lower()
+
+    if calendar_type == "daily":
+        from_date = datetime.strptime(payload.from_date, "%Y-%m-%d") if payload.from_date else datetime.utcnow()
+        calendar_data = calc_daily_strength(
+            from_date, payload.days_ahead, planets, ascendant["longitude"], payload.ayanamsa
+        )
+    elif calendar_type == "monthly":
+        year = payload.year if payload.year else datetime.utcnow().year
+        month = payload.month if payload.month else datetime.utcnow().month
+        calendar_data = calc_monthly_strength(year, month, planets, ascendant["longitude"], payload.ayanamsa)
+    elif calendar_type == "yearly":
+        year = payload.year if payload.year else datetime.utcnow().year
+        calendar_data = calc_yearly_strength(year, planets, ascendant["longitude"], payload.ayanamsa)
+    else:
+        calendar_data = calc_daily_strength(
+            datetime.utcnow(), 30, planets, ascendant["longitude"], payload.ayanamsa
+        )
+
+    return {
+        "type":              "ashtakavarga_strength_calendar",
+        "name":              payload.name,
+        "birth_date":        payload.date,
+        "birth_place":       resolved.place,
+        "ayanamsa":          payload.ayanamsa,
+        "ascendant":         ascendant,
+        "calendar_type":     calendar_type,
+        "calendar_data":     calendar_data,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# Shadbala (Six-fold Planetary Strength)
+# ─────────────────────────────────────────────────────────────
+
+def calculate_shadbala_endpoint(payload: ShadbalaInput) -> dict:
+    resolved, local_dt = resolve_location_and_time(
+        place=payload.place,
+        date_str=payload.date,
+        time_str=payload.time,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        timezone_offset_minutes=payload.timezone_offset_minutes,
+    )
+    jd_ut = to_julian_day_utc(local_dt, resolved.timezone_offset_minutes)
+    planets = calculate_planets(jd_ut, payload.ayanamsa)
+    ascendant = calculate_ascendant(jd_ut, resolved.latitude, resolved.longitude, payload.ayanamsa)
+
+    shadbala = calculate_shadbala(planets, ascendant, local_dt, resolved.latitude)
+
+    return {
+        "type": "shadbala",
+        "name": payload.name,
+        "birth_date": payload.date,
+        "ayanamsa": payload.ayanamsa,
+        "ascendant": ascendant,
+        "shadbala": shadbala,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# Bhava Chalit Chart
+# ─────────────────────────────────────────────────────────────
+
+def calculate_bhava_chalit_endpoint(payload: BhavaChalitInput) -> dict:
+    resolved, local_dt = resolve_location_and_time(
+        place=payload.place,
+        date_str=payload.date,
+        time_str=payload.time,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        timezone_offset_minutes=payload.timezone_offset_minutes,
+    )
+    jd_ut = to_julian_day_utc(local_dt, resolved.timezone_offset_minutes)
+    planets = calculate_planets(jd_ut, payload.ayanamsa)
+    ascendant = calculate_ascendant(jd_ut, resolved.latitude, resolved.longitude, payload.ayanamsa)
+    houses = build_house_cusps(jd_ut, resolved.latitude, resolved.longitude, payload.ayanamsa)
+
+    chalit = calculate_bhava_chalit(planets, houses, ascendant)
+
+    return {
+        "type": "bhava_chalit",
+        "name": payload.name,
+        "birth_date": payload.date,
+        "ayanamsa": payload.ayanamsa,
+        "ascendant": ascendant,
+        "bhava_chalit": chalit,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# KP System Analysis
+# ─────────────────────────────────────────────────────────────
+
+def calculate_kp_endpoint(payload: KPAnalysisInput) -> dict:
+    resolved, local_dt = resolve_location_and_time(
+        place=payload.place,
+        date_str=payload.date,
+        time_str=payload.time,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        timezone_offset_minutes=payload.timezone_offset_minutes,
+    )
+    jd_ut = to_julian_day_utc(local_dt, resolved.timezone_offset_minutes)
+    planets = calculate_planets(jd_ut, payload.ayanamsa)
+    ascendant = calculate_ascendant(jd_ut, resolved.latitude, resolved.longitude, payload.ayanamsa)
+    houses = build_house_cusps(jd_ut, resolved.latitude, resolved.longitude, payload.ayanamsa)
+
+    # Transit planets for ruling planets
+    transit_planets = None
+    transit_dt = None
+    if payload.transit_date:
+        t_resolved, t_dt = resolve_location_and_time(
+            place=payload.place,
+            date_str=payload.transit_date,
+            time_str=payload.transit_time or "09:15",
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            timezone_offset_minutes=payload.timezone_offset_minutes,
+        )
+        t_jd = to_julian_day_utc(t_dt, t_resolved.timezone_offset_minutes)
+        transit_planets = calculate_planets(t_jd, payload.ayanamsa)
+        transit_dt = t_dt
+
+    kp_data = calculate_kp_analysis(
+        planets, houses, ascendant, transit_planets, transit_dt
+    )
+
+    return {
+        "type": "kp_analysis",
+        "name": payload.name,
+        "birth_date": payload.date,
+        "ayanamsa": payload.ayanamsa,
+        "ascendant": ascendant,
+        "kp_analysis": kp_data,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# Panchang
+# ─────────────────────────────────────────────────────────────
+
+def calculate_panchang_endpoint(payload: PanchangInput) -> dict:
+    lat = payload.latitude or 19.076
+    lon = payload.longitude or 72.8777
+    return calculate_panchang(
+        payload.date, payload.time, lat, lon,
+        payload.timezone_offset_minutes, payload.ayanamsa
+    )
+
+
+def calculate_panchang_calendar_endpoint(payload: PanchangCalendarInput) -> dict:
+    lat = payload.latitude or 19.076
+    lon = payload.longitude or 72.8777
+    return calculate_panchang_calendar(
+        payload.start_date, payload.days, lat, lon,
+        payload.timezone_offset_minutes, payload.ayanamsa
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Market Data
+# ─────────────────────────────────────────────────────────────
+
+def get_market_prices_endpoint(indices: list) -> dict:
+    return get_current_prices(indices)
+
+
+def get_sector_perf_endpoint(period: str = "1mo") -> dict:
+    return get_sector_performance(period)
+
+
+# ─────────────────────────────────────────────────────────────
+# Backtesting
+# ─────────────────────────────────────────────────────────────
+
+def run_backtest_endpoint(payload: BacktestInput) -> dict:
+    market = get_historical_data(
+        payload.ticker, payload.start_date, payload.end_date
+    )
+    if "error" in market:
+        return market
+
+    data = market.get("data", [])
+    if len(data) < 30:
+        return {"error": "Insufficient market data for backtesting (need 30+ days)"}
+
+    if payload.signal_type == "moon_nakshatra":
+        return backtest_moon_nakshatra(data, payload.ayanamsa)
+    elif payload.signal_type == "planetary_transits":
+        return backtest_planetary_transits(data, payload.ayanamsa)
+    else:
+        return backtest_composite(data, payload.ayanamsa)

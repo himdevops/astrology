@@ -15,7 +15,6 @@ from app.core import (
     to_julian_day_utc,
 )
 from app.nakshatra import get_nakshatra
-from app.schemas import SarvatobhadraInput
 from app.himanshu_sarvatobhdra import (
     AKSHARAS_16,
     ChakraEntity,
@@ -143,7 +142,7 @@ def _flatten_cells(chakra: SarvatobhadraChakra) -> List[Dict[str, Any]]:
 # Main service function
 # ─────────────────────────────────────────────────────────────
 
-def calculate_sarvatobhadra(payload: SarvatobhadraInput) -> dict:
+def calculate_sarvatobhadra(payload) -> dict:
     """
     Compute Sarvatobhadra Chakra for natal chart + full transit SBC analysis
     (Vedha, Latta, Six Bindus, Navatara, NSE/BSE signal).

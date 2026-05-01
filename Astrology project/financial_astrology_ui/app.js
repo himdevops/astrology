@@ -1,1513 +1,1646 @@
 /* ═══════════════════════════════════════════════════════════════
-   Financial Astrology Engine v2.0 — Dashboard JavaScript
+   Financial Astrology Engine v3.0 — Dashboard JavaScript
    ══════════════════════════════════════════════════════════════ */
 
-// ── Helpers ──────────────────────────────────────────────────────
+const API = '';  // Same origin
 
-function getApiBase(inputId) {
-  const val = document.getElementById(inputId)?.value?.trim().replace(/\/$/, '');
-  return val || (window.location.protocol === 'file:' ? 'http://127.0.0.1:8010' : window.location.origin);
-}
-
-function setStatus(id, type, msg) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.className = 'status-bar ' + type;
-  el.textContent = msg;
-}
-
-function showLoading(msg = 'Calculating planetary positions...') {
-  document.getElementById('loadingOverlay').style.display = 'flex';
-  document.getElementById('loadingText').textContent = msg;
-}
-
-function hideLoading() {
-  document.getElementById('loadingOverlay').style.display = 'none';
-}
-
-async function apiPost(base, endpoint, body) {
-  const res = await fetch(`${base}${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
-  return data;
-}
-
-function scoreColor(score) {
-  if (score >= 0.6) return '#00c851';
-  if (score >= 0.3) return '#4caf50';
-  if (score >= 0)   return '#8bc34a';
-  if (score >= -0.3) return '#ff9800';
-  if (score >= -0.6) return '#ff5722';
-  return '#ff3d00';
-}
-
-function scoreBar(label, value, max = 1.0) {
-  const pct = Math.min(100, Math.max(0, ((value + 1) / 2) * 100));
-  const color = scoreColor(value);
-  return `<div class="score-bar-row">
-    <span class="score-bar-label">${label}</span>
-    <div class="score-bar-track">
-      <div class="score-bar-fill" style="width:${pct}%;background:${color}"></div>
-    </div>
-    <span class="score-bar-val" style="color:${color}">${value > 0 ? '+' : ''}${value.toFixed(3)}</span>
-  </div>`;
-}
-
-function signalPill(signal, color) {
-  const bg = color || scoreColor(0);
-  return `<span class="signal-pill" style="background:${bg}22;color:${bg};border:1px solid ${bg}55">${signal}</span>`;
-}
-
-function formatDate(dateStr) {
-  if (!dateStr || dateStr === 'CURRENT') return dateStr;
-  try {
-    return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch { return dateStr; }
-}
-
-// ── Tab Navigation ───────────────────────────────────────────────
-
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  });
-});
-
-// ── Global Birth Details ──────────────────────────────────────────
-
-function saveGlobalDetails() {
-  const data = {
-    name: document.getElementById('global_name').value,
-    date: document.getElementById('global_date').value,
-    time: document.getElementById('global_time').value,
-    place: document.getElementById('global_place').value,
-    ayanamsa: document.getElementById('global_ayanamsa').value,
-  };
-  localStorage.setItem('globalBirthDetails', JSON.stringify(data));
-}
-
-function loadGlobalDetails() {
-  const data = JSON.parse(localStorage.getItem('globalBirthDetails') || '{}');
-  return data;
-}
-
-function populateFormsFromGlobal() {
-  const data = loadGlobalDetails();
-  const fields = ['name', 'date', 'time', 'place', 'ayanamsa'];
-  const prefixes = ['global', 'c', 'd', 'dv', 'av', 'y', 'al', 'p_natal', 'sbc'];
-
-  fields.forEach(field => {
-    prefixes.forEach(prefix => {
-      const id = prefix === 'p_natal' ? `p_natal_${field}` : `${prefix}_${field}`;
-      const el = document.getElementById(id);
-      if (el && !el.value && data[field]) {
-        el.value = data[field];
-      }
+// ─── Tab Navigation ─────────────────────────────────────────
+document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     });
-  });
+});
+
+// Set today's date as default for type="date" (transit dates)
+const today = new Date().toISOString().split('T')[0];
+document.querySelectorAll('input[type="date"]').forEach(el => {
+    if (!el.value) el.value = today;
+});
+
+// ─── DD-MM-YYYY Date Helpers ────────────────────────────────
+// Convert DD-MM-YYYY → YYYY-MM-DD for API calls
+function ddmmToApi(ddmm) {
+    if (!ddmm) return '';
+    var parts = ddmm.split('-');
+    if (parts.length !== 3) return ddmm;
+    return parts[2] + '-' + parts[1] + '-' + parts[0]; // YYYY-MM-DD
+}
+// Convert YYYY-MM-DD → DD-MM-YYYY for display
+function apiToDdmm(api) {
+    if (!api) return '';
+    var parts = api.split('-');
+    if (parts.length !== 3) return api;
+    return parts[2] + '-' + parts[1] + '-' + parts[0];
 }
 
-function showResultPanel(panelId) {
-  const panel = document.getElementById(panelId);
-  if (panel) panel.style.display = 'block';
-}
-
-function clearResultPanel(panelId) {
-  const panel = document.getElementById(panelId);
-  if (panel) panel.style.display = 'none';
-}
-
-function clearGlobalDetails() {
-  localStorage.removeItem('globalBirthDetails');
-  const fields = ['global_name', 'global_date', 'global_time', 'global_place'];
-  fields.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  populateFormsFromGlobal(); // Reset others if needed
-}
-
-function initInputCardToggles() {
-  document.querySelectorAll('.input-card').forEach(card => {
-    const titleElement = card.querySelector('.card-title');
-    if (!titleElement) return;
-
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'toggle-panel';
-    toggle.textContent = 'Hide input panel';
-
-    const bodyElements = [
-      card.querySelector('.card-desc'),
-      card.querySelector('form')
-    ].filter(Boolean);
-
-    toggle.addEventListener('click', () => {
-      const collapsed = card.classList.toggle('collapsed');
-      toggle.textContent = collapsed ? 'Show input panel' : 'Hide input panel';
-      bodyElements.forEach(el => {
-        el.style.display = collapsed ? 'none' : '';
-      });
+// Auto-format DD-MM-YYYY as user types (add dashes automatically)
+function setupDateInput(input) {
+    input.addEventListener('input', function(e) {
+        var v = this.value.replace(/[^0-9]/g, '');
+        if (v.length > 8) v = v.slice(0, 8);
+        if (v.length >= 5) {
+            this.value = v.slice(0,2) + '-' + v.slice(2,4) + '-' + v.slice(4);
+        } else if (v.length >= 3) {
+            this.value = v.slice(0,2) + '-' + v.slice(2);
+        } else {
+            this.value = v;
+        }
     });
-
-    titleElement.insertAdjacentElement('afterend', toggle);
-  });
-}
-
-// Set today's date in all date inputs
-document.addEventListener('DOMContentLoaded', () => {
-  const today = new Date().toISOString().split('T')[0];
-  ['p_transit_date', 'al_date'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el && !el.value) el.value = today;
-  });
-
-  // Load and populate global details
-  const data = loadGlobalDetails();
-  Object.keys(data).forEach(key => {
-    const el = document.getElementById(`global_${key}`);
-    if (el) el.value = data[key] || '';
-  });
-  populateFormsFromGlobal();
-  initInputCardToggles();
-});
-
-// Global form handlers
-document.getElementById('globalForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  saveGlobalDetails();
-  populateFormsFromGlobal();
-  alert('Birth details saved and applied to all forms!');
-});
-
-document.getElementById('clearGlobal').addEventListener('click', () => {
-  clearGlobalDetails();
-  alert('Global birth details cleared.');
-});
-
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.close-results');
-  if (!btn) return;
-  const target = btn.dataset.target;
-  if (target) clearResultPanel(target);
-});
-
-// ── Clock ────────────────────────────────────────────────────────
-// 1. AUTO PREDICTION
-// ═══════════════════════════════════════════════════════════════════
-
-document.getElementById('predictForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const btn = document.getElementById('predictBtn');
-  btn.disabled = true;
-  showLoading('Running autonomous astrology prediction engine...');
-
-  const global = loadGlobalDetails();
-  const body = {
-    transit_date:  document.getElementById('p_transit_date').value,
-    transit_time:  document.getElementById('p_transit_time').value,
-    transit_place: document.getElementById('p_transit_place').value,
-    ayanamsa:      document.getElementById('p_ayanamsa').value || global.ayanamsa,
-    days_ahead:    parseInt(document.getElementById('p_days_ahead').value),
-  };
-
-  const natalDate  = document.getElementById('p_natal_date').value || global.date;
-  const natalTime  = document.getElementById('p_natal_time').value || global.time;
-  const natalPlace = document.getElementById('p_natal_place').value || global.place;
-  const natalName  = document.getElementById('p_natal_name').value || global.name;
-
-  if (natalDate && natalTime && natalPlace) {
-    body.natal_date  = natalDate;
-    body.natal_time  = natalTime;
-    body.natal_place = natalPlace;
-    body.natal_name  = natalName || 'User';
-  }
-
-  try {
-    const base = getApiBase('p_apiBase');
-    const data = await apiPost(base, '/predict', body);
-    renderPrediction(data);
-    document.getElementById('predictResults').style.display = 'block';
-  } catch (err) {
-    alert('Error: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    hideLoading();
-  }
-});
-
-function renderPrediction(data) {
-  const pred = data.prediction;
-  if (!pred) return;
-
-  const signal = pred.prediction || {};
-  const score = pred.overall_score || 0;
-  const color = signal.color || scoreColor(score);
-
-  // Main signal card
-  document.getElementById('signalEmoji').textContent = signal.emoji || '🔮';
-  document.getElementById('signalLabel').textContent = signal.signal || '';
-  document.getElementById('signalLabel').style.color = color;
-  document.getElementById('signalDirection').textContent = signal.direction || '';
-  document.getElementById('scoreValue').textContent = (score > 0 ? '+' : '') + score.toFixed(3);
-  document.getElementById('scoreValue').style.color = color;
-  document.getElementById('signalStrategy').textContent = signal.strategy || '';
-  document.getElementById('signalNiftyBias').textContent = '📊 ' + (signal.nifty_bias || '');
-  document.getElementById('mainSignalCard').style.borderColor = color;
-
-  const conf = pred.confidence || {};
-  document.getElementById('confidenceBadge').textContent =
-    `Confidence: ${conf.level || ''} (${conf.percent || 0}%) — ${conf.note || ''}`;
-
-  // Score breakdown
-  const bd = pred.score_breakdown || {};
-  document.getElementById('scoreBreakdown').innerHTML =
-    scoreBar('Planetary Positions', bd.planetary_position_score || 0) +
-    scoreBar('Moon Nakshatra',      bd.moon_nakshatra_score || 0) +
-    scoreBar('Dasha Period',        bd.dasha_score || 0) +
-    scoreBar('Active Yogas',        bd.yoga_score || 0) +
-    scoreBar('Transit Alerts',      bd.transit_score || 0) +
-    scoreBar('FINAL SCORE',         bd.final_weighted_score || 0);
-
-  // Weekly outlook
-  const weekly = pred.weekly_outlook || [];
-  document.getElementById('weeklyOutlook').innerHTML = weekly.map(d => `
-    <div class="week-day-card" style="border-color:${d.signal_color}44">
-      <div class="week-day-name">${d.day?.slice(0,3)}</div>
-      <div class="week-day-date">${formatDate(d.date)?.slice(0,6)}</div>
-      <div class="week-nak" style="color:${d.signal_color}">${d.nakshatra}</div>
-      <div class="fs-11 text-muted">${d.nakshatra_lord}</div>
-      <div class="week-signal" style="background:${d.signal_color}22;color:${d.signal_color}">
-        ${d.nse_signal?.split(' ')[0] || 'NEUTRAL'}
-      </div>
-    </div>`).join('');
-
-  // Sectors
-  const sectors = pred.sector_recommendations || {};
-  document.getElementById('sectorRecs').innerHTML = `
-    <div class="sector-col">
-      <h4 class="text-green">✅ Strong Buy</h4>
-      ${(sectors.strong_buy || []).map(s => `<span class="sector-tag sector-buy">${s}</span>`).join('')}
-    </div>
-    <div class="sector-col">
-      <h4 class="text-yellow">🔆 Hold</h4>
-      ${(sectors.hold || []).map(s => `<span class="sector-tag sector-hold">${s}</span>`).join('')}
-    </div>
-    <div class="sector-col">
-      <h4 class="text-red">❌ Avoid</h4>
-      ${(sectors.avoid || []).map(s => `<span class="sector-tag sector-avoid">${s}</span>`).join('')}
-    </div>`;
-
-  // Key events
-  const events = pred.key_events || [];
-  document.getElementById('keyEvents').innerHTML = events.length
-    ? events.slice(0, 6).map(ev => `
-      <div class="event-item" style="border-left-color:${scoreColor(ev.score || 0)}">
-        <div class="event-date">${ev.type} · ${formatDate(ev.date)}</div>
-        <div class="event-desc">${ev.description || ''}</div>
-        <span class="event-signal" style="background:${scoreColor(ev.score||0)}22;color:${scoreColor(ev.score||0)}">${ev.signal || ''}</span>
-      </div>`).join('')
-    : '<p class="text-muted fs-12">No critical events in this period.</p>';
-
-  // Dasha context
-  const dc = pred.dasha_context;
-  if (dc && dc.mahadasha) {
-    document.getElementById('dashaContextCard').style.display = 'block';
-    document.getElementById('dashaContext').innerHTML = `
-      <div class="dasha-ctx-item">
-        <div class="dasha-ctx-label">Mahadasha</div>
-        <div class="dasha-ctx-value text-gold">${dc.mahadasha}</div>
-        <div class="dasha-ctx-sub">${formatDate(dc.mahadasha_start)} → ${formatDate(dc.mahadasha_end)}</div>
-      </div>
-      <div class="dasha-ctx-item">
-        <div class="dasha-ctx-label">Antardasha</div>
-        <div class="dasha-ctx-value text-accent">${dc.antardasha || '—'}</div>
-        <div class="dasha-ctx-sub">${dc.antardasha_start ? formatDate(dc.antardasha_start) + ' → ' + formatDate(dc.antardasha_end) : ''}</div>
-      </div>
-      <div class="dasha-ctx-item" style="grid-column:1/-1">
-        <div class="dasha-ctx-label">Combined Score</div>
-        <div class="dasha-ctx-value" style="color:${scoreColor(dc.combined_score||0)}">${dc.combined_score > 0 ? '+' : ''}${dc.combined_score?.toFixed(3) || '0'}</div>
-        <div class="dasha-ctx-sub">${dc.market_outlook || ''}</div>
-      </div>`;
-  }
-
-  // Risk factors
-  const risks = pred.risk_factors || [];
-  document.getElementById('riskFactors').innerHTML = risks.length
-    ? risks.map(r => `<div class="risk-item">⚠️ ${r}</div>`).join('')
-    : '<p class="text-muted fs-12">No major risk factors detected.</p>';
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-// 2. BIRTH CHART
-// ═══════════════════════════════════════════════════════════════════
-
-document.getElementById('chartForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('chartStatus', 'loading', '⏳ Calculating birth chart...');
-  showLoading();
-  try {
-    const global = loadGlobalDetails();
-    const base = getApiBase('c_apiBase');
-    const data = await apiPost(base, '/chart', {
-      name: document.getElementById('c_name').value || global.name,
-      date: document.getElementById('c_date').value || global.date,
-      time: document.getElementById('c_time').value || global.time,
-      place: document.getElementById('c_place').value || global.place,
-      ayanamsa: document.getElementById('c_ayanamsa').value || global.ayanamsa,
+    input.addEventListener('keydown', function(e) {
+        // Allow backspace, delete, tab, arrows
+        if ([8, 46, 9, 37, 39].indexOf(e.keyCode) !== -1) return;
+        // Allow numbers only
+        if ((e.keyCode < 48 || e.keyCode > 57) && (e.keyCode < 96 || e.keyCode > 105)) {
+            e.preventDefault();
+        }
     });
-    renderChart(data);
-    showResultPanel('chartResultPanel');
-    setStatus('chartStatus', 'success', '✅ Chart calculated successfully');
-  } catch (err) {
-    setStatus('chartStatus', 'error', '❌ ' + err.message);
-  } finally { hideLoading(); }
-});
+}
+// Apply to all birth-date text inputs
+document.querySelectorAll('.birth-date').forEach(setupDateInput);
+// Also apply to master date
+var masterDateEl = document.getElementById('master-date');
+if (masterDateEl) setupDateInput(masterDateEl);
 
-function renderChart(data) {
-  const el = document.getElementById('chartResults');
-  const nak = {};
-  (data.planet_nakshatras || []).forEach(n => { nak[n.planet] = n; });
+// ─── Master Birth Data Sync ────────────────────────────────
+// All birth data fields across tabs (class-based)
+function applyMasterToAll() {
+    var name  = document.getElementById('master-name').value;
+    var date  = document.getElementById('master-date').value;
+    var time  = document.getElementById('master-time').value;
+    var place = document.getElementById('master-place').value;
 
-  const rows = (data.planets || []).map(p => {
-    const n = nak[p.planet] || {};
-    return `<tr>
-      <td><strong>${p.planet}</strong></td>
-      <td>${p.sign}</td>
-      <td>${p.degree_in_sign?.toFixed(2)}°</td>
-      <td>${p.retrograde ? '<span class="retro-badge">℞</span>' : ''}</td>
-      <td><span class="nak-badge">${n.nakshatra || ''}</span></td>
-      <td>${n.lord || ''}</td>
-      <td class="fs-11">${n.sub_lord || ''}</td>
-      <td>${signalPill(n.nse_signal || '', scoreColor(n.financial_score || 0))}</td>
-    </tr>`;
-  }).join('');
-
-  const asc = data.ascendant || {};
-  el.innerHTML = `
-    <div class="mb-8">
-      <strong class="text-gold">Ascendant (Lagna):</strong>
-      <span class="text-accent">${asc.sign}</span>
-      ${asc.degree_in_sign?.toFixed(2)}° | ${nak[asc.sign]?.nakshatra || ''}
-    </div>
-    <div class="table-wrap">
-      <table class="planet-table">
-        <thead><tr>
-          <th>Planet</th><th>Sign</th><th>Degree</th><th>℞</th>
-          <th>Nakshatra</th><th>Lord</th><th>Sub-Lord</th><th>NSE Signal</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    document.querySelectorAll('.birth-name').forEach(function(el) { el.value = name; });
+    document.querySelectorAll('.birth-date').forEach(function(el) { el.value = date; });
+    document.querySelectorAll('.birth-time').forEach(function(el) { el.value = time; });
+    document.querySelectorAll('.birth-place').forEach(function(el) { el.value = place; });
 }
 
+// Apply button
+document.getElementById('master-apply-btn').addEventListener('click', applyMasterToAll);
 
-// ═══════════════════════════════════════════════════════════════════
-// 3. DASHA
-// ═══════════════════════════════════════════════════════════════════
+// Also auto-apply when master fields change (live sync)
+['master-name','master-date','master-time','master-place'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', applyMasterToAll);
+});
 
-document.getElementById('dashaForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('dashaStatus', 'loading', '⏳ Calculating Vimshottari Dasha...');
-  showLoading('Computing dasha timeline...');
-  try {
-    const global = loadGlobalDetails();
-    const base = getApiBase('d_apiBase');
+// ─── API Helper ─────────────────────────────────────────────
+async function apiCall(endpoint, body, resultEl) {
+    resultEl.innerHTML = '<div class="loading">Calculating...</div>';
+    try {
+        const method = body ? 'POST' : 'GET';
+        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(API + endpoint, opts);
+        const data = await res.json();
+        console.log(`[API ${endpoint}]`, res.status, data);
+        if (!res.ok) throw new Error(data.detail || JSON.stringify(data) || 'API Error');
+        return data;
+    } catch (e) {
+        console.error(`[API ${endpoint}] ERROR:`, e);
+        resultEl.innerHTML = `<div class="error-msg" style="color:#ff4444;padding:16px;font-size:1rem"><strong>Error:</strong> ${e.message}</div>`;
+        return null;
+    }
+}
+
+// ─── PREDICTION ─────────────────────────────────────────────
+document.getElementById('predict-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('predict-result');
     const body = {
-      name: document.getElementById('d_name').value || global.name,
-      date: document.getElementById('d_date').value || global.date,
-      time: document.getElementById('d_time').value || global.time,
-      place: document.getElementById('d_place').value || global.place,
-      ayanamsa: document.getElementById('d_ayanamsa').value || global.ayanamsa,
+        transit_date: document.getElementById('p-transit-date').value,
+        transit_time: document.getElementById('p-transit-time').value,
+        transit_place: document.getElementById('p-transit-place').value,
+        ayanamsa: document.getElementById('p-ayanamsa').value,
     };
-    const asOf = document.getElementById('d_as_of').value;
-    if (asOf) body.as_of_date = asOf;
-    const data = await apiPost(base, '/dasha', body);
-    renderDasha(data);
-    setStatus('dashaStatus', 'success', '✅ Dasha calculated');
-  } catch (err) {
-    setStatus('dashaStatus', 'error', '❌ ' + err.message);
-  } finally { hideLoading(); }
-});
+    const natalDate = document.getElementById('p-natal-date').value;
+    if (natalDate) {
+        body.natal_name = document.getElementById('p-natal-name').value;
+        body.natal_date = ddmmToApi(natalDate);
+        body.natal_time = document.getElementById('p-natal-time').value;
+        body.natal_place = document.getElementById('p-natal-place').value;
+    }
 
-function renderDasha(data) {
-  const el = document.getElementById('dashaResults');
-  const current = data.current_dasha || {};
-  const dd = data.dasha_data || {};
+    const data = await apiCall('/predict', body, resultEl);
+    if (!data) return;
 
-  let html = `<div class="card mb-8" style="background:rgba(240,192,64,0.08);border-color:var(--gold)">
-    <div class="card-title">⭐ Currently Active Dasha</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-      <div>
-        <div class="fs-11 text-muted">Mahadasha</div>
-        <div class="text-gold fw-700" style="font-size:18px">${current.mahadasha || '—'}</div>
-        <div class="fs-11 text-muted">${formatDate(current.mahadasha_start)} → ${formatDate(current.mahadasha_end)}</div>
-      </div>
-      <div>
-        <div class="fs-11 text-muted">Antardasha</div>
-        <div class="text-accent fw-700" style="font-size:15px">${current.antardasha || '—'}</div>
-        <div class="fs-11 text-muted">${current.antardasha_start ? formatDate(current.antardasha_start) + ' → ' + formatDate(current.antardasha_end) : ''}</div>
-      </div>
-      <div>
-        <div class="fs-11 text-muted">Pratyantar</div>
-        <div class="fw-700" style="color:var(--accent2)">${current.pratyantar || '—'}</div>
-        <div class="fs-11 text-muted">${current.pratyantar_start ? formatDate(current.pratyantar_start) : ''}</div>
-      </div>
-    </div>
-    <div class="mt-8 fs-12 text-muted">${current.market_outlook || ''}</div>
-    <div class="mt-4">Combined Score: <strong style="color:${scoreColor(current.combined_score||0)}">${current.combined_score > 0 ? '+' : ''}${current.combined_score?.toFixed(3) || '0'}</strong></div>
-  </div>`;
+    const pred = data.prediction || {};
+    const signal = pred.prediction || {};
+    const breakdown = pred.score_breakdown || {};
+    const sectors = pred.sector_recommendations || {};
+    const weekly = pred.weekly_outlook || [];
+    const conf = pred.confidence || {};
 
-  html += `<div class="fs-11 text-muted mb-8">Birth Nakshatra: <strong class="text-gold">${dd.birth_nakshatra || ''}</strong> · Lord: ${dd.birth_nakshatra_lord || ''} · Balance at birth: ${dd.balance_at_birth?.years?.toFixed(2) || ''} years</div>`;
-  html += '<div class="dasha-timeline">';
+    const signalClass = signal.direction?.includes('BULL') ? 'bullish' : signal.direction?.includes('BEAR') ? 'bearish' : 'neutral';
+    const badgeClass = signal.signal?.includes('BUY') ? 'buy' : signal.signal?.includes('SELL') ? 'sell' : 'hold';
 
-  const today = new Date().toISOString().split('T')[0];
-  (dd.dashas || []).forEach((maha, i) => {
-    const isActive = maha.start_date <= today && today <= maha.end_date;
-    const fin = maha.financial || {};
-    const color = scoreColor(fin.score || 0);
-    html += `
-    <div class="maha-block ${isActive ? 'active-dasha' : ''}" style="border-left:4px solid ${color}">
-      <div class="maha-header" onclick="this.nextElementSibling.classList.toggle('open')">
-        <div>
-          <span class="maha-name" style="color:${color}">${maha.mahadasha_lord}</span>
-          ${isActive ? '<span style="font-size:10px;color:var(--gold);margin-left:8px">▶ ACTIVE</span>' : ''}
+    resultEl.innerHTML = `
+        <div class="signal-card ${signalClass}">
+            <div class="signal-header">
+                <div>
+                    <h3 style="color:${signal.color||'#fff'}; font-size:1.4rem">${signal.signal || 'ANALYZING'}</h3>
+                    <p style="color:var(--text-muted); font-size:0.85rem">${pred.prediction_date || ''} | ${pred.market || 'NSE/BSE'}</p>
+                </div>
+                <div class="score-display" style="color:${signal.color||'#fff'}">${(pred.overall_score * 100).toFixed(1)}%</div>
+            </div>
+            <p style="color:var(--text); margin-bottom:12px">${signal.nifty_bias || ''}</p>
+            <p style="color:var(--text-muted); font-size:0.85rem">${signal.strategy || ''}</p>
+
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Confidence</div><div class="value gold">${conf.percent || 0}%</div></div>
+                <div class="metric"><div class="label">Planet Score</div><div class="value">${breakdown.planetary_position_score?.toFixed(3) || '—'}</div></div>
+                <div class="metric"><div class="label">Moon Nakshatra</div><div class="value">${breakdown.moon_nakshatra_score?.toFixed(3) || '—'}</div></div>
+                <div class="metric"><div class="label">Dasha Score</div><div class="value">${breakdown.dasha_score?.toFixed(3) || '—'}</div></div>
+                <div class="metric"><div class="label">Yoga Score</div><div class="value">${breakdown.yoga_score?.toFixed(3) || '—'}</div></div>
+                <div class="metric"><div class="label">Transit Score</div><div class="value">${breakdown.transit_score?.toFixed(3) || '—'}</div></div>
+            </div>
         </div>
-        <div class="maha-dates">${formatDate(maha.start_date)} → ${formatDate(maha.end_date)} (${maha.duration_years?.toFixed(1)}y)</div>
-        <div class="maha-score" style="color:${color}">${fin.score > 0 ? '+' : ''}${fin.score?.toFixed(2) || '0'}</div>
-      </div>
-      <div class="maha-body ${isActive ? 'open' : ''}">
-        <div class="maha-desc">${fin.market_effect || ''}</div>
-        <div class="fs-11 text-muted mb-8">Sectors: ${(fin.sectors || []).join(' · ')}</div>
-        ${(maha.antardashas || []).map(antar => {
-          const isAActive = antar.start_date <= today && today <= antar.end_date;
-          const ac = scoreColor(antar.combined_score || 0);
-          return `<div class="antar-row ${isAActive ? 'active-dasha' : ''}">
-            <span class="antar-lord" style="color:${ac}">${antar.antardasha_lord}${isAActive ? ' ▶' : ''}</span>
-            <span class="antar-dates">${formatDate(antar.start_date)} → ${formatDate(antar.end_date)}</span>
-            <span class="antar-score" style="color:${ac}">${antar.combined_score > 0 ? '+' : ''}${antar.combined_score?.toFixed(2) || '0'}</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  });
-  html += '</div>';
-  el.innerHTML = html;
-  showResultPanel('dashaResultPanel');
-}
 
+        ${sectors.strong_buy?.length ? `
+        <div class="card">
+            <h2>Sector Recommendations</h2>
+            <div style="margin-bottom:12px">
+                <strong style="color:var(--green)">BUY:</strong>
+                <div class="sector-tags">${sectors.strong_buy.map(s=>`<span class="sector-tag buy">${s}</span>`).join('')}</div>
+            </div>
+            ${sectors.hold?.length ? `<div style="margin-bottom:12px"><strong style="color:var(--orange)">HOLD:</strong><div class="sector-tags">${sectors.hold.map(s=>`<span class="sector-tag hold">${s}</span>`).join('')}</div></div>` : ''}
+            ${sectors.avoid?.length ? `<div><strong style="color:var(--red)">AVOID:</strong><div class="sector-tags">${sectors.avoid.map(s=>`<span class="sector-tag avoid">${s}</span>`).join('')}</div></div>` : ''}
+        </div>` : ''}
 
-// ═══════════════════════════════════════════════════════════════════
-// 4. DIVISIONAL CHARTS
-// ═══════════════════════════════════════════════════════════════════
+        ${weekly.length ? `
+        <div class="card">
+            <h2>7-Day Moon Nakshatra Outlook</h2>
+            <div class="weekly-grid">
+                ${weekly.map(d => `
+                    <div class="day-cell" style="border-left: 3px solid ${d.signal_color}">
+                        <div class="day-name">${d.day?.substring(0,3) || ''}</div>
+                        <div style="color:var(--text-muted);font-size:0.7rem">${d.date?.substring(5) || ''}</div>
+                        <div style="color:var(--gold);font-size:0.7rem;margin-top:4px">${d.nakshatra || ''}</div>
+                        <div class="day-signal" style="color:${d.signal_color}">${d.nse_signal?.substring(0,10) || ''}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>` : ''}
 
-document.getElementById('divisionalForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('divStatus', 'loading', '⏳ Calculating divisional charts...');
-  showLoading('Computing D-charts...');
-  try {
-    const global = loadGlobalDetails();
-    const base = getApiBase('dv_apiBase');
-    const charts = Array.from(document.querySelectorAll('#tab-divisional input[type=checkbox]:checked')).map(c => c.value);
-    const data = await apiPost(base, '/divisional', {
-      name: document.getElementById('dv_name').value || global.name,
-      date: document.getElementById('dv_date').value || global.date,
-      time: document.getElementById('dv_time').value || global.time,
-      place: document.getElementById('dv_place').value || global.place,
-      charts,
-    });
-    renderDivisional(data);
-    setStatus('divStatus', 'success', '✅ Divisional charts computed');
-  } catch (err) {
-    setStatus('divStatus', 'error', '❌ ' + err.message);
-  } finally { hideLoading(); }
+        ${pred.risk_factors?.length ? `
+        <div class="card">
+            <h2>Risk Factors</h2>
+            <ul style="list-style:none;padding:0">${pred.risk_factors.map(r=>`<li style="color:var(--red);margin:6px 0;font-size:0.85rem">&#9888; ${r}</li>`).join('')}</ul>
+        </div>` : ''}
+    `;
 });
 
-function renderDivisional(data) {
-  const el = document.getElementById('divResults');
-  const c = data.charts || {};
-  let html = '';
+// ─── PANCHANG ───────────────────────────────────────────────
+document.getElementById('panchang-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('panchang-result');
+    const data = await apiCall('/panchang', {
+        date: document.getElementById('pc-date').value,
+        time: document.getElementById('pc-time').value,
+    }, resultEl);
+    if (!data) return;
 
-  if (c.d2_hora) {
-    const fa = c.d2_hora.financial_analysis || {};
-    html += `<div class="card mb-8">
-      <h3 class="card-title">${c.d2_hora.chart}</h3>
-      <p class="fs-12 text-muted mb-8">${c.d2_hora.description}</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div><div class="fs-11 text-muted">Active Income (Sun Hora)</div><div class="fw-700 text-gold">${fa.active_income_strength}</div><div class="fs-11">${c.d2_hora.sun_hora_planets?.join(', ')}</div></div>
-        <div><div class="fs-11 text-muted">Passive Income (Moon Hora)</div><div class="fw-700 text-accent">${fa.passive_income_strength}</div><div class="fs-11">${c.d2_hora.moon_hora_planets?.join(', ')}</div></div>
-      </div>
-      <div class="signal-pill" style="background:#ffc10722;color:#ffc107;border:1px solid #ffc10744">${fa.wealth_indication}</div>
-    </div>`;
-  }
+    const t = data.tithi || {};
+    const n = data.nakshatra || {};
+    const y = data.yoga || {};
+    const k = data.karana || {};
+    const v = data.vara || {};
+    const f = data.financial_analysis || {};
+    const m = data.muhurta || {};
+    const chog = m.choghadiya || [];
 
-  if (c.d9_navamsha) {
-    const fa = c.d9_navamsha.financial_analysis || {};
-    const rows = (c.d9_navamsha.planets || []).map(p => `<tr>
-      <td>${p.planet}</td><td>${p.d1_sign}</td><td class="text-accent">${p.d9_sign}</td>
-      <td>${p.vargottama ? '<span style="color:#ffd700">★ Vargottama</span>' : ''}</td>
-      <td class="fs-11">${p.d9_strength}</td>
-    </tr>`).join('');
-    html += `<div class="card mb-8">
-      <h3 class="card-title">${c.d9_navamsha.chart}</h3>
-      <p class="fs-12 text-muted mb-8">${c.d9_navamsha.description}</p>
-      <div class="mb-8 fs-12"><strong class="text-gold">Navamsha Ascendant:</strong> ${c.d9_navamsha.navamsha_ascendant}</div>
-      ${fa.vargottama_count > 0 ? `<div class="mb-8 fs-12 text-green">${fa.vargottama_note}</div>` : ''}
-      <div class="table-wrap">
-        <table class="planet-table">
-          <thead><tr><th>Planet</th><th>D1 Sign</th><th>D9 Sign</th><th>Status</th><th>Strength</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </div>`;
-  }
+    resultEl.innerHTML = `
+        <div class="signal-card" style="border-left-color:${f.color || '#d4a843'}">
+            <div class="signal-header">
+                <div>
+                    <h3 style="color:${f.color || '#d4a843'}">${f.signal || 'PANCHANG'}</h3>
+                    <p style="color:var(--text-muted)">${data.date} | ${v.day} (${v.lord})</p>
+                </div>
+                <div class="score-display" style="color:${f.color || '#d4a843'}">${(f.combined_score * 100).toFixed(0)}%</div>
+            </div>
+            <p style="color:var(--text);margin-bottom:16px">${f.action || ''}</p>
 
-  if (c.d10_dashamsha) {
-    const fa = c.d10_dashamsha.financial_analysis || {};
-    const rows = (c.d10_dashamsha.planets || []).map(p => `<tr>
-      <td>${p.planet}</td><td>${p.d1_sign}</td><td class="text-accent">${p.d10_sign}</td>
-      <td class="fs-11">${p.d10_strength}</td><td class="fs-11 text-muted">${p.career_note}</td>
-    </tr>`).join('');
-    html += `<div class="card mb-8">
-      <h3 class="card-title">${c.d10_dashamsha.chart}</h3>
-      <p class="fs-12 text-muted mb-8">${c.d10_dashamsha.description}</p>
-      <div class="mb-8 fs-12"><strong class="text-gold">D10 Ascendant:</strong> ${c.d10_dashamsha.d10_ascendant} (Lord: ${c.d10_dashamsha.d10_asc_lord})</div>
-      <div class="mb-8 signal-pill" style="background:#7c6cf722;color:var(--accent2);border:1px solid #7c6cf744">${fa.career_strength}</div>
-      <div class="table-wrap">
-        <table class="planet-table">
-          <thead><tr><th>Planet</th><th>D1 Sign</th><th>D10 Sign</th><th>Strength</th><th>Career</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </div>`;
-  }
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Tithi</div><div class="value gold">${t.tithi_name || ''}</div><div class="label">${t.paksha || ''} | ${t.nature || ''}</div></div>
+                <div class="metric"><div class="label">Nakshatra</div><div class="value gold">${n.nakshatra_name || ''}</div><div class="label">Pada ${n.pada || ''}</div></div>
+                <div class="metric"><div class="label">Yoga</div><div class="value gold">${y.yoga_name || ''}</div><div class="label">${y.signal || ''}</div></div>
+                <div class="metric"><div class="label">Karana</div><div class="value ${k.is_vishti_bhadra?'red':'gold'}">${k.karana_name || ''}</div><div class="label">${k.is_vishti_bhadra ? 'VISHTI!' : 'Normal'}</div></div>
+            </div>
+        </div>
 
-  el.innerHTML = html || '<p class="text-muted">No charts computed.</p>';
-  showResultPanel('divResultPanel');
-}
+        <div class="card">
+            <h2>Muhurta — Trading Windows</h2>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Rahu Kalam</div><div class="value red">${m.rahu_kalam?.start || ''} - ${m.rahu_kalam?.end || ''}</div></div>
+                <div class="metric"><div class="label">Gulika Kalam</div><div class="value red">${m.gulika_kalam?.start || ''} - ${m.gulika_kalam?.end || ''}</div></div>
+                <div class="metric"><div class="label">Abhijit Muhurta</div><div class="value green">${m.abhijit_muhurta?.start || ''} - ${m.abhijit_muhurta?.end || ''}</div></div>
+            </div>
 
-document.getElementById('sbcForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('sbcStatus', 'loading', '⏳ Casting Sarvatobhadra Chakra with Vedha/Latta analysis...');
-  showLoading('Computing Sarvatobhadra Chakra + transit analysis...');
-  try {
-    const global = loadGlobalDetails();
-    const base = getApiBase('sbc_apiBase');
-    const today = new Date().toISOString().split('T')[0];
+            ${chog.length ? `
+            <h3 style="color:var(--gold-light);margin-top:20px;font-size:0.95rem">Choghadiya</h3>
+            <div class="choghadiya-grid">
+                ${chog.map(c => `
+                    <div class="choghadiya-slot" style="background:${c.color}15; border-color:${c.color}40">
+                        <div style="font-weight:600;color:${c.color}">${c.name}</div>
+                        <div style="font-size:0.75rem;color:var(--text-muted)">${c.start} - ${c.end}</div>
+                        <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px">${c.quality}</div>
+                    </div>
+                `).join('')}
+            </div>` : ''}
+        </div>
+    `;
+});
+
+// ─── BIRTH CHART ────────────────────────────────────────────
+document.getElementById('chart-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('chart-result');
+    const data = await apiCall('/chart', {
+        name: document.getElementById('c-name').value,
+        date: ddmmToApi(document.getElementById('c-date').value),
+        time: document.getElementById('c-time').value,
+        place: document.getElementById('c-place').value,
+        ayanamsa: document.getElementById('c-ayanamsa').value,
+    }, resultEl);
+    if (!data) return;
+
+    const asc = data.ascendant || {};
+    const planets = data.planets || [];
+    const nakshatras = data.planet_nakshatras || [];
+
+    resultEl.innerHTML = `
+        <div class="card">
+            <h2>Birth Chart — ${data.name}</h2>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Ascendant</div><div class="value gold">${asc.sign || ''}</div><div class="label">${asc.degree_in_sign?.toFixed(2) || ''}°</div></div>
+            </div>
+            <table class="data-table" style="margin-top:16px">
+                <thead><tr><th>Planet</th><th>Sign</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>Sub-Lord</th><th>Retro</th></tr></thead>
+                <tbody>
+                    ${nakshatras.map(p => `
+                        <tr>
+                            <td style="font-weight:600">${p.planet}</td>
+                            <td>${p.sign}</td>
+                            <td>${p.longitude?.toFixed(2) || ''}°</td>
+                            <td style="color:var(--gold)">${p.nakshatra || ''}</td>
+                            <td>${p.pada || ''}</td>
+                            <td>${p.sub_lord || ''}</td>
+                            <td>${p.retrograde ? '<span style="color:var(--red)">R</span>' : ''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+});
+
+// ─── SHADBALA ───────────────────────────────────────────────
+document.getElementById('shadbala-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('shadbala-result');
+    const data = await apiCall('/shadbala', {
+        name: document.getElementById('sb-name').value,
+        date: ddmmToApi(document.getElementById('sb-date').value),
+        time: document.getElementById('sb-time').value,
+        place: document.getElementById('sb-place').value,
+    }, resultEl);
+    if (!data) return;
+
+    const sb = data.shadbala || {};
+    const planets = sb.planets || {};
+    const ranking = sb.ranking || [];
+    const summary = sb.financial_summary || {};
+
+    resultEl.innerHTML = `
+        <div class="signal-card">
+            <h3 style="color:var(--gold-light)">Shadbala — Planetary Strength</h3>
+            <p style="color:var(--text-muted);margin:8px 0">${summary.outlook || ''}</p>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Strongest</div><div class="value green">${sb.strongest_planet || ''}</div></div>
+                <div class="metric"><div class="label">Weakest</div><div class="value red">${sb.weakest_planet || ''}</div></div>
+                <div class="metric"><div class="label">Strong Planets</div><div class="value gold">${sb.strong_planets?.length || 0}/7</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Planetary Strength Ranking</h2>
+            <table class="data-table">
+                <thead><tr><th>Planet</th><th>Rupas</th><th>Required</th><th>Ratio</th><th>Strength</th><th>Financial Signal</th></tr></thead>
+                <tbody>
+                    ${ranking.map(r => {
+                        const p = planets[r.planet] || {};
+                        const fi = p.financial_impact || {};
+                        const color = r.ratio >= 1.0 ? 'var(--green)' : r.ratio >= 0.7 ? 'var(--orange)' : 'var(--red)';
+                        return `<tr>
+                            <td style="font-weight:600">${r.planet}</td>
+                            <td style="color:${color}">${r.rupas}</td>
+                            <td>${p.required_rupas || ''}</td>
+                            <td style="color:${color}">${r.ratio}x</td>
+                            <td>${p.strength_label || ''}</td>
+                            <td style="font-size:0.8rem">${fi.action || ''}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+});
+
+// ─── ASHTAKAVARGA ────────────────────────────────────────────
+document.getElementById('ashtakavarga-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('ashtakavarga-result');
+    const data = await apiCall('/ashtakavarga', {
+        name: document.getElementById('av-name').value,
+        date: ddmmToApi(document.getElementById('av-date').value),
+        time: document.getElementById('av-time').value,
+        place: document.getElementById('av-place').value,
+        days_ahead: parseInt(document.getElementById('av-days-ahead').value) || 180,
+    }, resultEl);
+    if (!data) return;
+
+    console.log('Ashtakavarga data:', data); // Debug log
+
+    // Remove debug display and implement proper display
+    const savData = data.sarvashtakavarga || {};
+    const sav = savData.sarvashtakavarga || {};
+    const bav = data.bhinnashtakavarga || {};
+    const transits = data.transit_predictions || [];
+
+    resultEl.innerHTML = `
+        <div class="signal-card">
+            <h3 style="color:var(--gold-light)">🔢 Ashtakavarga Analysis</h3>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">SAV Average</div><div class="value gold">${savData.average || 0}</div></div>
+                <div class="metric"><div class="label">Strongest Sign</div><div class="value green">${savData.strongest_sign || ''}</div></div>
+                <div class="metric"><div class="label">Weakest Sign</div><div class="value red">${savData.weakest_sign || ''}</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Sarvashtakavarga (Total Scores)</h2>
+            <table class="data-table">
+                <thead><tr><th>Sign</th><th>Score</th><th>Strength</th><th>Signal</th></tr></thead>
+                <tbody>
+                    ${Object.entries(sav).filter(([key]) => 
+                        ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'].includes(key)
+                    ).map(([sign, score]) => {
+                        const strength = score >= 35 ? 'VERY STRONG' : score >= 28 ? 'STRONG' : score >= 21 ? 'MODERATE' : 'WEAK';
+                        const color = score >= 35 ? 'var(--green)' : score >= 28 ? 'var(--gold)' : score >= 21 ? 'var(--orange)' : 'var(--red)';
+                        const signal = savData.sav_signals?.[sign] || 'NEUTRAL';
+                        const signalColor = signal.includes('BULLISH') ? 'var(--green)' : signal.includes('BEARISH') ? 'var(--red)' : 'var(--orange)';
+                        return `<tr>
+                            <td style="font-weight:600">${sign}</td>
+                            <td style="color:${color};font-weight:600">${score}</td>
+                            <td>${strength}</td>
+                            <td style="color:${signalColor};font-weight:600">${signal}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        ${transits.length ? `
+        <div class="card">
+            <h2>Transit Predictions (${transits.length} events)</h2>
+            <div class="transit-grid">
+                ${transits.slice(0, 10).map(t => `
+                    <div class="transit-item" style="border-left: 3px solid ${t.market_signal === 'BUY' ? 'var(--green)' : t.market_signal === 'SELL' ? 'var(--red)' : 'var(--orange)'}">
+                        <div class="transit-date">${t.date}</div>
+                        <div class="transit-event">${t.planet} enters ${t.sign}</div>
+                        <div class="transit-signal" style="color:${t.market_signal === 'BUY' ? 'var(--green)' : t.market_signal === 'SELL' ? 'var(--red)' : 'var(--orange)'}">${t.market_signal}</div>
+                        <div class="transit-reason" style="font-size:0.75rem;color:var(--text-muted)">${t.reason}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>` : ''}
+    `;
+});
+
+// ─── SARVATOBHADRA ───────────────────────────────────────────
+document.getElementById('sarvatobhadra-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('sarvatobhadra-result');
+    const data = await apiCall('/sarvatobhadra', {
+        name: document.getElementById('sbc-name').value,
+        date: ddmmToApi(document.getElementById('sbc-date').value),
+        time: document.getElementById('sbc-time').value,
+        place: document.getElementById('sbc-place').value,
+        ayanamsa: document.getElementById('sbc-ayanamsa').value,
+        transit_date: document.getElementById('sbc-transit-date').value || null,
+        transit_time: document.getElementById('sbc-transit-time').value || null,
+        transit_place: document.getElementById('sbc-transit-place').value || null,
+    }, resultEl);
+    if (!data) return;
+
+    const sbc = data.sbc_analysis || {};
+    const mkt = sbc.market_signal || {};
+    const moonNak = data.moon_nakshatra || {};
+    const vedhaHits = sbc.all_vedha_hits || sbc.vedha_hits || [];
+    const lattaHits = sbc.all_latta_hits || sbc.latta_hits || [];
+    const sixBindus = sbc.six_bindus || {};
+    const binduAnalysis = sbc.bindu_analysis || {};
+    const navatara = sbc.navatara || {};
+    const vedhaLinesAll = sbc.vedha_lines_all || sbc.vedha_lines || [];
+    const transitPlanets = data.transit_planets || [];
+    const natalPlanets = data.planet_positions || [];
+    const grid = data.chakra_grid || [];
+
+    /* ── Build nakshatra→cell position map from grid data ───── */
+    const nakCellMap = {};
+    for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < (grid[r]||[]).length; c++) {
+            const cell = grid[r][c];
+            (cell.entities || []).forEach(function(e) {
+                if (e.entity_type === 'nakshatra') {
+                    nakCellMap[e.name] = [r, c];
+                    nakCellMap[e.name.toLowerCase()] = [r, c];
+                }
+            });
+        }
+    }
+
+    /* ── Place transit planets onto grid cells (they aren't in chakra_grid) */
+    transitPlanets.forEach(function(tp) {
+        var nak = tp.nakshatra;
+        var pos = nakCellMap[nak] || nakCellMap[(nak||'').toLowerCase()];
+        if (!pos || !grid[pos[0]]) return;
+        var cell = grid[pos[0]][pos[1]];
+        if (!cell.entities) cell.entities = [];
+        var already = cell.entities.some(function(e){ return e.name === tp.planet && e.entity_type === 'special'; });
+        if (!already) {
+            cell.entities.push({
+                name: tp.planet,
+                entity_type: 'special',
+                meta: { source: 'transit', nakshatra: nak, sign: tp.sign, retrograde: tp.retrograde, speed: tp.speed }
+            });
+        }
+    });
+
+    /* ── Mark natal planets with source tag ──────────────────── */
+    for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < (grid[r]||[]).length; c++) {
+            (grid[r][c].entities || []).forEach(function(e) {
+                if (e.entity_type === 'special' && (!e.meta || !e.meta.source)) {
+                    if (!e.meta) e.meta = {};
+                    e.meta.source = 'natal';
+                }
+            });
+        }
+    }
+
+    /* ── Helpers ─────────────────────────────────────────────── */
+    const PLANET_ABBR = {Sun:'Su',Moon:'Mo',Mars:'Ma',Mercury:'Me',Jupiter:'Ju',Venus:'Ve',Saturn:'Sa',Rahu:'Ra',Ketu:'Ke'};
+    const BENEFICS = new Set(['Jupiter','Venus','Mercury','Moon']);
+    function abbr(n){ return PLANET_ABBR[n] || n.slice(0,2); }
+    function isBenefic(n){ return BENEFICS.has(n); }
+    function natalBadgeColor(n){
+        if(n==='Sun') return '#2255aa';
+        return isBenefic(n) ? '#1a6699' : '#334488';
+    }
+    function transitBadgeColor(n){
+        if(n==='Sun') return '#e67700';
+        return isBenefic(n) ? '#1a8c1a' : '#cc1a1a';
+    }
+    function shortenName(name){
+        let s = name;
+        if(s.length>14) s = s.replace('Shukla ','S.').replace('Krishna ','K.').replace('Uttara ','U.').replace('Purva ','P.').replace('Bhadrapada','Bhadra');
+        return s;
+    }
+
+    /* ── Zone / entity-type colour maps (Parashara's Light palette) */
+    const ZONE_BG   = { outer:'#d8c8f0', second:'#f5e6a3', third:'#f5c09a', fourth:'#a8e6a0', center:'#ffe0b0' };
+    const ZONE_TEXT  = { outer:'#3a2878', second:'#6b4e00', third:'#7a3a10', fourth:'#1a5a10', center:'#8b4513' };
+    const TYPE_BG    = { nakshatra:'#d8c8f0', rashi:'#f5e6a3', tithi:'#f5c09a', vara:'#a8e6a0', corner:'#e8e0d0', special:'#ffe0b0', empty:'#f8f4ee' };
+    const TYPE_TEXT   = { nakshatra:'#3a2878', rashi:'#6b4e00', tithi:'#7a3a10', vara:'#1a5a10', corner:'#555', special:'#8b4513', empty:'#999' };
+
+    /* ── Navatara quality colour map ─────────────────────────── */
+    const NAVATARA_COLOR = {
+        'Janma':'#ff6b6b','Sampat':'#51cf66','Vipat':'#ff4444','Kshema':'#69db7c',
+        'Pratyari':'#ff8787','Sadhaka':'#40c057','Vadha':'#e03131','Mitra':'#2f9e44',
+        'Ati Mitra':'#087f5b','Parama Mitra':'#099268',
+        'janma':'#ff6b6b','sampat':'#51cf66','vipat':'#ff4444','kshema':'#69db7c',
+        'pratyari':'#ff8787','sadhaka':'#40c057','vadha':'#e03131','mitra':'#2f9e44',
+        'ati_mitra':'#087f5b','parama_mitra':'#099268'
+    };
+
+    /* ── Devanagari aksharas for traditional SBC positions ───── */
+    const SBC_AKSHARAS = {
+        '0,0':'अ', '0,8':'आ', '8,0':'ऊ', '8,8':'ॠ',
+        '1,1':'उ', '1,7':'ऊ', '7,1':'ज', '7,7':'ए',
+        '2,2':'ल', '2,6':'म', '3,3':'ओ', '3,5':'औ',
+        '4,3':'द', '4,5':'प', '5,3':'अः', '5,5':'अं',
+        '6,2':'ग', '6,6':'र', '4,4':'✦'
+    };
+
+    /* ── Outer-ring nakshatra order for info strips ──────────── */
+    const TOP_NAK   = ['Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha'];
+    const RIGHT_NAK = ['Magha','P.Phalguni','U.Phalguni','Hasta','Chitra','Swati','Vishakha'];
+    const BOT_NAK   = ['Anuradha','Jyeshtha','Mula','P.Ashadha','U.Ashadha','Abhijit','Shravana'];
+    const LEFT_NAK  = ['Dhanishtha','Shatabhisha','P.Bhadrapada','U.Bhadrapada','Revati','Ashwini','Bharani'];
+
+    /* ── Build a set of afflicted (row,col) for vedha ────────── */
+    const afflictedSet = new Set();
+    vedhaHits.forEach(v => {
+        const tp = v.to_pos || v.target_pos;
+        if(tp) afflictedSet.add(tp[0]+','+tp[1]);
+    });
+
+    /* ── Build a set of latta-affected nakshatra names ───────── */
+    const lattaNakSet = new Set();
+    lattaHits.forEach(l => { if(l.kicked_nakshatra) lattaNakSet.add(l.kicked_nakshatra); });
+
+    /* ── Build navatara map (nakshatra name -> {tara, tara_number, quality}) */
+    const navataraMap = {};
+    Object.entries(navatara).forEach(([nak, info]) => { navataraMap[nak] = info; });
+
+    /* ── Helper: get navatara info for a nakshatra name ──────── */
+    function getNavataraFor(nakName){
+        var info = navataraMap[nakName];
+        if(!info) {
+            var alt = Object.keys(navataraMap).find(function(k){ return k.replace(/\s+/g,'').toLowerCase() === nakName.replace(/[\s.]+/g,'').toLowerCase(); });
+            if(alt) info = navataraMap[alt];
+        }
+        return info;
+    }
+
+    /* ── Build pada-vedha map: which nakshatra+pada has a transit planet ── */
+    var padaVedhaMap = {}; // key: "NakName" -> set of padas with transit planets
+    var transitPlanetsArr = data.transit_planets || [];
+    transitPlanetsArr.forEach(function(tp){
+        var nak = tp.nakshatra;
+        if(!nak) return;
+        // Check if this nakshatra is vedha-afflicted
+        var isAfflicted = vedhaHits.some(function(v){ return v.planet === tp.planet; });
+        if(!padaVedhaMap[nak]) padaVedhaMap[nak] = {};
+        // We don't have per-pada vedha, but mark which pada the transit planet is in
+        // (from the grid cell data or transit planet data)
+    });
+    // Build from vedha hits: mark afflicted nakshatras (both source and target)
+    var vedhaAffectedNaks = new Set();
+    vedhaHits.forEach(function(v){
+        if(v.from_nak) vedhaAffectedNaks.add(v.from_nak);
+        if(v.to_entity) vedhaAffectedNaks.add(v.to_entity);
+        // Also add the transit planet's nakshatra
+        if(v.planet){
+            var tp = transitPlanetsArr.find(function(t){ return t.planet === v.planet; });
+            if(tp && tp.nakshatra) vedhaAffectedNaks.add(tp.nakshatra);
+        }
+    });
+
+    /* ── Fuzzy nakshatra match for vedha set ──────────────────── */
+    var NAK_FULL_NAMES = {
+        'P.Bhadrapada':'Purva Bhadrapada','U.Bhadrapada':'Uttara Bhadrapada',
+        'P.Phalguni':'Purva Phalguni','U.Phalguni':'Uttara Phalguni',
+        'P.Ashadha':'Purva Ashadha','U.Ashadha':'Uttara Ashadha',
+        'Mrigashira':'Mrigashira','Krittika':'Krittika','Rohini':'Rohini',
+        'Ardra':'Ardra','Punarvasu':'Punarvasu','Pushya':'Pushya','Ashlesha':'Ashlesha',
+        'Magha':'Magha','Hasta':'Hasta','Chitra':'Chitra','Swati':'Swati','Vishakha':'Vishakha',
+        'Anuradha':'Anuradha','Jyeshtha':'Jyeshtha','Mula':'Mula','Abhijit':'Abhijit',
+        'Shravana':'Shravana','Dhanishtha':'Dhanishtha','Shatabhisha':'Shatabhisha',
+        'Revati':'Revati','Ashwini':'Ashwini','Bharani':'Bharani'
+    };
+    function isNakVedhaAffected(shortName){
+        if(vedhaAffectedNaks.has(shortName)) return true;
+        var full = NAK_FULL_NAMES[shortName];
+        if(full && vedhaAffectedNaks.has(full)) return true;
+        // Also try fuzzy: strip dots/spaces
+        var clean = shortName.replace(/[\s.]+/g,'').toLowerCase();
+        var found = false;
+        vedhaAffectedNaks.forEach(function(n){
+            if(n.replace(/[\s.]+/g,'').toLowerCase() === clean) found = true;
+        });
+        return found;
+    }
+
+    /* ── Build info strip HTML for a list of nakshatras ──────── */
+    function buildInfoStrip(nakList, orientation){
+        var isVert = orientation === 'vertical';
+
+        if(isVert){
+            /* Vertical strips (left/right) — 9 slots: header + 7 nak rows + spacer
+               Grid rows: [0]=corner, [1-7]=nakshatras, [8]=corner
+               Strip: [header], [7 nak rows matching grid rows 1-7], [spacer for row 8] */
+            var rows = '';
+            /* Header row (aligns with grid row 0 / corner) */
+            rows += '<div class="sbc-strip-row-v sbc-strip-hdr-row">';
+            rows += '<div class="sbc-sv-hdr">Nak</div><div class="sbc-sv-hdr">T#</div>';
+            rows += '<div class="sbc-sv-hdr sbc-sv-pada-hdr">1</div><div class="sbc-sv-hdr sbc-sv-pada-hdr">2</div>';
+            rows += '<div class="sbc-sv-hdr sbc-sv-pada-hdr">3</div><div class="sbc-sv-hdr sbc-sv-pada-hdr">4</div>';
+            rows += '</div>';
+            /* 7 nakshatra rows (align with grid rows 1-7) */
+            nakList.forEach(function(nak){
+                var navInfo = getNavataraFor(nak);
+                var taraNum = navInfo ? (navInfo.tara_number || '—') : '—';
+                var quality = navInfo ? (navInfo.quality || 'neutral') : 'neutral';
+                var qColor = quality === 'auspicious' ? '#1a8c1a' : quality === 'inauspicious' ? '#cc1a1a' : '#8b7700';
+                var shortNak = nak.length > 8 ? nak.slice(0,7)+'.' : nak;
+                var isVedha = isNakVedhaAffected(nak);
+                var rowCls = isVedha ? ' sbc-sv-vedha' : '';
+                rows += '<div class="sbc-strip-row-v'+rowCls+'">';
+                rows += '<div class="sbc-sv-cell sbc-sv-nak" title="'+nak+'">'+shortNak+'</div>';
+                rows += '<div class="sbc-sv-cell sbc-sv-tara" style="color:'+qColor+'">'+taraNum+'</div>';
+                for(var p=1; p<=4; p++){
+                    var padaCls = isVedha ? ' sbc-pada-hit' : '';
+                    rows += '<div class="sbc-sv-cell sbc-sv-pada'+padaCls+'">'+p+'</div>';
+                }
+                rows += '</div>';
+            });
+            /* Spacer (aligns with grid row 8 / corner) */
+            rows += '<div class="sbc-strip-spacer"></div>';
+            return '<div class="sbc-strip-col">'+rows+'</div>';
+        }
+
+        /* Horizontal strips (top/bottom) — header row + one column per nakshatra */
+        var html = '<table class="sbc-strip-table"><thead><tr>';
+        html += '<th class="sbc-sh-hdr"></th>';
+        nakList.forEach(function(nak){
+            var shortNak = nak.length > 8 ? nak.slice(0,7)+'.' : nak;
+            html += '<th class="sbc-sh-hdr sbc-sh-nak" title="'+nak+'">'+shortNak+'</th>';
+        });
+        html += '</tr></thead><tbody>';
+
+        /* Tara row */
+        html += '<tr><td class="sbc-sh-label">Tara#</td>';
+        nakList.forEach(function(nak){
+            var navInfo = getNavataraFor(nak);
+            var taraNum = navInfo ? (navInfo.tara_number || '—') : '—';
+            var quality = navInfo ? (navInfo.quality || 'neutral') : 'neutral';
+            var qColor = quality === 'auspicious' ? '#1a8c1a' : quality === 'inauspicious' ? '#cc1a1a' : '#8b7700';
+            html += '<td class="sbc-sh-cell" style="color:'+qColor+'">'+taraNum+'</td>';
+        });
+        html += '</tr>';
+
+        /* Pada rows (1-4) */
+        for(var p=1; p<=4; p++){
+            html += '<tr><td class="sbc-sh-label">Pd '+p+'</td>';
+            nakList.forEach(function(nak){
+                var isVedha = isNakVedhaAffected(nak);
+                var padaCls = isVedha ? ' sbc-pada-hit' : '';
+                html += '<td class="sbc-sh-cell sbc-sh-pada'+padaCls+'">'+p+'</td>';
+            });
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        return html;
+    }
+
+    const sigColor = mkt.color || '#d4a843';
+
+    /* ══════════════════════════════════════════════════════════
+       Render the entire SBC section (Parashara's Light 9.0 style)
+       ══════════════════════════════════════════════════════════ */
+    resultEl.innerHTML = `
+        <style>
+            /* ── Toggle / Options Bar ─────────────────────────── */
+            .sbc-options-panel{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 12px;background:rgba(26,26,46,0.6);border:1px solid rgba(212,168,67,0.3);border-radius:6px}
+            .sbc-opt-label{display:flex;align-items:center;gap:4px;font-size:0.78rem;color:#c8b880;cursor:pointer;user-select:none;padding:3px 8px;border-radius:4px;transition:all .2s}
+            .sbc-opt-label:hover{background:rgba(212,168,67,0.12)}
+            .sbc-opt-label input[type=checkbox]{accent-color:#d4a843;width:14px;height:14px;cursor:pointer}
+
+            /* ── Grid Layout Container ────────────────────────── */
+            .sbc-master-wrap{max-width:860px;margin:0 auto}
+            .sbc-chart-area{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto 1fr auto;gap:0}
+
+            /* ── Info Strips ──────────────────────────────────── */
+            .sbc-strip-top,.sbc-strip-bottom{grid-column:2/3}
+            .sbc-strip-left{grid-column:1/2;grid-row:2/3;display:flex;align-items:stretch}
+            .sbc-strip-right{grid-column:3/4;grid-row:2/3;display:flex;align-items:stretch}
+
+            /* Vertical strip (left/right) */
+            .sbc-strip-col{display:grid;grid-template-rows:auto repeat(7,1fr) auto;width:100%;height:100%}
+            .sbc-strip-col .sbc-strip-row-v{display:grid;grid-template-columns:60px 24px 18px 18px 18px 18px;gap:0;align-items:center;border-bottom:1px solid rgba(212,168,67,0.1)}
+            .sbc-strip-col .sbc-strip-hdr-row{background:rgba(26,26,46,0.9);border-bottom:1px solid rgba(212,168,67,0.25)}
+            .sbc-strip-col .sbc-strip-spacer{}
+            .sbc-sv-hdr{font-size:0.55rem;font-weight:700;color:#d4a843;text-align:center;padding:3px 2px}
+            .sbc-sv-pada-hdr{font-size:0.5rem}
+            .sbc-sv-cell{font-size:0.6rem;padding:2px 3px;color:#c8b880;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .sbc-sv-nak{text-align:left;font-weight:600;color:#ddd;padding-left:4px}
+            .sbc-sv-tara{font-weight:700}
+            .sbc-sv-pada{font-size:0.55rem;color:#888;border-left:1px solid rgba(212,168,67,0.06)}
+            .sbc-sv-vedha{background:rgba(255,0,0,0.06)}
+            .sbc-pada-hit{background:rgba(255,50,50,0.18);color:#ff6666!important;font-weight:700}
+
+            /* Horizontal strip (top/bottom) */
+            .sbc-strip-table{width:100%;border-collapse:collapse;border-spacing:0}
+            .sbc-strip-table th,.sbc-strip-table td{padding:2px 3px;text-align:center;font-size:0.58rem;border:1px solid rgba(212,168,67,0.08)}
+            .sbc-sh-hdr{background:rgba(26,26,46,0.9);color:#d4a843;font-weight:700;font-size:0.58rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .sbc-sh-nak{min-width:60px}
+            .sbc-sh-label{font-size:0.52rem;font-weight:700;color:#d4a843;background:rgba(26,26,46,0.8);padding:2px 4px;text-align:right;white-space:nowrap}
+            .sbc-sh-cell{color:#c8b880;font-size:0.55rem}
+            .sbc-sh-pada{color:#888;font-size:0.5rem}
+
+            /* ── Grid Wrapper ─────────────────────────────────── */
+            .sbc-grid-wrap{position:relative;grid-column:2/3;grid-row:2/3}
+            .sbc-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:0;border:2px solid #8b7040;position:relative;z-index:1}
+
+            /* ── Cells ────────────────────────────────────────── */
+            .sbc-cell{border:1px solid rgba(0,0,0,0.18);padding:2px 1px;text-align:center;min-height:64px;min-width:64px;display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative;transition:all .15s;cursor:default}
+            .sbc-cell:hover{filter:brightness(1.08);z-index:5}
+            .sbc-cell .cell-name{font-weight:700;line-height:1.12;word-break:break-word}
+            .sbc-cell .cell-akshara{font-size:0.65rem;color:rgba(0,0,0,0.4);font-weight:600;position:absolute;top:1px;left:3px;pointer-events:none}
+            .sbc-cell .planet-badges{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin-top:2px}
+            .sbc-cell .planet-badge{font-size:0.58rem;color:#fff;padding:1px 4px;font-weight:700;display:inline-block;line-height:1.3;letter-spacing:0.3px}
+            .sbc-transit-click{cursor:pointer;transition:transform .15s,box-shadow .15s}
+            .sbc-transit-click:hover{transform:scale(1.25);box-shadow:0 0 6px rgba(255,204,0,0.8)}
+            .sbc-transit-click.sbc-selected{transform:scale(1.3);box-shadow:0 0 10px rgba(255,255,0,1);outline:2px solid #fff}
+            .sbc-cell .latta-badge{position:absolute;top:1px;right:2px;width:14px;height:14px;background:#ff8c00;color:#fff;font-size:0.5rem;font-weight:900;line-height:14px;text-align:center;border-radius:2px;z-index:3;display:none}
+            .sbc-cell.latta-active .latta-badge{display:block}
+            .sbc-cell.vedha-hit{box-shadow:inset 0 0 0 2px #ff0000}
+            .sbc-cell.navatara-on .navatara-stripe{display:block}
+            .sbc-cell .navatara-stripe{position:absolute;bottom:0;left:0;right:0;height:5px;display:none;z-index:2;border-radius:0 0 1px 1px}
+
+            /* ── SVG Vedha Overlay ─────────────────────────────── */
+            .sbc-vedha-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4}
+
+            /* ── Legend ────────────────────────────────────────── */
+            .sbc-legend{display:flex;gap:14px;justify-content:center;margin-top:14px;font-size:0.72rem;flex-wrap:wrap;color:var(--text-muted,#aaa)}
+            .sbc-legend-dot{display:inline-block;width:13px;height:13px;vertical-align:middle;border-radius:2px;margin-right:3px;border:1px solid rgba(0,0,0,0.2)}
+
+            /* ── Info Cards ────────────────────────────────────── */
+            .sbc-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+            @media(max-width:700px){.sbc-info-grid{grid-template-columns:1fr} .sbc-grid{min-width:520px}}
+        </style>
+
+        <!-- SBC Chakra Card -->
+        <div class="card">
+            <h2 style="text-align:center;margin-bottom:4px">Sarvatobhadra Chakra</h2>
+            <div style="text-align:center;font-size:0.78rem;color:var(--text-muted);margin-bottom:12px">
+                Moon: <strong>${(moonNak.nakshatra || moonNak)}</strong> | Janma: <strong>${data.janma_nakshatra || '—'}</strong>
+            </div>
+
+            <!-- Options Panel -->
+            <div class="sbc-options-panel" id="sbc-options-panel">
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="natal" checked> Show natal planets</label>
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="transit" checked> Show transit planets</label>
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="vedha" checked> Show Vedha lines</label>
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="latta" checked> Show Latta</label>
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="navatara"> Show Navatara colors</label>
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="aksharas" checked> Show Devanagari</label>
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="tarabala" checked> Show Tarabala</label>
+            </div>
+
+            <div style="overflow-x:auto">
+                <div class="sbc-master-wrap">
+                    <div class="sbc-chart-area">
+                        <!-- Top Info Strip -->
+                        <div class="sbc-strip-top" id="sbc-strip-top"></div>
+                        <!-- Left Info Strip -->
+                        <div class="sbc-strip-left" id="sbc-strip-left"></div>
+                        <!-- Main Grid -->
+                        <div class="sbc-grid-wrap" id="sbc-grid-wrap">
+                            <div class="sbc-grid" id="sbc-chakra-grid"></div>
+                            <svg class="sbc-vedha-svg" id="sbc-vedha-svg"></svg>
+                        </div>
+                        <!-- Right Info Strip -->
+                        <div class="sbc-strip-right" id="sbc-strip-right"></div>
+                        <!-- Bottom Info Strip -->
+                        <div class="sbc-strip-bottom" id="sbc-strip-bottom"></div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="sbc-legend">
+                    <span><span class="sbc-legend-dot" style="background:#d8c8f0"></span>Nakshatra</span>
+                    <span><span class="sbc-legend-dot" style="background:#f5e6a3"></span>Rashi</span>
+                    <span><span class="sbc-legend-dot" style="background:#f5c09a"></span>Tithi</span>
+                    <span><span class="sbc-legend-dot" style="background:#a8e6a0"></span>Vara</span>
+                    <span><span class="sbc-legend-dot" style="background:#ffe0b0"></span>Center</span>
+                    <span><span class="sbc-legend-dot" style="background:#1a8c1a"></span>Benefic</span>
+                    <span><span class="sbc-legend-dot" style="background:#cc1a1a"></span>Malefic</span>
+                    <span><span class="sbc-legend-dot" style="background:#ff8c00"></span>Latta</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Market Signal Card -->
+        <div class="signal-card" style="border-left-color:${sigColor}">
+            <div class="signal-header">
+                <div>
+                    <h3 style="color:${sigColor}">${mkt.signal || 'SARVATOBHADRA'}</h3>
+                    <div style="font-size:0.9rem;color:var(--text-muted)">${mkt.action || ''}</div>
+                </div>
+                <div class="signal-score">${sbc.sbc_score ?? mkt.score ?? 0}</div>
+            </div>
+            <div class="signal-details">
+                <div class="detail-item"><strong>Moon Nakshatra:</strong> ${(moonNak.nakshatra || moonNak)} (Pada ${moonNak.pada || '—'}, Lord: ${moonNak.lord || '—'})</div>
+                <div class="detail-item"><strong>Janma Nakshatra:</strong> ${data.janma_nakshatra || ''}</div>
+                <div class="detail-item"><strong>Vedha Hits:</strong> ${vedhaHits.length}</div>
+                <div class="detail-item"><strong>Active Lattas:</strong> ${lattaHits.length}</div>
+            </div>
+            ${mkt.warning_tips?.length ? '<div style="margin-top:8px">' + mkt.warning_tips.map(function(w){ return '<p style="color:var(--red);margin:4px 0">&#9888; '+w+'</p>'; }).join('') + '</div>' : ''}
+        </div>
+
+        <!-- Info Cards Grid -->
+        <div class="sbc-info-grid">
+            <!-- Six Bindus -->
+            <div class="card">
+                <h2>Six Personal Bindus</h2>
+                <table class="data-table">
+                    <thead><tr><th>Bindu</th><th>Nakshatra</th><th>Status</th></tr></thead>
+                    <tbody>
+                        ${Object.entries(sixBindus).map(function([key, val]){
+                            var st = (binduAnalysis[key] && binduAnalysis[key].status) || '—';
+                            var stColor = st === 'AFFLICTED' ? 'var(--red)' : st === 'PROTECTED' ? 'var(--green)' : 'var(--gold)';
+                            return '<tr><td style="font-weight:600">'+key+'</td><td>'+(val && val.nakshatra ? val.nakshatra : val || '—')+'</td><td style="color:'+stColor+'">'+st+'</td></tr>';
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Latta Hits -->
+            ${lattaHits.length ? '<div class="card"><h2>Latta Analysis</h2><table class="data-table"><thead><tr><th>Planet</th><th>Kicks</th><th>Dir</th><th>Severity</th><th>Effect</th></tr></thead><tbody>' + lattaHits.map(function(l){ return '<tr><td style="font-weight:600">'+l.planet+'</td><td>'+(l.kicked_nakshatra||'—')+'</td><td>'+(l.direction||'—')+'</td><td style="color:'+(l.severity==='HIGH'?'var(--red)':'var(--gold)')+'">'+(l.severity||'—')+'</td><td>'+(l.effect||l.nse_impact||'—')+'</td></tr>'; }).join('') + '</tbody></table></div>' : '<div></div>'}
+        </div>
+
+        <!-- Transit Planets -->
+        <div class="card">
+            <h2>Transit Planets</h2>
+            <table class="data-table">
+                <thead><tr><th>Planet</th><th>Nakshatra</th><th>Sign</th><th>Longitude</th><th>Speed</th><th>Retro</th></tr></thead>
+                <tbody>
+                    ${transitPlanets.map(function(tp){ return '<tr><td style="font-weight:600">'+tp.planet+'</td><td>'+(tp.nakshatra||'—')+'</td><td>'+(tp.sign||'—')+'</td><td>'+(tp.longitude!=null?tp.longitude.toFixed(2):'—')+'</td><td>'+(tp.speed!=null?tp.speed.toFixed(4):'—')+'</td><td>'+(tp.retrograde?'<span style="color:var(--red)">R</span>':'—')+'</td></tr>'; }).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Vedha Hits -->
+        ${vedhaHits.length ? '<div class="card"><h2>Vedha Analysis</h2><table class="data-table"><thead><tr><th>Planet</th><th>From</th><th>To</th><th>Type</th><th>Nature</th><th>Classification</th></tr></thead><tbody>' + vedhaHits.slice(0,20).map(function(v){ return '<tr><td style="font-weight:600">'+(v.planet||'—')+'</td><td>'+(v.from_entity||'—')+'</td><td>'+(v.to_entity||'—')+'</td><td>'+(v.vedha_type||v.type||'—')+'</td><td style="color:'+(v.nature==='papa_vedha'?'var(--red)':'var(--green)')+'">'+(v.nature||'—')+'</td><td>'+(v.classification||'—')+'</td></tr>'; }).join('') + '</tbody></table>' + (vedhaHits.length>20 ? '<p style="color:var(--text-muted);margin-top:8px">Showing 20 of '+vedhaHits.length+' vedha hits</p>' : '') + '</div>' : ''}
+    `;
+
+    /* ══════════════════════════════════════════════════════════
+       Populate Info Strips (Tarabala / Nakshatra info around grid)
+       ══════════════════════════════════════════════════════════ */
+    var stripTop = document.getElementById('sbc-strip-top');
+    var stripBot = document.getElementById('sbc-strip-bottom');
+    var stripLeft = document.getElementById('sbc-strip-left');
+    var stripRight = document.getElementById('sbc-strip-right');
+    if(stripTop) stripTop.innerHTML = buildInfoStrip(TOP_NAK, 'horizontal');
+    if(stripBot) stripBot.innerHTML = buildInfoStrip(BOT_NAK, 'horizontal');
+    if(stripLeft) stripLeft.innerHTML = buildInfoStrip(LEFT_NAK, 'vertical');
+    if(stripRight) stripRight.innerHTML = buildInfoStrip(RIGHT_NAK, 'vertical');
+
+    /* ══════════════════════════════════════════════════════════
+       Build the interactive 9x9 SBC Grid (Parashara's Light style)
+       ══════════════════════════════════════════════════════════ */
+    const gridEl = document.getElementById('sbc-chakra-grid');
+    if (!gridEl || grid.length !== 9) return;
+
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            const cell = grid[r][c];
+            const entities = cell.entities || [];
+            const mainEnt = entities.find(function(e){ return e.entity_type !== 'special'; }) || entities[0];
+            const planets = entities.filter(function(e){ return e.entity_type === 'special'; });
+            const type = mainEnt ? mainEnt.entity_type : 'empty';
+            const name = (mainEnt ? mainEnt.name : '') || cell.label || '';
+            const zone = cell.zone || '';
+            const isCenter = (r === 4 && c === 4);
+
+            /* Determine background: prefer zone, fall back to entity type */
+            const bg = isCenter ? '#ffe0b0' : (ZONE_BG[zone] || TYPE_BG[type] || '#f8f4ee');
+            const tc = isCenter ? '#8b4513' : (ZONE_TEXT[zone] || TYPE_TEXT[type] || '#333');
+
+            const el = document.createElement('div');
+            el.className = 'sbc-cell';
+            el.dataset.row = r;
+            el.dataset.col = c;
+            el.style.background = bg;
+
+            /* Vedha affliction highlight */
+            if (afflictedSet.has(r+','+c)) {
+                el.classList.add('vedha-hit');
+            }
+
+            /* Latta check (match by nakshatra name in this cell) */
+            const hasLatta = (type === 'nakshatra' && lattaNakSet.has(name));
+            if (hasLatta) el.classList.add('latta-active');
+
+            /* Navatara stripe color */
+            var navInfo = getNavataraFor(name);
+            var navColor = '';
+            if (navInfo) {
+                var tara = navInfo.tara || navInfo.quality || '';
+                navColor = NAVATARA_COLOR[tara] || NAVATARA_COLOR[tara.toLowerCase()] || '#888';
+            }
+
+            /* Shorten display name */
+            var nameShort = shortenName(name);
+            var fs = nameShort.length > 10 ? '0.55rem' : nameShort.length > 7 ? '0.6rem' : '0.68rem';
+
+            /* Build cell inner HTML */
+            var html = '';
+
+            /* Devanagari akshara overlay */
+            var aksharaKey = r+','+c;
+            if (SBC_AKSHARAS[aksharaKey]) {
+                html += '<div class="cell-akshara sbc-akshara-layer">'+SBC_AKSHARAS[aksharaKey]+'</div>';
+            }
+
+            /* Cell name */
+            html += '<div class="cell-name" style="font-size:'+fs+';color:'+tc+'">'+nameShort+'</div>';
+
+            /* Navatara tara number beneath name (for nakshatras) */
+            if (type === 'nakshatra' && navInfo) {
+                html += '<div class="sbc-tara-num" style="font-size:0.48rem;color:'+tc+';opacity:0.7">'+(navInfo.tara || '')+(navInfo.tara_number ? ' ('+navInfo.tara_number+')' : '')+'</div>';
+            }
+
+            /* Planet badges - separate natal and transit */
+            if (planets.length) {
+                html += '<div class="planet-badges">';
+                planets.forEach(function(p){
+                    var isNatal = p.meta && p.meta.source === 'natal';
+                    if (isNatal) {
+                        var pColor = natalBadgeColor(p.name);
+                        html += '<span class="planet-badge sbc-natal-planet" style="background:'+pColor+';border-radius:50%;padding:1px 3px;border:2px solid #7799cc;" title="'+p.name+' (natal)">'+abbr(p.name)+'</span> ';
+                    } else {
+                        var pColor = transitBadgeColor(p.name);
+                        html += '<span class="planet-badge sbc-transit-planet sbc-transit-click" data-planet="'+p.name+'" style="background:'+pColor+';border-radius:2px;padding:1px 4px;cursor:pointer;border:2px solid #ffcc00;" title="'+p.name+' (transit) — click to show vedha">'+abbr(p.name)+'</span> ';
+                    }
+                });
+                html += '</div>';
+            }
+
+            /* Latta badge */
+            html += '<div class="latta-badge">L</div>';
+
+            /* Navatara stripe */
+            html += '<div class="navatara-stripe" style="background:'+(navColor||'transparent')+'"></div>';
+
+            /* Tooltip */
+            var tooltip = name;
+            if(navInfo) tooltip += ' | Tara: '+(navInfo.tara||'')+(navInfo.tara_number?' (#'+navInfo.tara_number+')':'');
+            if(hasLatta) tooltip += ' | LATTA';
+            if(afflictedSet.has(r+','+c)) tooltip += ' | VEDHA';
+            el.title = tooltip;
+
+            el.innerHTML = html;
+            gridEl.appendChild(el);
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       Draw Vedha Lines (SVG overlay)
+       ══════════════════════════════════════════════════════════ */
+    function drawVedhaLines() {
+        var svg = document.getElementById('sbc-vedha-svg');
+        if (!svg) return;
+        var wrap = document.getElementById('sbc-grid-wrap');
+        var gEl = document.getElementById('sbc-chakra-grid');
+        if (!gEl) return;
+
+        requestAnimationFrame(function(){
+            var gRect = gEl.getBoundingClientRect();
+            var wRect = wrap.getBoundingClientRect();
+            svg.setAttribute('viewBox', '0 0 ' + gRect.width + ' ' + gRect.height);
+            svg.style.width = gRect.width + 'px';
+            svg.style.height = gRect.height + 'px';
+            svg.style.left = (gRect.left - wRect.left) + 'px';
+            svg.style.top = (gRect.top - wRect.top) + 'px';
+            svg.innerHTML = '';
+
+            var cellW = gRect.width / 9;
+            var cellH = gRect.height / 9;
+
+            /* Flatten vedha_lines_all: each entry has {planet, nature, lines:[{from,to,type}]} */
+            var flatLines = [];
+            vedhaLinesAll.forEach(function(pl){
+                var nature = pl.nature || 'malefic';
+                var isPapa = (nature === 'malefic' || nature === 'papa');
+                var lineStyle = pl.line_style || 'solid';
+                (pl.lines || []).forEach(function(seg){
+                    flatLines.push({ from: seg.from, to: seg.to, isPapa: isPapa, lineStyle: lineStyle, planet: pl.planet });
+                });
+            });
+
+            /* Fallback: use vedha hits if vedha_lines_all was empty */
+            if (!flatLines.length && vedhaHits.length) {
+                vedhaHits.forEach(function(v){
+                    if (v.from_pos && v.to_pos) {
+                        flatLines.push({
+                            from: v.from_pos, to: v.to_pos,
+                            isPapa: (v.nature === 'papa_vedha'),
+                            lineStyle: 'solid', planet: v.planet
+                        });
+                    }
+                });
+            }
+
+            flatLines.forEach(function(vl){
+                if (!vl.from || !vl.to) return;
+                var x1 = vl.from[1] * cellW + cellW/2;
+                var y1 = vl.from[0] * cellH + cellH/2;
+                var x2 = vl.to[1] * cellW + cellW/2;
+                var y2 = vl.to[0] * cellH + cellH/2;
+
+                var color = vl.isPapa ? '#ff2222' : '#22cc44';
+                var line = document.createElementNS('http://www.w3.org/2000/svg','line');
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                line.setAttribute('stroke', color);
+                line.setAttribute('stroke-width', vl.isPapa ? '2' : '1.5');
+                line.setAttribute('stroke-opacity', '0.5');
+                line.setAttribute('stroke-linecap', 'round');
+                if(vl.lineStyle === 'dashed' || !vl.isPapa) line.setAttribute('stroke-dasharray', '6,3');
+                if(vl.lineStyle === 'thick') line.setAttribute('stroke-width', '3');
+                svg.appendChild(line);
+            });
+        });
+    }
+    drawVedhaLines();
+    window.addEventListener('resize', drawVedhaLines);
+
+    /* ══════════════════════════════════════════════════════════
+       Toggle layer visibility (checkbox-based)
+       ══════════════════════════════════════════════════════════ */
+    document.querySelectorAll('#sbc-options-panel input[type=checkbox]').forEach(function(cb){
+        cb.addEventListener('change', function(){
+            var layer = cb.dataset.layer;
+            var on = cb.checked;
+
+            if (layer === 'vedha') {
+                var svg = document.getElementById('sbc-vedha-svg');
+                if (svg) svg.style.display = on ? '' : 'none';
+                document.querySelectorAll('.sbc-cell.vedha-hit').forEach(function(c){
+                    c.style.boxShadow = on ? 'inset 0 0 0 2px #ff0000' : 'none';
+                });
+            }
+            if (layer === 'latta') {
+                document.querySelectorAll('.sbc-cell.latta-active .latta-badge').forEach(function(b){
+                    b.style.display = on ? 'block' : 'none';
+                });
+            }
+            if (layer === 'navatara') {
+                document.querySelectorAll('.sbc-cell').forEach(function(c){
+                    if (on) c.classList.add('navatara-on');
+                    else c.classList.remove('navatara-on');
+                });
+            }
+            if (layer === 'transit') {
+                document.querySelectorAll('.sbc-transit-planet').forEach(function(b){
+                    b.style.display = on ? '' : 'none';
+                });
+            }
+            if (layer === 'natal') {
+                document.querySelectorAll('.sbc-natal-planet').forEach(function(b){
+                    b.style.display = on ? '' : 'none';
+                });
+            }
+            if (layer === 'aksharas') {
+                document.querySelectorAll('.sbc-akshara-layer').forEach(function(a){
+                    a.style.display = on ? '' : 'none';
+                });
+            }
+            if (layer === 'tarabala') {
+                document.querySelectorAll('.sbc-tara-num').forEach(function(t){
+                    t.style.display = on ? '' : 'none';
+                });
+                /* Also toggle info strips */
+                ['sbc-strip-top','sbc-strip-bottom','sbc-strip-left','sbc-strip-right'].forEach(function(id){
+                    var el = document.getElementById(id);
+                    if(el) el.style.display = on ? '' : 'none';
+                });
+            }
+        });
+    });
+
+    /* ══════════════════════════════════════════════════════════
+       Transit planet click → show per-planet vedha lines
+       ══════════════════════════════════════════════════════════ */
+    var selectedTransitPlanet = null;
+
+    function drawVedhaForPlanet(planetName) {
+        var svg = document.getElementById('sbc-vedha-svg');
+        if (!svg) return;
+        var wrap = document.getElementById('sbc-grid-wrap');
+        var gEl = document.getElementById('sbc-chakra-grid');
+        if (!gEl) return;
+
+        requestAnimationFrame(function(){
+            var gRect = gEl.getBoundingClientRect();
+            var wRect = wrap.getBoundingClientRect();
+            svg.setAttribute('viewBox', '0 0 ' + gRect.width + ' ' + gRect.height);
+            svg.style.width = gRect.width + 'px';
+            svg.style.height = gRect.height + 'px';
+            svg.style.left = (gRect.left - wRect.left) + 'px';
+            svg.style.top = (gRect.top - wRect.top) + 'px';
+            svg.innerHTML = '';
+
+            var cellW = gRect.width / 9;
+            var cellH = gRect.height / 9;
+
+            /* Filter vedha lines for this planet only */
+            var planetLines = [];
+            vedhaLinesAll.forEach(function(pl){
+                if (pl.planet !== planetName) return;
+                var nature = pl.nature || 'malefic';
+                var isPapa = (nature === 'malefic' || nature === 'papa');
+                var lineStyle = pl.line_style || 'solid';
+                (pl.lines || []).forEach(function(seg){
+                    planetLines.push({ from: seg.from, to: seg.to, isPapa: isPapa, lineStyle: lineStyle });
+                });
+            });
+
+            /* Fallback: filter vedha hits for this planet */
+            if (!planetLines.length) {
+                vedhaHits.forEach(function(v){
+                    if (v.planet !== planetName) return;
+                    if (v.from_pos && v.to_pos) {
+                        planetLines.push({
+                            from: v.from_pos, to: v.to_pos,
+                            isPapa: (v.nature === 'papa_vedha'),
+                            lineStyle: 'solid'
+                        });
+                    }
+                });
+            }
+
+            planetLines.forEach(function(vl){
+                if (!vl.from || !vl.to) return;
+                var x1 = vl.from[1] * cellW + cellW/2;
+                var y1 = vl.from[0] * cellH + cellH/2;
+                var x2 = vl.to[1] * cellW + cellW/2;
+                var y2 = vl.to[0] * cellH + cellH/2;
+
+                var color = vl.isPapa ? '#ff2222' : '#22cc44';
+                var line = document.createElementNS('http://www.w3.org/2000/svg','line');
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                line.setAttribute('stroke', color);
+                line.setAttribute('stroke-width', vl.isPapa ? '3' : '2.5');
+                line.setAttribute('stroke-opacity', '0.75');
+                line.setAttribute('stroke-linecap', 'round');
+                if(vl.lineStyle === 'dashed' || !vl.isPapa) line.setAttribute('stroke-dasharray', '6,3');
+                svg.appendChild(line);
+            });
+
+            /* Show vedha checkbox SVG if hidden */
+            svg.style.display = '';
+        });
+    }
+
+    document.getElementById('sbc-result').addEventListener('click', function(e) {
+        var badge = e.target.closest('.sbc-transit-click');
+        if (!badge) return;
+
+        var planetName = badge.getAttribute('data-planet');
+        if (!planetName) return;
+
+        /* Deselect all first */
+        document.querySelectorAll('.sbc-transit-click.sbc-selected').forEach(function(b){
+            b.classList.remove('sbc-selected');
+        });
+
+        if (selectedTransitPlanet === planetName) {
+            /* Clicking same planet again → deselect, restore all vedha lines */
+            selectedTransitPlanet = null;
+            drawVedhaLines();
+        } else {
+            /* Select this planet → draw only its vedha lines */
+            selectedTransitPlanet = planetName;
+            badge.classList.add('sbc-selected');
+            drawVedhaForPlanet(planetName);
+        }
+    });
+
+    /* ══════════════════════════════════════════════════════════
+       Legend: Natal vs Transit badges
+       ══════════════════════════════════════════════════════════ */
+    var legendHtml = '<div style="margin-top:10px;padding:8px 12px;background:#1a1a2e;border:1px solid #333;border-radius:6px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:12px;color:#ccc;">';
+    legendHtml += '<span style="font-weight:600;color:#fff;">Legend:</span>';
+    legendHtml += '<span><span style="display:inline-block;width:16px;height:16px;background:#3366aa;border-radius:50%;border:2px solid #7799cc;vertical-align:middle;margin-right:4px;"></span> Natal</span>';
+    legendHtml += '<span><span style="display:inline-block;width:16px;height:16px;background:#dd4400;border-radius:2px;border:2px solid #ffcc00;vertical-align:middle;margin-right:4px;"></span> Transit <span style="color:#aaa;font-size:10px;">(click for vedha)</span></span>';
+    legendHtml += '<span><span style="display:inline-block;width:16px;height:2px;background:#ff2222;vertical-align:middle;margin-right:4px;"></span> Papa Vedha</span>';
+    legendHtml += '<span><span style="display:inline-block;width:16px;height:2px;background:#22cc44;vertical-align:middle;margin-right:4px;border-top:1px dashed #22cc44;"></span> Shubha Vedha</span>';
+    legendHtml += '</div>';
+    var gridWrap = document.getElementById('sbc-grid-wrap');
+    if (gridWrap) gridWrap.insertAdjacentHTML('afterend', legendHtml);
+});
+
+// ─── STRENGTH CALENDAR ───────────────────────────────────────
+document.getElementById('strength-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('strength-result');
+    const data = await apiCall('/strength-calendar', {
+        name: document.getElementById('sc-name').value,
+        date: ddmmToApi(document.getElementById('sc-date').value),
+        time: document.getElementById('sc-time').value,
+        place: document.getElementById('sc-place').value,
+        calendar_type: document.getElementById('sc-calendar-type').value,
+        days_ahead: parseInt(document.getElementById('sc-days-ahead').value) || 30,
+    }, resultEl);
+    if (!data) return;
+
+    const calendar = data.calendar_data || {};
+
+    if (calendar.daily_data) {
+        resultEl.innerHTML = `
+            <div class="card">
+                <h2>Daily Strength Calendar (30 Days)</h2>
+                <div class="calendar-grid">
+                    ${calendar.daily_data.map(day => `
+                        <div class="calendar-day" style="border: 1px solid var(--border); padding: 8px; margin: 2px;">
+                            <div class="day-date" style="font-weight: bold;">${day.date}</div>
+                            <div class="day-sav" style="color: ${day.sav >= 28 ? 'var(--green)' : day.sav >= 24 ? 'var(--gold)' : 'var(--red)'}">SAV: ${day.sav}</div>
+                            <div class="day-strong" style="font-size: 0.8rem;">Strong: ${day.strong_planets?.join(', ') || 'None'}</div>
+                            <div class="day-recommendation" style="font-size: 0.7rem; color: var(--text-muted);">${day.recommendation || ''}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    } else if (calendar.monthly_data) {
+        resultEl.innerHTML = `
+            <div class="card">
+                <h2>Monthly Strength Summary</h2>
+                <table class="data-table">
+                    <thead><tr><th>Month</th><th>Avg SAV</th><th>Strong Planets</th><th>Recommendation</th></tr></thead>
+                    <tbody>
+                        ${calendar.monthly_data.map(month => `
+                            <tr>
+                                <td style="font-weight:600">${month.month}</td>
+                                <td style="color:${month.avg_sav >= 28 ? 'var(--green)' : month.avg_sav >= 24 ? 'var(--gold)' : 'var(--red)'}">${month.avg_sav}</td>
+                                <td>${month.strong_planets?.join(', ') || ''}</td>
+                                <td style="font-size:0.8rem">${month.recommendation || ''}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else if (calendar.yearly_data) {
+        resultEl.innerHTML = `
+            <div class="card">
+                <h2>Yearly Planetary Strength Ranking</h2>
+                <table class="data-table">
+                    <thead><tr><th>Planet</th><th>Strength Score</th><th>Rating</th><th>Financial Impact</th></tr></thead>
+                    <tbody>
+                        ${calendar.yearly_data.map(planet => `
+                            <tr>
+                                <td style="font-weight:600">${planet.planet}</td>
+                                <td style="color:${planet.strength_score >= 80 ? 'var(--green)' : planet.strength_score >= 60 ? 'var(--gold)' : 'var(--red)'}">${planet.strength_score}%</td>
+                                <td>${planet.rating || ''}</td>
+                                <td style="font-size:0.8rem">${planet.financial_impact || ''}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+});
+
+// ─── KP SYSTEM ──────────────────────────────────────────────
+document.getElementById('kp-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('kp-result');
     const body = {
-      name:     document.getElementById('sbc_name').value  || global.name,
-      date:     document.getElementById('sbc_date').value  || global.date,
-      time:     document.getElementById('sbc_time').value  || global.time,
-      place:    document.getElementById('sbc_place').value || global.place,
-      ayanamsa: document.getElementById('sbc_ayanamsa').value || global.ayanamsa || 'lahiri',
-      transit_date:  document.getElementById('sbc_transit_date').value  || today,
-      transit_time:  document.getElementById('sbc_transit_time').value  || '09:15',
-      transit_place: document.getElementById('sbc_transit_place').value || 'Mumbai, Maharashtra, India',
+        name: document.getElementById('kp-name').value,
+        date: ddmmToApi(document.getElementById('kp-date').value),
+        time: document.getElementById('kp-time').value,
+        place: document.getElementById('kp-place').value,
+        ayanamsa: 'krishnamurti',
     };
-    const data = await apiPost(base, '/sarvatobhadra', body);
-    renderSarvatobhadra(data);
-    setStatus('sbcStatus', 'success', '✅ Sarvatobhadra Chakra with full Vedha/Latta analysis complete');
-  } catch (err) {
-    setStatus('sbcStatus', 'error', '❌ ' + err.message);
-  } finally { hideLoading(); }
+    const transitDate = document.getElementById('kp-transit-date').value;
+    if (transitDate) body.transit_date = transitDate;
+
+    const data = await apiCall('/kp', body, resultEl);
+    if (!data) return;
+
+    const kp = data.kp_analysis || {};
+    const cuspal = kp.cuspal_sublords || [];
+    const fin = kp.financial_analysis || {};
+    const rp = kp.ruling_planets || {};
+
+    resultEl.innerHTML = `
+        <div class="signal-card">
+            <h3 style="color:var(--gold-light)">KP Financial Analysis</h3>
+            <p style="color:var(--text);margin:8px 0">${fin.overall_verdict || ''}</p>
+            <div class="metric" style="display:inline-block;margin-top:8px"><div class="label">KP Score</div><div class="value gold">${(fin.avg_score * 100).toFixed(0)}%</div></div>
+        </div>
+
+        <div class="card">
+            <h2>Cuspal Sub-Lords</h2>
+            <table class="data-table">
+                <thead><tr><th>House</th><th>Sign</th><th>Sign Lord</th><th>Star Lord</th><th>Sub Lord</th><th>Financial Relevance</th></tr></thead>
+                <tbody>
+                    ${cuspal.map(c => `
+                        <tr style="${[2,5,7,10,11].includes(c.house)?'background:rgba(212,168,67,0.05)':''}">
+                            <td style="font-weight:600;color:${[2,5,7,10,11].includes(c.house)?'var(--gold)':'var(--text)'}">${c.house}</td>
+                            <td>${c.sign}</td>
+                            <td>${c.sign_lord}</td>
+                            <td>${c.star_lord}</td>
+                            <td style="color:var(--gold)">${c.sub_lord}</td>
+                            <td style="font-size:0.75rem;color:var(--text-muted)">${c.financial_relevance || ''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        ${rp ? `
+        <div class="card">
+            <h2>Ruling Planets</h2>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Day Lord</div><div class="value gold">${rp.day_lord || ''}</div></div>
+                <div class="metric"><div class="label">Primary RPs</div><div class="value">${rp.ruling_planets?.primary?.join(', ') || '—'}</div></div>
+                <div class="metric"><div class="label">Timing Signal</div><div class="value">${rp.financial_timing?.signal || ''}</div></div>
+            </div>
+        </div>` : ''}
+    `;
 });
 
-// ─── SBC Constants ───────────────────────────────────────────────
-const SBC_ZONE_STYLE = {
-  outer:  { bg: '#1a3a1a', border: '#4caf50', text: '#a5d6a7' },   // green
-  second: { bg: '#2a3a1a', border: '#8bc34a', text: '#dce775' },   // yellow-green
-  third:  { bg: '#3a2a2a', border: '#f48fb1', text: '#f8bbd0' },   // pink
-  fourth: { bg: '#1a2a3a', border: '#64b5f6', text: '#bbdefb' },   // blue
-  center: { bg: '#3a2a00', border: '#ffd700', text: '#fff176' },   // gold
-};
+// ─── DASHA ──────────────────────────────────────────────────
+document.getElementById('dasha-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('dasha-result');
+    const data = await apiCall('/dasha', {
+        name: document.getElementById('d-name').value,
+        date: ddmmToApi(document.getElementById('d-date').value),
+        time: document.getElementById('d-time').value,
+        place: document.getElementById('d-place').value,
+    }, resultEl);
+    if (!data) return;
 
-const PLANET_COLORS = {
-  Sun:'#FFA500', Moon:'#C0C0C0', Mars:'#FF4444', Mercury:'#00CED1',
-  Jupiter:'#FFD700', Venus:'#FF69B4', Saturn:'#4169E1',
-  Rahu:'#8B008B', Ketu:'#808080',
-};
+    const dd = data.dasha_data || {};
+    const current = data.current_dasha || {};
+    const dashas = dd.dashas || [];
 
-const DIRECTION_LABELS = {
-  0: '← EAST →', 8: '← WEST →',
-};
-
-function renderSarvatobhadra(data) {
-  const el = document.getElementById('sbcResults');
-  const grid = data.chakra_grid || [];
-  const cells = data.chakra_cells || [];
-  const moonNak = data.moon_nakshatra || {};
-  const asc = data.ascendant || {};
-  const planets = data.planet_positions || [];
-
-  // Build lookup of which planets are at which grid cell
-  const planetAtCell = {};
-  cells.forEach(cell => {
-    const pEntities = (cell.entities || []).filter(e => e.entity_type === 'special');
-    if (pEntities.length) {
-      planetAtCell[`${cell.row},${cell.col}`] = pEntities.map(e => e.name);
-    }
-  });
-
-  // Render the 9×9 grid
-  const gridRows = grid.map((row, rowIdx) => {
-    const tds = row.map((cell, colIdx) => {
-      const zone = cell.zone || 'inner';
-      const style = SBC_ZONE_STYLE[zone] || SBC_ZONE_STYLE.center;
-      const planetsHere = planetAtCell[`${cell.row},${cell.col}`] || [];
-      const hasPlanet = planetsHere.length > 0;
-
-      // Main label
-      const label = cell.label && cell.label !== '·' ? cell.label : '';
-      const baseEntity = (cell.entities || []).find(
-        e => ['nakshatra','rashi','tithi','vara','corner'].includes(e.entity_type));
-      const displayLabel = label || (baseEntity ? baseEntity.name : '·');
-
-      // Planet badges
-      const planetBadges = planetsHere.map(p =>
-        `<div style="background:${PLANET_COLORS[p]||'#888'};color:#000;border-radius:3px;padding:1px 4px;font-size:9px;font-weight:700;margin-top:2px">${p}</div>`
-      ).join('');
-
-      const border = hasPlanet ? `2px solid ${PLANET_COLORS[planetsHere[0]]||'#ffd700'}` : `1px solid ${style.border}`;
-      const bg = hasPlanet ? style.bg.replace('1a','2a') : style.bg;
-      const shadow = hasPlanet ? `0 0 8px ${PLANET_COLORS[planetsHere[0]]}44` : 'none';
-
-      return `<td style="
-        background:${bg};border:${border};box-shadow:${shadow};
-        padding:4px;vertical-align:top;text-align:center;
-        min-width:70px;max-width:90px;height:60px;
-        color:${style.text};font-size:10px;line-height:1.3;
-        transition:all 0.2s;
-      " title="${displayLabel} · ${zone}">
-        <div style="font-weight:700;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${displayLabel}</div>
-        <div style="font-size:9px;opacity:0.6">${zone}</div>
-        ${planetBadges}
-      </td>`;
-    }).join('');
-
-    // Add direction label row
-    const dirLabel = DIRECTION_LABELS[rowIdx] || '';
-    return `<tr>${tds}${dirLabel ? `<td style="padding:4px 8px;color:#888;font-size:10px;white-space:nowrap;vertical-align:middle">${dirLabel}</td>` : '<td></td>'}</tr>`;
-  });
-
-  // Column direction labels (NORTH = right, SOUTH = left)
-  const colLabels = `<tr>
-    <td style="text-align:center;color:#888;font-size:10px;padding:4px">↕ SOUTH</td>
-    ${Array(7).fill('<td></td>').join('')}
-    <td style="text-align:center;color:#888;font-size:10px;padding:4px">↕ NORTH</td>
-    <td></td>
-  </tr>`;
-
-  // Occupied cells table
-  const occupied = cells.filter(c => (c.entities||[]).some(e => e.entity_type === 'special'));
-  const occupiedRows = occupied.length
-    ? occupied.map(cell => {
-        const pNames = (cell.entities||[]).filter(e=>e.entity_type==='special').map(e=>e.name);
-        const baseNames = (cell.entities||[]).filter(e=>e.entity_type!=='special').map(e=>e.name).join(', ');
-        const nak = (cell.entities||[]).find(e=>e.entity_type==='nakshatra');
-        const badges = pNames.map(p =>
-          `<span style="background:${PLANET_COLORS[p]||'#888'};color:#000;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;margin:2px">${p}</span>`
-        ).join('');
-        return `<tr>
-          <td>${nak ? `<strong>${nak.name}</strong>` : cell.label || `(${cell.row},${cell.col})`}</td>
-          <td><span style="font-size:10px;opacity:0.7">${cell.zone}</span></td>
-          <td>${baseNames || '–'}</td>
-          <td>${badges}</td>
-        </tr>`;
-      }).join('')
-    : `<tr><td colspan="4" class="text-muted">No natal planets placed on chakra cells.</td></tr>`;
-
-  // Zone legend
-  const legend = Object.entries(SBC_ZONE_STYLE).map(([zone, s]) =>
-    `<span style="background:${s.bg};border:1px solid ${s.border};color:${s.text};padding:3px 10px;border-radius:4px;font-size:11px;margin-right:6px">${zone}</span>`
-  ).join('');
-
-  const sbc = data.sbc_analysis || {};
-  const mktSignal = sbc.market_signal || {};
-  const bindus = sbc.six_bindus || {};
-  const navatara = sbc.navatara || {};
-  const vedhaHits = sbc.all_vedha_hits || [];
-  const lattaHits = sbc.all_latta_hits || [];
-  const binduCells = sbc.bindu_cells || {};
-  const vedhaOverlay = sbc.cells_under_vedha || {};
-  const lattaOverlay = sbc.cells_with_latta || {};
-  const binduAnalysis = sbc.bindu_analysis || [];
-  const planetAnalyses = sbc.planet_analyses || [];
-
-  // Build overlay lookups: "row,col" → info
-  const overlayData = {};
-  Object.values(binduCells).forEach(b => {
-    const key = `${b.row},${b.col}`;
-    overlayData[key] = overlayData[key] || {};
-    overlayData[key].bindu = Object.entries(binduCells).find(([,v])=>v.row===b.row&&v.col===b.col)?.[0];
-  });
-  Object.entries(vedhaOverlay).forEach(([key,v]) => {
-    overlayData[key] = overlayData[key] || {};
-    overlayData[key].vedha = v.net;
-    overlayData[key].vedha_planets = [...(v.malefic||[]), ...(v.benefic||[])];
-  });
-  Object.entries(lattaOverlay).forEach(([key,v]) => {
-    overlayData[key] = overlayData[key] || {};
-    overlayData[key].latta = v.planets;
-  });
-
-  // Render grid with overlays
-  const gridRowsAdv = grid.map((row, rowIdx) => {
-    const tds = row.map((cell, colIdx) => {
-      const zone = cell.zone || 'inner';
-      const style = SBC_ZONE_STYLE[zone] || SBC_ZONE_STYLE.center;
-      const key = `${cell.row},${cell.col}`;
-      const overlay = overlayData[key] || {};
-      const planetsHere = planetAtCell[key] || [];
-      const hasPlanet = planetsHere.length > 0;
-      const isBindu = !!overlay.bindu;
-      const hasLatta = overlay.latta?.length > 0;
-      const vedhaNet = overlay.vedha;
-
-      const label = cell.label && cell.label !== '·' ? cell.label : '';
-      const baseEntity = (cell.entities||[]).find(e=>['nakshatra','rashi','tithi','vara','corner'].includes(e.entity_type));
-      const displayLabel = label || (baseEntity ? baseEntity.name : '·');
-
-      // Planet badges
-      const pBadges = planetsHere.map(p =>
-        `<div style="background:${PLANET_COLORS[p]||'#888'};color:#000;border-radius:3px;padding:1px 4px;font-size:9px;font-weight:700;margin-top:2px">${p}</div>`
-      ).join('');
-
-      // Bindu badge
-      const binduBadge = isBindu
-        ? `<div style="background:#ffd700;color:#000;border-radius:3px;padding:1px 4px;font-size:8px;font-weight:700;margin-top:2px">★${overlay.bindu?.slice(0,4)}</div>` : '';
-
-      // Latta badge
-      const lattaBadge = hasLatta
-        ? `<div style="background:#ff00ff;color:#fff;border-radius:3px;padding:1px 4px;font-size:8px;font-weight:700;margin-top:2px">⚡${overlay.latta.join(',')}</div>` : '';
-
-      // Border/bg based on overlay
-      let border = `1px solid ${style.border}`;
-      let bg = style.bg;
-      let shadow = 'none';
-      if (isBindu) { border = '2px solid #ffd700'; shadow = '0 0 10px #ffd70066'; bg = '#2a2000'; }
-      if (hasPlanet) { border = `2px solid ${PLANET_COLORS[planetsHere[0]]||'#888'}`; shadow = `0 0 8px ${PLANET_COLORS[planetsHere[0]]}44`; }
-      if (vedhaNet === 'malefic') { bg = 'rgba(255,61,0,0.2)'; }
-      else if (vedhaNet === 'benefic') { bg = 'rgba(0,200,81,0.1)'; }
-      if (hasLatta) { border = '2px solid #ff00ff'; }
-
-      return `<td style="background:${bg};border:${border};box-shadow:${shadow};
-        padding:4px;vertical-align:top;text-align:center;
-        min-width:72px;max-width:90px;height:65px;
-        color:${style.text};font-size:9px;line-height:1.3;position:relative"
-        title="${displayLabel} [${zone}]${isBindu?' | ★'+overlay.bindu:''}${hasLatta?' | ⚡Latta':''}${vedhaNet?' | Vedha:'+vedhaNet:''}">
-        <div style="font-weight:700;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${style.text}">${displayLabel}</div>
-        <div style="font-size:8px;opacity:0.5">${zone}</div>
-        ${binduBadge}${pBadges}${lattaBadge}
-      </td>`;
-    }).join('');
-    const dirLabel = DIRECTION_LABELS[rowIdx] || '';
-    return `<tr>${tds}${dirLabel ? `<td style="padding:4px 8px;color:#888;font-size:10px;white-space:nowrap;vertical-align:middle">${dirLabel}</td>` : '<td></td>'}</tr>`;
-  });
-
-  // Bindu status section
-  const binduStatusHtml = binduAnalysis.map(b => {
-    const statusColor = b.status==='AFFLICTED'?'#ff5722':b.status==='PROTECTED'?'#00c851':b.status==='MIXED'?'#ffc107':'#888';
-    return `<div style="background:var(--bg-input);border-radius:8px;padding:10px;border-left:4px solid ${statusColor};margin-bottom:6px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><strong style="color:${statusColor}">${b.bindu}</strong> <span class="fs-11 text-muted">— ${b.nakshatra}</span></div>
-        <span style="background:${statusColor}22;color:${statusColor};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">${b.status}</span>
-      </div>
-      <div class="fs-11 text-muted mt-4">${b.description}</div>
-      ${b.afflicting_planets.length ? `<div class="fs-11 mt-4">⚠️ Afflicted by: ${b.afflicting_planets.map(p=>`<span style="color:${PLANET_COLORS[p]||'#ff5722'};font-weight:700">${p}</span>`).join(', ')}</div>` : ''}
-      ${b.protecting_planets.length ? `<div class="fs-11 mt-4">✅ Protected by: ${b.protecting_planets.map(p=>`<span style="color:${PLANET_COLORS[p]||'#00c851'};font-weight:700">${p}</span>`).join(', ')}</div>` : ''}
-      ${b.latta_hits > 0 ? `<div class="fs-11 mt-4" style="color:#ff00ff">⚡ Latta hits: ${b.latta_hits}</div>` : ''}
-    </div>`;
-  }).join('');
-
-  // Latta summary
-  const lattaHtml = lattaHits.length
-    ? lattaHits.map(l => `
-      <div style="background:var(--bg-input);border-radius:8px;padding:10px;border-left:4px solid #ff00ff;margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between">
-          <strong><span style="color:${PLANET_COLORS[l.planet]||'#ff00ff'}">${l.planet}</span> ⚡ kicks → ${l.kicked_nak}</strong>
-          <span style="font-size:10px;color:#ff00ff;font-weight:700">${l.severity}</span>
+    resultEl.innerHTML = `
+        <div class="signal-card">
+            <h3 style="color:var(--gold-light)">Current Dasha Period</h3>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Mahadasha</div><div class="value gold">${current.mahadasha || ''}</div><div class="label">${current.mahadasha_start || ''} → ${current.mahadasha_end || ''}</div></div>
+                <div class="metric"><div class="label">Antardasha</div><div class="value">${current.antardasha || ''}</div><div class="label">${current.antardasha_start || ''} → ${current.antardasha_end || ''}</div></div>
+                <div class="metric"><div class="label">Pratyantar</div><div class="value">${current.pratyantar || ''}</div></div>
+                <div class="metric"><div class="label">Combined Score</div><div class="value ${current.combined_score > 0.5 ? 'green' : current.combined_score < 0 ? 'red' : 'gold'}">${current.combined_score?.toFixed(2) || ''}</div></div>
+            </div>
+            <p style="color:var(--text-muted);margin-top:12px;font-size:0.85rem">${current.market_outlook || ''}</p>
         </div>
-        ${l.bindu_type ? `<div class="fs-11 mt-4" style="color:#ffd700">★ Hits ${l.bindu_type} Bindu</div>` : ''}
-        <div class="fs-11 text-muted mt-4">${l.effect}</div>
-        <div class="fs-11 mt-4" style="color:#ff9800">${l.nse_impact}</div>
-      </div>`) .join('')
-    : '<p class="fs-12 text-muted">No significant Latta active on personal nakshatras.</p>';
 
-  // Vedha summary (top 8)
-  const topVedhas = vedhaHits.slice(0, 8);
-  const vedhaHtml = topVedhas.length
-    ? topVedhas.map(v => {
-        const c = v.nature==='papa_vedha' ? '#ff5722' : '#00c851';
-        return `<div style="background:var(--bg-input);border-radius:6px;padding:8px 12px;border-left:3px solid ${c};margin-bottom:4px;font-size:11px">
-          <span style="color:${PLANET_COLORS[v.planet]||c};font-weight:700">${v.planet}</span>
-          ${v.nature==='papa_vedha'?'🔴 Papa':'🟢 Shubha'} Vedha on <strong>${v.to_entity}</strong>
-          ${v.bindu_type ? `<span style="color:#ffd700"> (★${v.bindu_type})</span>` : ''}
-          · <span style="opacity:0.7">${v.vedha_type}</span>
-        </div>`;
-      }).join('')
-    : '<p class="fs-12 text-muted">No significant Vedha on personal nakshatras.</p>';
-
-  // Navatara summary for transit planets
-  const navataraRows = (data.transit_planets || []).map(tp => {
-    const nt = navatara[tp.nakshatra] || {};
-    const qColor = nt.quality==='auspicious'?'#00c851':nt.quality==='inauspicious'?'#ff5722':'#888';
-    return `<tr>
-      <td><span style="color:${PLANET_COLORS[tp.planet]||'#fff'};font-weight:700">${tp.planet}</span>${tp.retrograde?'<span class="retro-badge" style="margin-left:4px">℞</span>':''}</td>
-      <td>${tp.nakshatra}</td>
-      <td style="color:${qColor};font-weight:700">${nt.tara||'—'}</td>
-      <td style="color:${qColor}">${nt.quality||'—'}</td>
-      <td class="fs-11 text-muted">${nt.description||'—'}</td>
-    </tr>`;
-  }).join('');
-
-  el.innerHTML = `
-    <!-- Market Signal -->
-    <div class="card mb-8" style="background:rgba(${mktSignal.color==='#00C851'?'0,200,81':mktSignal.color==='#FF3D00'?'255,61,0':'255,152,0'},0.1);border-color:${mktSignal.color||'#888'}">
-      <div style="display:flex;align-items:center;gap:16px">
-        <div style="font-size:28px">${mktSignal.signal?.includes('BULL')?'🚀':mktSignal.signal?.includes('BEAR')?'🔻':'⚖️'}</div>
-        <div>
-          <div style="font-size:20px;font-weight:700;color:${mktSignal.color}">${mktSignal.signal||'NEUTRAL'}</div>
-          <div class="fs-12 text-muted">SBC Score: ${mktSignal.score||0} · ${mktSignal.action||''}</div>
-          ${(mktSignal.warning_tips||[]).map(t=>`<div style="color:#ff9800;font-size:11px;margin-top:2px">⚠️ ${t}</div>`).join('')}
+        <div class="card">
+            <h2>Mahadasha Timeline</h2>
+            <table class="data-table">
+                <thead><tr><th>Lord</th><th>Start</th><th>End</th><th>Years</th><th>Score</th><th>Sectors</th></tr></thead>
+                <tbody>
+                    ${dashas.map(d => {
+                        const fin = d.financial || {};
+                        return `<tr style="border-left:3px solid ${fin.color||'#888'}">
+                            <td style="font-weight:600;color:${fin.color||'#fff'}">${d.mahadasha_lord}</td>
+                            <td>${d.start_date}</td>
+                            <td>${d.end_date}</td>
+                            <td>${d.duration_years?.toFixed(1) || ''}</td>
+                            <td style="color:${fin.score > 0.5 ? 'var(--green)' : fin.score < 0 ? 'var(--red)' : 'var(--text)'}">${fin.score?.toFixed(2) || ''}</td>
+                            <td style="font-size:0.75rem">${fin.sectors?.join(', ') || ''}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
         </div>
-        <div style="margin-left:auto;text-align:right;font-size:11px;color:var(--text-muted)">
-          <div>Transit: ${data.transit_date||''}</div>
-          <div>Janma Nak: <strong class="text-gold">${data.janma_nakshatra||''}</strong></div>
-          ${sbc.malefic_vedha_count>0?`<div style="color:#ff5722">Papa Vedhas: ${sbc.malefic_vedha_count}</div>`:''}
-          ${sbc.multiple_vedha_effect?`<div style="color:#ff3d00;font-weight:700">${sbc.multiple_vedha_effect}</div>`:''}
-        </div>
-      </div>
-    </div>
+    `;
+});
 
-    <!-- Zone Legend + Grid -->
-    <div class="card mb-8">
-      <div class="card-title">🌀 Sarvatobhadra Chakra — ${data.name||''}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-        ${Object.entries(SBC_ZONE_STYLE).map(([z,s])=>`<span style="background:${s.bg};border:1px solid ${s.border};color:${s.text};padding:2px 8px;border-radius:4px;font-size:10px">${z}</span>`).join('')}
-        <span style="background:#2a200022;border:2px solid #ffd700;color:#ffd700;padding:2px 8px;border-radius:4px;font-size:10px">★ Bindu</span>
-        <span style="background:rgba(255,0,255,0.1);border:2px solid #ff00ff;color:#ff00ff;padding:2px 8px;border-radius:4px;font-size:10px">⚡ Latta</span>
-        <span style="background:rgba(255,61,0,0.2);border:1px solid #ff5722;color:#ff5722;padding:2px 8px;border-radius:4px;font-size:10px">🔴 Papa Vedha</span>
-        <span style="background:rgba(0,200,81,0.1);border:1px solid #00c851;color:#00c851;padding:2px 8px;border-radius:4px;font-size:10px">🟢 Shubha Vedha</span>
-      </div>
-      <p class="fs-11 text-muted mb-8">East=top · North=right · West=bottom · South=left</p>
-      <div class="sbc-grid-wrap" style="overflow-x:auto">
-        <table id="sbcChakraTable" style="border-collapse:collapse;table-layout:fixed">
-          ${colLabels}
-          <tbody>${gridRowsAdv.join('')}</tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Six Bindus -->
-    <div class="card mb-8">
-      <h3 class="card-title">★ Six Personal Bindus (Sensitive Nakshatras)</h3>
-      <p class="fs-11 text-muted mb-8">These 6 nakshatras are your most sensitive personal points. Malefic transits over them are warning signs; benefic transits are favorable periods.</p>
-      ${binduStatusHtml}
-    </div>
-
-    <!-- Latta (Planetary Kicks) -->
-    <div class="card mb-8">
-      <h3 class="card-title">⚡ Active Latta (Planetary Kicks)</h3>
-      <p class="fs-11 text-muted mb-8">Sun kicks 12th·Mars kicks 3rd·Jupiter kicks 6th·Saturn kicks 8th (forward) | Venus 5th·Mercury 7th·Rahu/Ketu 9th·Moon 22nd (backward)</p>
-      ${lattaHtml}
-    </div>
-
-    <!-- Vedha Summary -->
-    <div class="card mb-8">
-      <h3 class="card-title">🔴🟢 Vedha Analysis (Significant Hits)</h3>
-      ${vedhaHtml}
-    </div>
-
-    <!-- Navatara -->
-    <div class="card mb-8">
-      <h3 class="card-title">🌟 Navatara — Transit Planets in Your Star Cycle</h3>
-      <div class="table-wrap">
-        <table class="planet-table">
-          <thead><tr><th>Planet</th><th>Nakshatra</th><th>Tara</th><th>Quality</th><th>Meaning</th></tr></thead>
-          <tbody>${navataraRows}</tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Natal Planets -->
-    <div class="card mb-8">
-      <h3 class="card-title">🪐 Natal Planets on Chakra</h3>
-      <div class="table-wrap">
-        <table class="planet-table">
-          <thead><tr><th>Cell / Nakshatra</th><th>Zone</th><th>Base Entity</th><th>Planets</th></tr></thead>
-          <tbody>${occupiedRows}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
-  showResultPanel('sbcResultPanel');
-
-  // Remove stale table wrapper so canvas re-attaches cleanly
-  const staleWrap = document.getElementById('sbcTableWrap');
-  if (staleWrap) {
-    const tbl = staleWrap.querySelector('#sbcChakraTable');
-    if (tbl) staleWrap.parentNode.insertBefore(tbl, staleWrap);
-    staleWrap.remove();
-  }
-
-  // Draw Vedha lines on Canvas after DOM renders
-  setTimeout(() => drawSBCVedhaLines(data), 150);
-}
-
-
-// ── Interactive Canvas Vedha Line Renderer ────────────────────────────────────
-// Hover = show lines temporarily  |  Click = pin/unpin lines
-// ─────────────────────────────────────────────────────────────────────────────
-function drawSBCVedhaLines(data) {
-  const sbc           = data.sbc_analysis || {};
-  const vedhaLinesAll = sbc.vedha_lines_all || [];
-  const binduCells    = sbc.bindu_cells || {};
-
-  // Remove existing canvas + tooltip
-  ['sbcVedhaCanvas','sbcVedhaTooltip','sbcVedhaControls'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.remove();
-  });
-  if (!vedhaLinesAll.length) return;
-
-  const table = document.getElementById('sbcChakraTable');
-  if (!table) return;
-
-  // Wrap table in relative container
-  let tableWrapper = table.parentNode;
-  if (!tableWrapper.id || tableWrapper.id !== 'sbcTableWrap') {
-    const wrap = document.createElement('div');
-    wrap.id = 'sbcTableWrap';
-    wrap.style.cssText = 'position:relative; display:inline-block; min-width:100%';
-    table.parentNode.insertBefore(wrap, table);
-    wrap.appendChild(table);
-    tableWrapper = wrap;
-  }
-
-  // Canvas — pointer-events ON (we need mouse events)
-  const canvas = document.createElement('canvas');
-  canvas.id = 'sbcVedhaCanvas';
-  canvas.width  = table.offsetWidth  || table.scrollWidth;
-  canvas.height = table.offsetHeight || table.scrollHeight;
-  canvas.style.cssText = 'position:absolute;top:0;left:0;z-index:10;cursor:default;';
-  tableWrapper.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
-
-  // Tooltip div
-  const tooltip = document.createElement('div');
-  tooltip.id = 'sbcVedhaTooltip';
-  tooltip.style.cssText = `
-    position:fixed; display:none; z-index:9999;
-    background:rgba(10,11,20,0.95); border:1px solid #4a4e80;
-    border-radius:8px; padding:10px 14px; max-width:280px;
-    font-size:12px; color:#e2e4f0; pointer-events:none;
-    box-shadow:0 4px 24px rgba(0,0,0,0.6);
-  `;
-  document.body.appendChild(tooltip);
-
-  // ── Control buttons above the grid ──────────────────────────────
-  const controls = document.createElement('div');
-  controls.id = 'sbcVedhaControls';
-  controls.style.cssText = `
-    display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-    margin-bottom:10px; padding:8px 12px;
-    background:var(--bg-card2,#161830); border:1px solid var(--border,#2a2e4a);
-    border-radius:8px; font-size:11px;
-  `;
-  // Line-style legend items rendered as HTML (no canvas overlap)
-  const legendItems = [
-    { style:'border-top:2px solid #aaa',           label:'Direct (Dakshina)' },
-    { style:'border-top:3.5px solid #aaa',         label:'Atichar (Vama)'    },
-    { style:'border-top:2px dashed #aaa',          label:'Retrograde (Prishtha)' },
-    { style:'border-top:4px double #aaa',          label:'Stationary (Sthana)'   },
-    { style:'border:2px solid #ffd700;border-radius:50%;width:10px;height:10px;display:inline-block', label:'Bindu ★' },
-  ];
-  const legendHtml = legendItems.map(l =>
-    `<span style="display:inline-flex;align-items:center;gap:5px;color:#aaa;white-space:nowrap">
-      <span style="display:inline-block;width:28px;${l.style}"></span>${l.label}
-    </span>`
-  ).join('');
-  controls.innerHTML = `
-    <span style="color:#666;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Vedha Lines:</span>
-    ${legendHtml}
-    <span style="flex:1"></span>
-    <span style="color:#8892b0;font-size:10px">Hover planet ● to preview · Click to pin 📌</span>
-    <button id="sbcShowAll" style="background:#2a2e4a;border:1px solid #4a4e80;color:#e2e4f0;
-      padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer">Show All</button>
-    <button id="sbcClearAll" style="background:#2a2e4a;border:1px solid #4a4e80;color:#e2e4f0;
-      padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer">Clear All</button>
-  `;
-  tableWrapper.parentNode.insertBefore(controls, tableWrapper);
-
-  // ── Cell center (pixel-perfect via getBoundingClientRect) ───────
-  function cellCenter(row, col) {
-    const rows = table.querySelectorAll('tr');
-    const domRow = rows[row + 1]; // row+1: skip the direction-labels row
-    if (!domRow) return null;
-    const td = domRow.querySelectorAll('td')[col];
-    if (!td) return null;
-    const cr = canvas.getBoundingClientRect();
-    const tr = td.getBoundingClientRect();
-    return { x: tr.left - cr.left + tr.width / 2, y: tr.top - cr.top + tr.height / 2 };
-  }
-
-  // ── Pre-compute planet dots (centers + hit radius) ──────────────
-  const PLANET_RADIUS = 12;
-  const planetDots = [];  // { planet, color, center, lineData, lineStyle, vedhaType, speed, retrograde }
-
-  vedhaLinesAll.forEach(vl => {
-    if (!vl || !vl.lines) return;
-    const center = cellCenter(vl.position[0], vl.position[1]);
-    if (!center) return;
-    planetDots.push({
-      planet:    vl.planet,
-      color:     PLANET_COLORS[vl.planet] || '#888888',
-      center,
-      lines:     vl.lines,
-      lineStyle: vl.line_style,
-      vedhaType: vl.vedha_type,
-      speed:     vl.speed,
-      retrograde:vl.line_style === 'dashed',
-      radius:    PLANET_RADIUS,
-    });
-  });
-
-  // Bindu centers
-  const binduDots = {};
-  Object.entries(binduCells).forEach(([name, b]) => {
-    const c = cellCenter(b.row, b.col);
-    if (c) binduDots[name] = { ...c, nakshatra: b.nakshatra };
-  });
-
-  // ── State ───────────────────────────────────────────────────────
-  let hoveredPlanet = null;
-  const pinnedPlanets = new Set();
-
-  // ── Drawing helpers ─────────────────────────────────────────────
-  function applyLineStyle(lineStyle, color, alpha) {
-    const hex = Math.round(alpha * 255).toString(16).padStart(2, '0');
-    ctx.strokeStyle = color + hex;
-    ctx.setLineDash([]);
-    if      (lineStyle === 'dashed') { ctx.setLineDash([7, 5]); ctx.lineWidth = 1.8; }
-    else if (lineStyle === 'thick')  { ctx.lineWidth = 3.0; }
-    else if (lineStyle === 'double') { ctx.lineWidth = 4.0; }
-    else                             { ctx.lineWidth = 1.8; }
-  }
-
-  function drawPlanetLines(dot, alpha) {
-    dot.lines.forEach(line => {
-      const from = cellCenter(line.from[0], line.from[1]);
-      const to   = cellCenter(line.to[0],   line.to[1]);
-      if (!from || !to) return;
-      applyLineStyle(dot.lineStyle, dot.color, alpha);
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x,   to.y);
-      ctx.stroke();
-    });
-    ctx.setLineDash([]);
-  }
-
-  function drawPlanetDot(dot, isHovered, isPinned) {
-    const { center: c, color, planet } = dot;
-    const r = isHovered ? PLANET_RADIUS + 3 : PLANET_RADIUS;
-
-    // Glow for hovered/pinned
-    if (isHovered || isPinned) {
-      ctx.shadowColor = color;
-      ctx.shadowBlur  = isHovered ? 16 : 10;
-    }
-
-    // Filled circle for pinned, ring for normal
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
-    if (isPinned) {
-      ctx.fillStyle = color + 'cc';
-      ctx.fill();
-    }
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = isPinned ? 2.5 : 2;
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-
-    // Pin indicator
-    if (isPinned) {
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 9px Inter,sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('📌', c.x, c.y + 3);
-    }
-
-    // Planet label above dot
-    ctx.fillStyle = color;
-    ctx.font = `bold ${isHovered ? 10 : 9}px Inter,sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(planet.slice(0, 3), c.x, c.y - r - 4);
-  }
-
-  function drawBinduRings() {
-    Object.entries(binduDots).forEach(([name, c]) => {
-      ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = '#ffd700bb';
-      ctx.lineWidth   = 1.5;
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, 18, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#ffd70088';
-      ctx.font = '7px Inter,sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('★' + name.slice(0, 4), c.x, c.y - 20);
-    });
-  }
-
-  // Legend is now rendered as HTML in the controls bar above — nothing drawn on canvas
-
-  // ── Main redraw ─────────────────────────────────────────────────
-  function redraw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw lines for pinned planets (behind dots)
-    planetDots.forEach(dot => {
-      if (pinnedPlanets.has(dot.planet)) drawPlanetLines(dot, 0.75);
-    });
-
-    // Draw lines for hovered planet (on top of pinned, slightly brighter)
-    if (hoveredPlanet) {
-      const dot = planetDots.find(d => d.planet === hoveredPlanet);
-      if (dot && !pinnedPlanets.has(hoveredPlanet)) drawPlanetLines(dot, 0.90);
-    }
-
-    // Draw bindu rings
-    drawBinduRings();
-
-    // Draw all planet dots
-    planetDots.forEach(dot => {
-      drawPlanetDot(
-        dot,
-        dot.planet === hoveredPlanet,
-        pinnedPlanets.has(dot.planet)
-      );
-    });
-
-  }
-
-  // ── Mouse event helpers ─────────────────────────────────────────
-  function canvasXY(e) {
-    const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  }
-
-  function hitPlanet(x, y) {
-    for (const dot of planetDots) {
-      const dx = x - dot.center.x, dy = y - dot.center.y;
-      if (Math.sqrt(dx*dx + dy*dy) <= dot.radius + 4) return dot;
-    }
-    return null;
-  }
-
-  function showTooltip(dot, e) {
-    const retro = dot.retrograde ? '℞ Retrograde' : 'Direct';
-    const speed = dot.speed != null ? `${Math.abs(dot.speed).toFixed(4)}°/day` : '';
-    const pinned = pinnedPlanets.has(dot.planet);
-    tooltip.innerHTML = `
-      <div style="font-weight:700;color:${dot.color};font-size:13px;margin-bottom:6px">
-        ${dot.planet}  <span style="font-size:10px;color:#888">${retro}</span>
-      </div>
-      <div style="margin-bottom:4px"><span style="color:#888">Vedha Type:</span>
-        <strong style="color:#a78bfa"> ${dot.vedhaType}</strong></div>
-      <div style="margin-bottom:4px"><span style="color:#888">Speed:</span>
-        <strong> ${speed}</strong></div>
-      <div style="font-size:11px;color:#888;margin-top:6px;border-top:1px solid #2a2e4a;padding-top:6px">
-        ${pinned ? '📌 Pinned — click to unpin' : '🖱️ Click to pin vedha lines'}
-      </div>`;
-    tooltip.style.display = 'block';
-    tooltip.style.left = (e.clientX + 14) + 'px';
-    tooltip.style.top  = (e.clientY - 10) + 'px';
-  }
-
-  function hideTooltip() {
-    tooltip.style.display = 'none';
-  }
-
-  // ── Event listeners ─────────────────────────────────────────────
-  canvas.addEventListener('mousemove', e => {
-    const { x, y } = canvasXY(e);
-    const hit = hitPlanet(x, y);
-    const name = hit ? hit.planet : null;
-    if (name !== hoveredPlanet) {
-      hoveredPlanet = name;
-      canvas.style.cursor = name ? 'pointer' : 'default';
-      redraw();
-    }
-    if (hit) showTooltip(hit, e);
-    else hideTooltip();
-  });
-
-  canvas.addEventListener('mouseleave', () => {
-    hoveredPlanet = null;
-    canvas.style.cursor = 'default';
-    hideTooltip();
-    redraw();
-  });
-
-  canvas.addEventListener('click', e => {
-    const { x, y } = canvasXY(e);
-    const hit = hitPlanet(x, y);
-    if (!hit) return;
-    if (pinnedPlanets.has(hit.planet)) pinnedPlanets.delete(hit.planet);
-    else                               pinnedPlanets.add(hit.planet);
-    showTooltip(hit, e);
-    redraw();
-  });
-
-  // Control buttons
-  document.getElementById('sbcShowAll')?.addEventListener('click', () => {
-    planetDots.forEach(d => pinnedPlanets.add(d.planet));
-    redraw();
-  });
-  document.getElementById('sbcClearAll')?.addEventListener('click', () => {
-    pinnedPlanets.clear();
-    redraw();
-  });
-
-  // Initial draw (only dots + bindus, no lines)
-  redraw();
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-// 5. ASHTAKAVARGA
-// ═══════════════════════════════════════════════════════════════════
-
-document.getElementById('ashtakavargaForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('avStatus', 'loading', '⏳ Computing Ashtakavarga...');
-  showLoading('Computing Ashtakavarga and transit dates...');
-  try {
-    const global = loadGlobalDetails();
-    const base = getApiBase('av_apiBase');
+// ─── BACKTEST ───────────────────────────────────────────────
+document.getElementById('backtest-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('backtest-result');
     const body = {
-      name: document.getElementById('av_name').value || global.name,
-      date: document.getElementById('av_date').value || global.date,
-      time: document.getElementById('av_time').value || global.time,
-      place: document.getElementById('av_place').value || global.place,
-      days_ahead: parseInt(document.getElementById('av_days').value),
+        ticker: document.getElementById('bt-ticker').value,
+        start_date: document.getElementById('bt-start').value,
+        signal_type: document.getElementById('bt-signal').value,
     };
-    const fromDate = document.getElementById('av_from').value;
-    if (fromDate) body.transit_from_date = fromDate;
-    const data = await apiPost(base, '/ashtakavarga', body);
-    renderAshtakavarga(data);
-    setStatus('avStatus', 'success', '✅ Ashtakavarga computed');
-  } catch (err) {
-    setStatus('avStatus', 'error', '❌ ' + err.message);
-  } finally { hideLoading(); }
-});
+    const endDate = document.getElementById('bt-end').value;
+    if (endDate) body.end_date = endDate;
 
-const SIGNS_ORDER = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+    const data = await apiCall('/backtest', body, resultEl);
+    if (!data) return;
 
-function renderAshtakavarga(data) {
-  const el = document.getElementById('avResults');
-  const sav = data.sarvashtakavarga || {};
-  const bav = sav.bhinnashtakavarga || {};
-  const tp = data.transit_predictions || {};
+    const risk = data.risk_metrics || {};
+    const assess = data.assessment || {};
+    const monthly = data.monthly_summary || [];
+    const dist = data.signal_distribution || {};
 
-  // SAV table
-  let savHtml = `<div class="card mb-8">
-    <h3 class="card-title">Sarvashtakavarga (Total SAV Scores)</h3>
-    <p class="fs-12 text-muted mb-8">Strongest: <strong class="text-green">${sav.strongest_sign || ''}</strong> · Weakest: <strong class="text-red">${sav.weakest_sign || ''}</strong></p>
-    <div class="table-wrap">
-      <table class="av-table">
-        <thead><tr><th>Sign</th>${SIGNS_ORDER.map(s => `<th>${s.slice(0,3)}</th>`).join('')}</tr></thead>
-        <tbody>
-          <tr><td class="fw-700">SAV</td>${SIGNS_ORDER.map(s => {
-            const v = sav.sarvashtakavarga?.[s] || 0;
-            const cls = v >= 30 ? 'av-score-high' : v <= 18 ? 'av-score-low' : 'av-score-mid';
-            return `<td class="${cls}">${v}</td>`;
-          }).join('')}</tr>
-          ${Object.entries(bav).map(([planet, data]) =>
-            `<tr><td>${planet}</td>${SIGNS_ORDER.map(s => {
-              const v = data.scores?.[s] || 0;
-              const cls = v >= 5 ? 'av-score-high' : v <= 2 ? 'av-score-low' : '';
-              return `<td class="${cls}">${v}</td>`;
-            }).join('')}</tr>`
-          ).join('')}
-        </tbody>
-      </table>
-    </div>
-  </div>`;
+    const gradeColor = assess.grade === 'A' ? 'var(--green)' : assess.grade === 'B' ? '#8BC34A' : assess.grade === 'C' ? 'var(--orange)' : 'var(--red)';
 
-  // Transit predictions
-  const alerts = tp.transit_alerts || [];
-  const summary = tp.summary || {};
-  let transitHtml = `<div class="card">
-    <h3 class="card-title">Transit Predictions with Ashtakavarga Scores (${tp.days_ahead || 0} days)</h3>
-    ${summary.overall_outlook ? `<div class="mb-8 overall-badge" style="color:${scoreColor(summary.avg_transit_score||0)}">${summary.overall_outlook}: ${summary.recommendation}</div>` : ''}
-    ${alerts.slice(0, 20).map(a => `
-      <div class="av-transit-card" style="border-left-color:${a.market_impact?.color || '#666'}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <strong>${a.planet} → ${a.entering_sign}</strong>
-            ${a.retrograde ? '<span class="retro-badge">℞</span>' : ''}
-            <span class="fs-11 text-muted ml-8">${a.ingress_date}</span>
-            ${a.exit_date ? `<span class="fs-11 text-muted"> → ${a.exit_date}</span>` : ''}
-          </div>
-          <div style="text-align:right">
-            <div class="fw-700 fs-12" style="color:${a.market_impact?.color}">${a.nse_action || ''}</div>
-            <div class="fs-11 text-muted">BAV: ${a.bav_score} · SAV: ${a.sav_score}</div>
-          </div>
+    resultEl.innerHTML = `
+        <div class="signal-card ${data.cumulative_return_pct > 0 ? 'bullish' : 'bearish'}">
+            <div class="signal-header">
+                <div>
+                    <h3 style="color:var(--gold-light)">Backtest Results — ${data.type?.replace('backtest_', '').replace(/_/g, ' ').toUpperCase() || ''}</h3>
+                    <p style="color:var(--text-muted)">${data.total_trading_days || 0} trading days analyzed</p>
+                </div>
+                <div class="score-display" style="color:${gradeColor}">${assess.grade || '?'}</div>
+            </div>
+            <p style="color:var(--text);margin-bottom:4px">${assess.verdict || ''}</p>
+
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Hit Ratio</div><div class="value ${data.hit_ratio_pct >= 55 ? 'green' : 'red'}">${data.hit_ratio_pct?.toFixed(1) || 0}%</div></div>
+                <div class="metric"><div class="label">Cumulative Return</div><div class="value ${data.cumulative_return_pct > 0 ? 'green' : 'red'}">${data.cumulative_return_pct?.toFixed(2) || 0}%</div></div>
+                <div class="metric"><div class="label">Sharpe Ratio</div><div class="value gold">${risk.sharpe_ratio?.toFixed(2) || '—'}</div></div>
+                <div class="metric"><div class="label">Max Drawdown</div><div class="value red">-${risk.max_drawdown_pct?.toFixed(2) || 0}%</div></div>
+                <div class="metric"><div class="label">Win/Loss</div><div class="value">${risk.win_loss_ratio?.toFixed(2) || '—'}</div></div>
+                <div class="metric"><div class="label">Signals</div><div class="value">${data.signals_generated || 0}</div></div>
+            </div>
         </div>
-        <div class="fs-11 text-muted mt-4">${a.bav_signal}</div>
-      </div>`).join('')}
-  </div>`;
 
-  el.innerHTML = savHtml + transitHtml;
-  showResultPanel('avResultPanel');
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-// 6. YOGAS
-// ═══════════════════════════════════════════════════════════════════
-
-document.getElementById('yogaForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('yogaStatus', 'loading', '⏳ Detecting yogas...');
-  showLoading('Scanning for financial yogas...');
-  try {
-    const global = loadGlobalDetails();
-    const base = getApiBase('y_apiBase');
-    const data = await apiPost(base, '/yogas', {
-      name: document.getElementById('y_name').value || global.name,
-      date: document.getElementById('y_date').value || global.date,
-      time: document.getElementById('y_time').value || global.time,
-      place: document.getElementById('y_place').value || global.place,
-    });
-    renderYogas(data);
-    setStatus('yogaStatus', 'success', '✅ Yoga detection complete');
-  } catch (err) {
-    setStatus('yogaStatus', 'error', '❌ ' + err.message);
-  } finally { hideLoading(); }
+        ${monthly.length ? `
+        <div class="card">
+            <h2>Monthly Breakdown</h2>
+            <table class="data-table">
+                <thead><tr><th>Month</th><th>Days</th><th>Signals</th><th>Correct</th><th>Hit %</th><th>Return %</th></tr></thead>
+                <tbody>
+                    ${monthly.map(m => `
+                        <tr>
+                            <td style="font-weight:600">${m.month}</td>
+                            <td>${m.trading_days}</td>
+                            <td>${m.signals}</td>
+                            <td>${m.correct}</td>
+                            <td style="color:${m.hit_ratio >= 55 ? 'var(--green)' : m.hit_ratio < 45 ? 'var(--red)' : 'var(--text)'}">${m.hit_ratio}%</td>
+                            <td style="color:${m.monthly_return_pct > 0 ? 'var(--green)' : 'var(--red)'}">${m.monthly_return_pct > 0 ? '+' : ''}${m.monthly_return_pct}%</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>` : ''}
+    `;
 });
 
-function renderYogas(data) {
-  const el = document.getElementById('yogaResults');
-  const yogas = data.yogas || {};
-  const signal = yogas.overall_signal || '';
-  const color = yogas.signal_color || '#888';
-
-  let html = `<div class="overall-badge" style="color:${color};background:${color}22;border-color:${color}55">
-    ${signal} — Score: ${yogas.overall_yoga_score > 0 ? '+' : ''}${yogas.overall_yoga_score?.toFixed(3) || '0'}
-  </div>
-  <p class="fs-12 text-muted mb-8">${yogas.summary || ''}</p>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-    <div>
-      <div class="fs-11 text-muted mb-4">Favorable Sectors</div>
-      ${(yogas.favorable_sectors || []).map(s => `<span class="sector-tag sector-buy">${s}</span>`).join('')}
-    </div>
-    <div>
-      <div class="fs-11 text-muted mb-4">Sectors to Avoid</div>
-      ${(yogas.avoid_sectors || []).map(s => `<span class="sector-tag sector-avoid">${s}</span>`).join('')}
-    </div>
-  </div>`;
-
-  if (yogas.positive_yogas?.length) {
-    html += `<div class="section-title">✨ Positive Yogas (${yogas.positive_yogas.length})</div>`;
-    html += yogas.positive_yogas.map(y => renderYogaCard(y)).join('');
-  }
-  if (yogas.negative_yogas?.length) {
-    html += `<div class="section-title">⚠️ Challenging Yogas (${yogas.negative_yogas.length})</div>`;
-    html += yogas.negative_yogas.map(y => renderYogaCard(y)).join('');
-  }
-
-  el.innerHTML = html;
-  showResultPanel('yogaResultPanel');
-}
-
-function renderYogaCard(y) {
-  const c = scoreColor(y.score || 0);
-  return `<div class="yoga-card" style="border-left-color:${c}">
-    <div class="yoga-name" style="color:${c}">${y.name}</div>
-    <div class="yoga-sanskrit">${y.sanskrit || ''}</div>
-    <div><span class="yoga-type" style="color:${c}">${y.type}</span> · <span class="fs-11 text-muted">Strength: ${y.strength}</span></div>
-    <div class="yoga-impact">${y.financial_impact}</div>
-    <span class="yoga-signal" style="background:${c}22;color:${c};border:1px solid ${c}44">${y.nse_signal}</span>
-  </div>`;
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-// 7. TRANSIT ALERTS
-// ═══════════════════════════════════════════════════════════════════
-
-document.getElementById('alertForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('alertStatus', 'loading', '⏳ Generating transit alerts...');
-  showLoading('Scanning upcoming transits...');
-  try {
-    const global = loadGlobalDetails();
-    const base = getApiBase('al_apiBase');
+// ─── Kaksha Ashtakavarga ────────────────────────────────────
+document.getElementById('kaksha-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const mode = document.getElementById('kk-mode').value;
     const body = {
-      date: document.getElementById('al_date').value,
-      time: document.getElementById('al_time').value,
-      place: document.getElementById('al_place').value,
-      days_ahead: parseInt(document.getElementById('al_days').value),
+        name: document.getElementById('kk-name').value,
+        date: ddmmToApi(document.getElementById('kk-date').value),
+        time: document.getElementById('kk-time').value,
+        place: document.getElementById('kk-place').value,
+        ayanamsa: document.getElementById('kk-ayanamsa').value,
+        transit_date: document.getElementById('kk-transit-date').value || undefined,
+        transit_time: document.getElementById('kk-transit-time').value,
+        transit_place: document.getElementById('kk-transit-place').value,
     };
-    const nd = document.getElementById('al_natal_date').value || global.date;
-    const nt = document.getElementById('al_natal_time').value || global.time;
-    const np = document.getElementById('al_natal_place').value || global.place;
-    if (nd && nt && np) { body.natal_date = nd; body.natal_time = nt; body.natal_place = np; }
-    const data = await apiPost(base, '/transit-alerts', body);
-    renderAlerts(data);
-    setStatus('alertStatus', 'success', `✅ ${data.alerts?.total_alerts || 0} alerts generated`);
-  } catch (err) {
-    setStatus('alertStatus', 'error', '❌ ' + err.message);
-  } finally { hideLoading(); }
+    if (mode === 'timeline') body.days = parseInt(document.getElementById('kk-days').value) || 30;
+    const endpoint = mode === 'daily' ? '/kaksha/daily' : '/kaksha/timeline';
+    const el = document.getElementById('kaksha-result');
+    const data = await apiCall(endpoint, body, el);
+    if (!data) return;
+
+    if (mode === 'daily') {
+        const pw = data.planet_kaksha || [];
+        const hourly = data.hourly_moon_kaksha || [];
+        const best = data.best_windows || [];
+        const avoid = data.avoid_windows || [];
+        const ov = data.overall || {};
+        const qColor = ov.score >= 0.25 ? 'var(--green)' : ov.score < -0.1 ? 'var(--red)' : 'var(--gold)';
+        el.innerHTML = `
+            <div class="card">
+                <h2>Day Signal: <span style="color:${qColor}">${ov.signal || '—'}</span> (${ov.score})</h2>
+                <p>Transit: ${data.transit?.date} — ${data.transit?.place}</p>
+            </div>
+            <div class="card">
+                <h2>Planet Kaksha Windows</h2>
+                <table class="data-table">
+                    <thead><tr><th>Planet</th><th>Sign</th><th>Kaksha Lord</th><th>BAV</th><th>SAV</th><th>Bindu</th><th>Score</th><th>Quality</th></tr></thead>
+                    <tbody>${pw.map(p => `
+                        <tr>
+                            <td style="font-weight:600">${p.planet}</td>
+                            <td>${p.sign} ${p.degree_dms}</td>
+                            <td>${p.kaksha_lord} (#${p.kaksha_index})</td>
+                            <td>${p.bav_score}</td><td>${p.sav_score}</td>
+                            <td style="color:${p.bindu ? 'var(--green)' : 'var(--red)'}">${p.bindu}</td>
+                            <td style="color:${p.score >= 0.25 ? 'var(--green)' : p.score < -0.1 ? 'var(--red)' : 'var(--text)'}">${p.score}</td>
+                            <td>${p.quality}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card">
+                <h2>Best Moon Windows</h2>
+                <div class="metrics-grid">${best.map(w => `
+                    <div class="metric"><div class="label">${w.time}</div><div class="value green">${w.score} — ${w.kaksha_lord}</div></div>
+                `).join('')}</div>
+            </div>
+            <div class="card">
+                <h2>Avoid Windows</h2>
+                <div class="metrics-grid">${avoid.map(w => `
+                    <div class="metric"><div class="label">${w.time}</div><div class="value red">${w.score} — ${w.kaksha_lord}</div></div>
+                `).join('')}</div>
+            </div>
+            <div class="card">
+                <h2>Hourly Moon Kaksha</h2>
+                <table class="data-table">
+                    <thead><tr><th>Time</th><th>Sign</th><th>Kaksha Lord</th><th>Bindu</th><th>Score</th><th>Quality</th></tr></thead>
+                    <tbody>${hourly.map(h => `
+                        <tr>
+                            <td style="font-weight:600">${h.time}</td>
+                            <td>${h.sign} ${h.degree_dms}</td>
+                            <td>${h.kaksha_lord}</td>
+                            <td>${h.bindu}</td>
+                            <td style="color:${h.score >= 0.25 ? 'var(--green)' : h.score < -0.1 ? 'var(--red)' : 'var(--text)'}">${h.score}</td>
+                            <td>${h.quality}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else {
+        // Timeline mode
+        const days = data.days || [];
+        const bestD = data.best_days || [];
+        const worstD = data.worst_days || [];
+        el.innerHTML = `
+            <div class="card">
+                <h2>Kaksha Timeline — ${data.days_count} days from ${data.start_date}</h2>
+                <div class="metrics-grid">
+                    <div class="metric"><div class="label">Best Day</div><div class="value green">${bestD[0]?.date || '—'} (${bestD[0]?.score || '—'})</div></div>
+                    <div class="metric"><div class="label">Worst Day</div><div class="value red">${worstD[0]?.date || '—'} (${worstD[0]?.score || '—'})</div></div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Daily Scores</h2>
+                <table class="data-table">
+                    <thead><tr><th>Date</th><th>Day</th><th>Score</th><th>Signal</th><th>Best Planet</th><th>Weakest</th><th>Moon Kaksha</th></tr></thead>
+                    <tbody>${days.map(d => `
+                        <tr>
+                            <td style="font-weight:600">${d.date}</td>
+                            <td>${d.weekday}</td>
+                            <td style="color:${d.score >= 0.25 ? 'var(--green)' : d.score < -0.1 ? 'var(--red)' : 'var(--text)'}">${d.score}</td>
+                            <td>${d.signal}</td>
+                            <td>${d.best_planet}</td>
+                            <td>${d.weakest_planet}</td>
+                            <td>${d.moon_kaksha?.kaksha_lord || '—'} (${d.moon_kaksha?.quality || '—'})</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
 });
 
-function renderAlerts(data) {
-  const el = document.getElementById('alertResults');
-  const a = data.alerts || {};
-  const outlook = a.market_outlook || '';
-  const outlookColor = a.outlook_color || '#888';
+// ─── SBC Daily Signal ───────────────────────────────────────
+document.getElementById('sbc-signal-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = {
+        name: document.getElementById('ss-name').value,
+        date: ddmmToApi(document.getElementById('ss-date').value),
+        time: document.getElementById('ss-time').value,
+        place: document.getElementById('ss-place').value,
+        ayanamsa: document.getElementById('ss-ayanamsa').value,
+        transit_date: document.getElementById('ss-transit-date').value || undefined,
+        transit_time: document.getElementById('ss-transit-time').value,
+        transit_place: document.getElementById('ss-transit-place').value,
+    };
+    const el = document.getElementById('sbc-signal-result');
+    const data = await apiCall('/sbc/daily-signal', body, el);
+    if (!data) return;
 
-  let html = `<div class="overall-badge mb-8" style="color:${outlookColor};background:${outlookColor}22;border-color:${outlookColor}55">
-    ${outlook}
-  </div>
-  <p class="fs-12 text-muted mb-8">${a.recommendation || ''}</p>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
-    <div><div class="fs-11 text-muted">Buy Sectors</div>${(a.nse_sectors?.buy||[]).map(s=>`<span class="sector-tag sector-buy">${s}</span>`).join('')}</div>
-    <div><div class="fs-11 text-muted">Hold Sectors</div>${(a.nse_sectors?.hold||[]).map(s=>`<span class="sector-tag sector-hold">${s}</span>`).join('')}</div>
-    <div><div class="fs-11 text-muted">Avoid Sectors</div>${(a.nse_sectors?.avoid||[]).map(s=>`<span class="sector-tag sector-avoid">${s}</span>`).join('')}</div>
-  </div>`;
+    const lattas = data.active_lattas || [];
+    const vedhaNaks = data.active_vedha_naks || [];
+    const mkt = data.market_signal || {};
+    const signal = mkt.signal || '—';
+    const action = mkt.action || '—';
+    const score = data.overall_score ?? mkt.score ?? '—';
+    const sigColor = mkt.color || (signal.includes('BULL') ? 'var(--green)' : signal.includes('BEAR') ? 'var(--red)' : 'var(--gold)');
+    const warnings = mkt.warning_tips || [];
 
-  const renderAlertItems = (items, title) => {
-    if (!items?.length) return '';
-    return `<div class="section-title">${title} (${items.length})</div>` +
-      items.map(al => {
-        const c = scoreColor(al.score || 0);
-        return `<div class="alert-item" style="border-left-color:${c}">
-          <div class="alert-planet">${al.planet || al.type}</div>
-          <div class="alert-date">${al.type} · ${al.date === 'CURRENT' ? 'Active Now' : formatDate(al.date)}</div>
-          <div class="alert-desc">${al.description}</div>
-          ${al.action ? `<span class="alert-action" style="background:${c}22;color:${c}">${al.action}</span>` : ''}
-        </div>`;
-      }).join('');
-  };
-
-  html += renderAlertItems(a.high_priority_alerts,   '🔴 High Priority');
-  html += renderAlertItems(a.medium_priority_alerts, '🟡 Medium Priority');
-  html += renderAlertItems(a.low_priority_alerts,    '🟢 Low Priority');
-
-  el.innerHTML = html;
-  showResultPanel('alertResultPanel');
-}
+    el.innerHTML = `
+        <div class="card">
+            <h2>SBC Market Signal: <span style="color:${sigColor}">${signal}</span></h2>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Janma Nakshatra</div><div class="value">${data.janma_nakshatra || '—'}</div></div>
+                <div class="metric"><div class="label">Transit Date</div><div class="value">${data.transit_date || '—'}</div></div>
+                <div class="metric"><div class="label">Overall Score</div><div class="value" style="color:${sigColor}">${score}</div></div>
+                <div class="metric"><div class="label">Action</div><div class="value gold">${action}</div></div>
+            </div>
+            ${warnings.length ? `<div style="margin-top:12px">${warnings.map(w => `<p style="color:var(--red);margin:4px 0">⚠ ${w}</p>`).join('')}</div>` : ''}
+        </div>
+        ${lattas.length ? `
+        <div class="card">
+            <h2>Active Lattas</h2>
+            <table class="data-table">
+                <thead><tr><th>Planet</th><th>Kicks Nakshatra</th><th>Tara</th><th>Quality</th><th>Severity</th><th>Effect</th></tr></thead>
+                <tbody>${lattas.map(l => `
+                    <tr>
+                        <td style="font-weight:600">${l.planet}</td>
+                        <td>${l.kicked || '—'}</td>
+                        <td>${l.tara || '—'}</td>
+                        <td>${l.quality || '—'}</td>
+                        <td style="color:${l.severity === 'HIGH' ? 'var(--red)' : 'var(--gold)'}">${l.severity || '—'}</td>
+                        <td>${l.effect || '—'}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>` : '<div class="card"><h2>No Active Lattas</h2><p>No significant Latta afflictions today.</p></div>'}
+        ${vedhaNaks.length ? `
+        <div class="card">
+            <h2>Afflicted Vedha Nakshatras</h2>
+            <p>${vedhaNaks.join(', ')}</p>
+        </div>` : ''}
+    `;
+});

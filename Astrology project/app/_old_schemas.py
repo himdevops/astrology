@@ -153,3 +153,134 @@ class FullPredictionInput(BaseModel):
     natal_place: Optional[str]  = Field(default=None)
     natal_latitude:  Optional[float] = Field(default=None)
     natal_longitude: Optional[float] = Field(default=None)
+
+
+class StrengthCalendarInput(BaseModel):
+    """Input for Ashtakavarga daily/monthly/yearly strength calendar."""
+    name: str  = Field(...,  example="Himanshu")
+    date: str  = Field(...,  example="1990-01-15")
+    time: str  = Field(...,  example="10:30")
+    place: str = Field(...,  example="Mumbai, Maharashtra, India")
+    latitude:  Optional[float] = Field(default=None)
+    longitude: Optional[float] = Field(default=None)
+    timezone_offset_minutes: Optional[int] = Field(default=None)
+    ayanamsa: str = Field(default="lahiri")
+    
+    # Calendar type
+    calendar_type: str = Field(
+        default="daily",
+        example="daily",
+        description="'daily' (next N days), 'monthly' (specific month), or 'yearly' (full year)"
+    )
+    
+    # For daily calendar
+    from_date: Optional[str] = Field(
+        default=None,
+        example="2026-04-15",
+        description="Start date for daily calendar. Defaults to today."
+    )
+    days_ahead: int = Field(
+        default=30,
+        ge=7,
+        le=365,
+        description="Number of days to show (default 30)"
+    )
+    
+    # For monthly/yearly calendar
+    year: Optional[int] = Field(
+        default=None,
+        example=2026,
+        description="Year for monthly/yearly calendar. Defaults to current year."
+    )
+    month: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=12,
+        example=4,
+        description="Month (1-12) for monthly calendar. Defaults to current month."
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# NEW v3.0 Schemas
+# ─────────────────────────────────────────────────────────────
+
+class ShadbalaInput(BaseModel):
+    """Input for Shadbala (six-fold planetary strength) calculation."""
+    name: str  = Field(...,  example="Himanshu")
+    date: str  = Field(...,  example="1990-01-15")
+    time: str  = Field(...,  example="10:30")
+    place: str = Field(...,  example="Mumbai, Maharashtra, India")
+    latitude:  Optional[float] = Field(default=None)
+    longitude: Optional[float] = Field(default=None)
+    timezone_offset_minutes: Optional[int] = Field(default=None)
+    ayanamsa: str = Field(default="lahiri")
+
+
+class BhavaChalitInput(BaseModel):
+    """Input for Bhava Chalit chart."""
+    name: str  = Field(...,  example="Himanshu")
+    date: str  = Field(...,  example="1990-01-15")
+    time: str  = Field(...,  example="10:30")
+    place: str = Field(...,  example="Mumbai, Maharashtra, India")
+    latitude:  Optional[float] = Field(default=None)
+    longitude: Optional[float] = Field(default=None)
+    timezone_offset_minutes: Optional[int] = Field(default=None)
+    ayanamsa: str = Field(default="lahiri")
+
+
+class KPAnalysisInput(BaseModel):
+    """Input for KP (Krishnamurti) system analysis."""
+    name: str  = Field(...,  example="Himanshu")
+    date: str  = Field(...,  example="1990-01-15")
+    time: str  = Field(...,  example="10:30")
+    place: str = Field(...,  example="Mumbai, Maharashtra, India")
+    latitude:  Optional[float] = Field(default=None)
+    longitude: Optional[float] = Field(default=None)
+    timezone_offset_minutes: Optional[int] = Field(default=None)
+    ayanamsa: str = Field(default="krishnamurti")
+    # Optional transit for ruling planets
+    transit_date: Optional[str] = Field(default=None, example="2026-04-28")
+    transit_time: Optional[str] = Field(default="09:15")
+
+
+class PanchangInput(BaseModel):
+    """Input for Panchang calculation."""
+    date: str  = Field(...,  example="2026-04-28")
+    time: str  = Field(default="09:15", example="09:15")
+    place: str = Field(default="Mumbai, Maharashtra, India")
+    latitude:  Optional[float] = Field(default=None, example=19.076)
+    longitude: Optional[float] = Field(default=None, example=72.8777)
+    timezone_offset_minutes: int = Field(default=330)
+    ayanamsa: str = Field(default="lahiri")
+
+
+class PanchangCalendarInput(BaseModel):
+    """Input for multi-day Panchang trading calendar."""
+    start_date: str = Field(..., example="2026-04-01")
+    days: int = Field(default=30, ge=7, le=365)
+    place: str = Field(default="Mumbai, Maharashtra, India")
+    latitude:  Optional[float] = Field(default=None, example=19.076)
+    longitude: Optional[float] = Field(default=None, example=72.8777)
+    timezone_offset_minutes: int = Field(default=330)
+    ayanamsa: str = Field(default="lahiri")
+
+
+class MarketDataInput(BaseModel):
+    """Input for live market data."""
+    indices: List[str] = Field(
+        default=["NIFTY_50", "SENSEX", "BANK_NIFTY"],
+        description="Index names: NIFTY_50, SENSEX, BANK_NIFTY, NIFTY_IT, etc."
+    )
+
+
+class BacktestInput(BaseModel):
+    """Input for backtesting astrology signals against market data."""
+    ticker: str = Field(default="NIFTY_50", example="NIFTY_50")
+    start_date: str = Field(default="2023-01-01", example="2023-01-01")
+    end_date: Optional[str] = Field(default=None, example="2026-04-28")
+    signal_type: str = Field(
+        default="composite",
+        description="'moon_nakshatra', 'planetary_transits', or 'composite'"
+    )
+    ayanamsa: str = Field(default="lahiri")

@@ -53,12 +53,31 @@ def parse_datetime(date_str: str, time_str: str) -> datetime:
     raise ValueError("Invalid date/time format. Use date=YYYY-MM-DD and time=HH:MM")
 
 
+_GEOCODE_CACHE: Dict[str, Tuple[float, float, str]] = {
+    "Mumbai, Maharashtra, India": (19.0760, 72.8777, "Mumbai, Maharashtra, India"),
+    "Ujjain, Madhya Pradesh, India": (23.1765, 75.7885, "Ujjain, Madhya Pradesh, India"),
+    "Delhi, India": (28.6139, 77.2090, "Delhi, India"),
+    "New Delhi, India": (28.6139, 77.2090, "New Delhi, India"),
+    "Kolkata, India": (22.5726, 88.3639, "Kolkata, India"),
+    "Chennai, India": (13.0827, 80.2707, "Chennai, India"),
+    "Bangalore, India": (12.9716, 77.5946, "Bangalore, India"),
+    "Hyderabad, India": (17.3850, 78.4867, "Hyderabad, India"),
+    "Pune, India": (18.5204, 73.8567, "Pune, India"),
+    "Ahmedabad, India": (23.0225, 72.5714, "Ahmedabad, India"),
+    "Jaipur, India": (26.9124, 75.7873, "Jaipur, India"),
+}
+_geolocator = Nominatim(user_agent="financial_astrology_engine", timeout=10)
+
+
 def geocode_place(place: str) -> Tuple[float, float, str]:
-    geolocator = Nominatim(user_agent="financial_astrology_engine")
-    location = geolocator.geocode(place)
+    if place in _GEOCODE_CACHE:
+        return _GEOCODE_CACHE[place]
+    location = _geolocator.geocode(place)
     if not location:
         raise ValueError(f"Could not find coordinates for place: {place}")
-    return float(location.latitude), float(location.longitude), location.address
+    result = (float(location.latitude), float(location.longitude), location.address)
+    _GEOCODE_CACHE[place] = result
+    return result
 
 
 def resolve_timezone_name(latitude: float, longitude: float) -> str:

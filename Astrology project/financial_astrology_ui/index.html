@@ -1,507 +1,361 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Financial Astrology Engine v2.0 — NSE/BSE Predictor</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    .global-details { margin: 20px auto; max-width: 1200px; padding: 0 20px; }
-    .global-details .card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; }
-    .global-details .card-title { margin: 0 0 10px 0; color: #495057; }
-    .global-details .card-desc { margin: 0 0 15px 0; font-size: 14px; color: #6c757d; }
-    .global-details .form-row { display: flex; gap: 15px; margin-bottom: 10px; }
-    .global-details label { display: flex; flex-direction: column; flex: 1; }
-    .global-details input, .global-details select { padding: 8px; border: 1px solid #ced4da; border-radius: 4px; }
-    .global-details button { margin-top: 10px; margin-right: 10px; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; }
-    .btn-secondary { background: #6c757d; color: white; }
-    .btn-secondary:hover { background: #5a6268; }
-    .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .close-results { background: transparent; color: #6c757d; border: 1px solid #ced4da; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
-    .close-results:hover { background: #f1f3f5; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Astrology Engine v3.0 — NSE/BSE</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<!-- ═══ HEADER ═══════════════════════════════════════════════════════ -->
-<header class="app-header">
-  <div class="header-inner">
-    <div class="logo">
-      <span class="logo-icon">🔮</span>
-      <div>
-        <h1>Financial Astrology Engine</h1>
-        <span class="logo-sub">Advanced Vedic Astrology · NSE/BSE Market Predictor</span>
-      </div>
-    </div>
-    <div class="header-right">
-      <span class="version-badge">v2.0</span>
-      <span id="currentTime" class="time-display"></span>
-    </div>
-  </div>
-</header>
-
-<!-- ═══ TABS ══════════════════════════════════════════════════════════ -->
-<nav class="tab-nav">
-  <button class="tab-btn" data-tab="global">🧭 Shared Details</button>
-  <button class="tab-btn active" data-tab="predict">🎯 Auto Predict</button>
-  <button class="tab-btn" data-tab="chart">🪐 Birth Chart</button>
-  <button class="tab-btn" data-tab="dasha">⏳ Dasha</button>
-  <button class="tab-btn" data-tab="divisional">📊 D-Charts</button>
-  <button class="tab-btn" data-tab="sarvatobhadra">🌀 Sarvatobhadra</button>
-  <button class="tab-btn" data-tab="ashtakavarga">🔢 Ashtakavarga</button>
-  <button class="tab-btn" data-tab="yogas">✨ Yogas</button>
-  <button class="tab-btn" data-tab="alerts">🔔 Alerts</button>
-</nav>
-<main class="app-main">
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: SHARED GLOBAL BIRTH DETAILS                                   -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-global" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">🌟 Shared Birth Details</h2>
-      <p class="card-desc">Enter your birth details once here, then use any tab below without retyping.</p>
-      <form id="globalForm">
-        <div class="form-row">
-          <label>Name <input type="text" id="global_name" placeholder="Your name" /></label>
-          <label>Birth Date <input type="date" id="global_date" /></label>
+    <header>
+        <div class="header-content">
+            <h1>Financial Astrology Engine <span class="version">v3.0</span></h1>
+            <p class="subtitle">Advanced Vedic Astrology × NSE/BSE Market Prediction</p>
         </div>
-        <div class="form-row">
-          <label>Birth Time <input type="time" id="global_time" /></label>
-          <label>Birth Place <input type="text" id="global_place" placeholder="City, State, India" /></label>
+        <nav>
+            <button class="nav-btn active" data-tab="predict">Prediction</button>
+            <button class="nav-btn" data-tab="panchang">Panchang</button>
+            <button class="nav-btn" data-tab="chart">Birth Chart</button>
+            <button class="nav-btn" data-tab="shadbala">Shadbala</button>
+            <button class="nav-btn" data-tab="ashtakavarga">Ashtakavarga</button>
+            <button class="nav-btn" data-tab="sarvatobhadra">Sarvatobhadra</button>
+            <button class="nav-btn" data-tab="strength">Strength Calendar</button>
+            <button class="nav-btn" data-tab="kp">KP System</button>
+            <button class="nav-btn" data-tab="dasha">Dasha</button>
+            <button class="nav-btn" data-tab="backtest">Backtest</button>
+            <button class="nav-btn" data-tab="kaksha">Kaksha AV</button>
+            <button class="nav-btn" data-tab="sbc-signal">SBC Signal</button>
+        </nav>
+    </header>
+
+    <!-- ═══ Master Birth Data — fills all tabs ═══ -->
+    <div id="master-birth-panel">
+        <div class="master-inner">
+            <span class="master-label">Birth Data</span>
+            <div class="master-fields">
+                <div class="mf"><label>Name</label><input type="text" id="master-name" value="Himanshu" placeholder="Name"></div>
+                <div class="mf"><label>Date (DD-MM-YYYY)</label><input type="text" id="master-date" placeholder="DD-MM-YYYY" maxlength="10" autocomplete="off"></div>
+                <div class="mf"><label>Time</label><input type="time" id="master-time" placeholder="HH:MM"></div>
+                <div class="mf"><label>Place</label><input type="text" id="master-place" value="Mumbai, Maharashtra, India" list="city-suggestions" placeholder="City, State, Country"></div>
+            </div>
+            <button type="button" id="master-apply-btn" class="btn-apply">Apply to All Tabs</button>
         </div>
-        <label>Ayanamsa
-          <select id="global_ayanamsa">
-            <option value="lahiri" selected>Lahiri (Standard)</option>
-            <option value="raman">Raman</option>
-            <option value="krishnamurti">KP (Krishnamurti)</option>
-          </select>
-        </label>
-        <div class="form-row" style="margin-top:14px;">
-          <button type="submit" class="btn-secondary">💾 Save Details</button>
-          <button type="button" id="clearGlobal" class="btn-secondary">🗑️ Clear</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: AUTO PREDICT                                                  -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-predict" class="tab-section active">
-  <div class="section-grid">
-
-    <!-- Input Panel -->
-    <div class="card input-card">
-      <h2 class="card-title">🎯 Autonomous Market Prediction</h2>
-      <p class="card-desc">Get NSE/BSE buy/sell signals powered by all Vedic astrology systems</p>
-
-      <form id="predictForm">
-        <fieldset class="form-section">
-          <legend>📅 Prediction Date (Current Transits)</legend>
-          <div class="form-row">
-            <label>Date <input type="date" id="p_transit_date" required /></label>
-            <label>Time <input type="time" id="p_transit_time" value="09:15" /></label>
-          </div>
-          <label>Location <input type="text" id="p_transit_place" value="Mumbai, Maharashtra, India" /></label>
-        </fieldset>
-
-        <fieldset class="form-section">
-          <legend>🌟 Natal Chart (Optional — for personalized prediction)</legend>
-          <p class="hint">Add birth details for Dasha + Yoga analysis</p>
-          <div class="form-row">
-            <label>Name <input type="text" id="p_natal_name" placeholder="Your name" /></label>
-            <label>Birth Date <input type="date" id="p_natal_date" /></label>
-          </div>
-          <div class="form-row">
-            <label>Birth Time <input type="time" id="p_natal_time" /></label>
-            <label>Birth Place <input type="text" id="p_natal_place" placeholder="City, State, India" /></label>
-          </div>
-        </fieldset>
-
-        <div class="form-row">
-          <label>Ayanamsa
-            <select id="p_ayanamsa">
-              <option value="lahiri" selected>Lahiri (Standard)</option>
-              <option value="raman">Raman</option>
-              <option value="krishnamurti">KP (Krishnamurti)</option>
-            </select>
-          </label>
-          <label>Days Ahead
-            <input type="number" id="p_days_ahead" value="90" min="7" max="365" />
-          </label>
-        </div>
-
-        <div class="api-row">
-          <label>API Base <input type="text" id="p_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-
-        <button type="submit" class="btn-primary" id="predictBtn">
-          <span>🔮 Generate Prediction</span>
-        </button>
-      </form>
     </div>
 
-    <!-- Results Panel -->
-    <div id="predictResults" class="results-area" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Prediction Results</h3>
-        <button type="button" class="close-results" data-target="predictResults">Close</button>
-      </div>
+    <!-- City autocomplete datalist -->
+    <datalist id="city-suggestions">
+        <option value="Mumbai, Maharashtra, India">
+        <option value="Delhi, India">
+        <option value="New Delhi, India">
+        <option value="Bangalore, India">
+        <option value="Bengaluru, Karnataka, India">
+        <option value="Hyderabad, India">
+        <option value="Chennai, India">
+        <option value="Kolkata, India">
+        <option value="Pune, India">
+        <option value="Ahmedabad, India">
+        <option value="Jaipur, India">
+        <option value="Ujjain, Madhya Pradesh, India">
+        <option value="Lucknow, India">
+        <option value="Chandigarh, India">
+        <option value="Surat, India">
+        <option value="Indore, India">
+        <option value="Bhopal, India">
+        <option value="Nagpur, India">
+        <option value="Varanasi, India">
+        <option value="Patna, India">
+        <option value="Coimbatore, India">
+        <option value="Thiruvananthapuram, India">
+        <option value="Visakhapatnam, India">
+        <option value="Kochi, India">
+        <option value="Guwahati, India">
+        <option value="Dehradun, India">
+        <option value="Noida, India">
+        <option value="Gurugram, India">
+        <option value="Amritsar, India">
+        <option value="Raipur, India">
+        <option value="Ranchi, India">
+        <option value="New York, USA">
+        <option value="London, UK">
+        <option value="Dubai, UAE">
+        <option value="Singapore">
+        <option value="Sydney, Australia">
+    </datalist>
 
-      <!-- Main Signal Card -->
-      <div id="mainSignalCard" class="signal-card">
-        <div class="signal-top">
-          <span id="signalEmoji" class="signal-emoji"></span>
-          <div>
-            <div id="signalLabel" class="signal-label"></div>
-            <div id="signalDirection" class="signal-direction"></div>
-          </div>
-          <div class="signal-score-box">
-            <div id="scoreValue" class="score-value"></div>
-            <div class="score-label">Score</div>
-          </div>
-        </div>
-        <div id="signalStrategy" class="signal-strategy"></div>
-        <div id="signalNiftyBias" class="signal-nifty"></div>
-        <div id="confidenceBadge" class="confidence-badge"></div>
-      </div>
+    <main>
+        <!-- PREDICTION TAB -->
+        <section id="tab-predict" class="tab-content active">
+            <div class="card">
+                <h2>Autonomous Market Prediction</h2>
+                <form id="predict-form" class="form-grid">
+                    <div class="form-group">
+                        <label>Transit Date</label>
+                        <input type="date" id="p-transit-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Transit Time</label>
+                        <input type="time" id="p-transit-time" value="09:15">
+                    </div>
+                    <div class="form-group">
+                        <label>Place</label>
+                        <input type="text" id="p-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions">
+                    </div>
+                    <div class="form-group">
+                        <label>Ayanamsa</label>
+                        <select id="p-ayanamsa">
+                            <option value="lahiri" selected>Lahiri</option>
+                            <option value="krishnamurti">KP (Krishnamurti)</option>
+                            <option value="raman">Raman</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <details>
+                            <summary>+ Add Natal Chart (personalized prediction)</summary>
+                            <div class="form-grid" style="margin-top:12px">
+                                <div class="form-group"><label>Name</label><input type="text" id="p-natal-name" placeholder="Your name" class="birth-name"></div>
+                                <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="p-natal-date" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                                <div class="form-group"><label>Birth Time</label><input type="time" id="p-natal-time" class="birth-time"></div>
+                                <div class="form-group"><label>Birth Place</label><input type="text" id="p-natal-place" placeholder="City, State, Country" list="city-suggestions" class="birth-place"></div>
+                            </div>
+                        </details>
+                    </div>
+                    <button type="submit" class="btn-primary">Generate Prediction</button>
+                </form>
+            </div>
+            <div id="predict-result" class="result-area"></div>
+        </section>
 
-      <!-- Score Breakdown -->
-      <div class="card">
-        <h3 class="card-title">📊 Score Breakdown</h3>
-        <div id="scoreBreakdown" class="score-bars"></div>
-      </div>
+        <!-- PANCHANG TAB -->
+        <section id="tab-panchang" class="tab-content">
+            <div class="card">
+                <h2>Panchang & Muhurta</h2>
+                <form id="panchang-form" class="form-grid">
+                    <div class="form-group"><label>Date</label><input type="date" id="pc-date" required></div>
+                    <div class="form-group"><label>Time</label><input type="time" id="pc-time" value="09:15"></div>
+                    <button type="submit" class="btn-primary">Get Panchang</button>
+                </form>
+            </div>
+            <div id="panchang-result" class="result-area"></div>
+        </section>
 
-      <!-- Weekly Outlook -->
-      <div class="card">
-        <h3 class="card-title">📅 7-Day Moon Nakshatra Outlook</h3>
-        <div id="weeklyOutlook" class="weekly-grid"></div>
-      </div>
+        <!-- BIRTH CHART TAB -->
+        <section id="tab-chart" class="tab-content">
+            <div class="card">
+                <h2>Vedic Birth Chart</h2>
+                <form id="chart-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="c-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="c-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="c-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="c-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Ayanamsa</label>
+                        <select id="c-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <button type="submit" class="btn-primary">Calculate Chart</button>
+                </form>
+            </div>
+            <div id="chart-result" class="result-area"></div>
+        </section>
 
-      <!-- Sector Recommendations -->
-      <div class="card">
-        <h3 class="card-title">📈 NSE/BSE Sector Recommendations</h3>
-        <div id="sectorRecs" class="sector-grid"></div>
-      </div>
+        <!-- SHADBALA TAB -->
+        <section id="tab-shadbala" class="tab-content">
+            <div class="card">
+                <h2>Shadbala — Six-fold Planetary Strength</h2>
+                <form id="shadbala-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="sb-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sb-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="sb-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="sb-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <button type="submit" class="btn-primary">Calculate Shadbala</button>
+                </form>
+            </div>
+            <div id="shadbala-result" class="result-area"></div>
+        </section>
 
-      <!-- Key Events -->
-      <div class="card">
-        <h3 class="card-title">🔔 Key Upcoming Planetary Events</h3>
-        <div id="keyEvents" class="events-list"></div>
-      </div>
+        <!-- ASHTAKAVARGA TAB -->
+        <section id="tab-ashtakavarga" class="tab-content">
+            <div class="card">
+                <h2>🔢 Ashtakavarga — Planetary Strength Analysis</h2>
+                <form id="ashtakavarga-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="av-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="av-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="av-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="av-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Transit From Date</label><input type="date" id="av-transit-date"></div>
+                    <div class="form-group"><label>Days Ahead</label><input type="number" id="av-days-ahead" value="180" min="1" max="365"></div>
+                    <button type="submit" class="btn-primary">🔢 Calculate Ashtakavarga</button>
+                </form>
+            </div>
+            <div id="ashtakavarga-result" class="result-area"></div>
+        </section>
 
-      <!-- Current Dasha -->
-      <div id="dashaContextCard" class="card" style="display:none">
-        <h3 class="card-title">⏳ Active Dasha Context</h3>
-        <div id="dashaContext" class="dasha-context"></div>
-      </div>
+        <!-- SARVATOBHADRA TAB -->
+        <section id="tab-sarvatobhadra" class="tab-content">
+            <div class="card">
+                <h2>🌀 Sarvatobhadra Chakra — Complete Vedic Analysis</h2>
+                <form id="sarvatobhadra-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="sbc-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sbc-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="sbc-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="sbc-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Ayanamsa</label>
+                        <select id="sbc-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <div class="form-group"><label>Transit Date (for Vedha/Latta)</label><input type="date" id="sbc-transit-date"></div>
+                    <div class="form-group"><label>Transit Time</label><input type="time" id="sbc-transit-time" value="09:15"></div>
+                    <div class="form-group"><label>Transit Place</label><input type="text" id="sbc-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions"></div>
+                    <button type="submit" class="btn-primary">🌀 Cast Sarvatobhadra Chakra</button>
+                </form>
+            </div>
+            <div id="sarvatobhadra-result" class="result-area"></div>
+        </section>
 
-      <!-- Risk Factors -->
-      <div class="card">
-        <h3 class="card-title">⚠️ Risk Factors</h3>
-        <div id="riskFactors" class="risk-list"></div>
-      </div>
+        <!-- STRENGTH CALENDAR TAB -->
+        <section id="tab-strength" class="tab-content">
+            <div class="card">
+                <h2>📅 Strength Calendar — Parashara Light Planetary Strength</h2>
+                <form id="strength-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="sc-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sc-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="sc-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="sc-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Calendar Type</label>
+                        <select id="sc-calendar-type">
+                            <option value="daily" selected>Daily (30 days)</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Days Ahead</label><input type="number" id="sc-days-ahead" value="30" min="1" max="365"></div>
+                    <button type="submit" class="btn-primary">📅 Generate Strength Calendar</button>
+                </form>
+            </div>
+            <div id="strength-result" class="result-area"></div>
+        </section>
 
-    </div>
-  </div>
-</section>
+        <!-- KP TAB -->
+        <section id="tab-kp" class="tab-content">
+            <div class="card">
+                <h2>KP (Krishnamurti Paddhati) System</h2>
+                <form id="kp-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="kp-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="kp-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="kp-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="kp-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Transit Date (for RP)</label><input type="date" id="kp-transit-date"></div>
+                    <button type="submit" class="btn-primary">Run KP Analysis</button>
+                </form>
+            </div>
+            <div id="kp-result" class="result-area"></div>
+        </section>
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: BIRTH CHART                                                   -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-chart" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">🪐 Vedic Birth Chart</h2>
-      <form id="chartForm">
-        <div class="form-row">
-          <label>Name <input type="text" id="c_name" placeholder="Name" required /></label>
-          <label>Date <input type="date" id="c_date" required /></label>
-        </div>
-        <div class="form-row">
-          <label>Time <input type="time" id="c_time" required /></label>
-          <label>Place <input type="text" id="c_place" placeholder="City, India" required /></label>
-        </div>
-        <label>Ayanamsa
-          <select id="c_ayanamsa">
-            <option value="lahiri" selected>Lahiri</option>
-            <option value="raman">Raman</option>
-            <option value="krishnamurti">KP</option>
-          </select>
-        </label>
-        <div class="api-row">
-          <label>API Base <input type="text" id="c_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-        <button type="submit" class="btn-primary">🪐 Calculate Chart</button>
-      </form>
-    </div>
-    <div id="chartResultPanel" class="card wide-card results-panel" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Chart Results</h3>
-        <button type="button" class="close-results" data-target="chartResultPanel">Close</button>
-      </div>
-      <div id="chartStatus" class="status-bar"></div>
-      <div id="chartResults" class="chart-display"></div>
-    </div>
-  </div>
-</section>
+        <!-- DASHA TAB -->
+        <section id="tab-dasha" class="tab-content">
+            <div class="card">
+                <h2>Vimshottari Dasha</h2>
+                <form id="dasha-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="d-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="d-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="d-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="d-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <button type="submit" class="btn-primary">Calculate Dasha</button>
+                </form>
+            </div>
+            <div id="dasha-result" class="result-area"></div>
+        </section>
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: DASHA                                                         -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-dasha" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">⏳ Vimshottari Dasha</h2>
-      <form id="dashaForm">
-        <div class="form-row">
-          <label>Name <input type="text" id="d_name" required /></label>
-          <label>Birth Date <input type="date" id="d_date" required /></label>
-        </div>
-        <div class="form-row">
-          <label>Birth Time <input type="time" id="d_time" required /></label>
-          <label>Birth Place <input type="text" id="d_place" required /></label>
-        </div>
-        <div class="form-row">
-          <label>As Of Date <input type="date" id="d_as_of" /></label>
-          <label>Ayanamsa
-            <select id="d_ayanamsa">
-              <option value="lahiri" selected>Lahiri</option>
-              <option value="raman">Raman</option>
-              <option value="krishnamurti">KP</option>
-            </select>
-          </label>
-        </div>
-        <div class="api-row">
-          <label>API Base <input type="text" id="d_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-        <button type="submit" class="btn-primary">⏳ Calculate Dasha</button>
-      </form>
-    </div>
-    <div id="dashaResultPanel" class="card wide-card results-panel" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Dasha Timeline</h3>
-        <button type="button" class="close-results" data-target="dashaResultPanel">Close</button>
-      </div>
-      <div id="dashaStatus" class="status-bar"></div>
-      <div id="dashaResults" class="dasha-timeline"></div>
-    </div>
-  </div>
-</section>
+        <!-- BACKTEST TAB -->
+        <section id="tab-backtest" class="tab-content">
+            <div class="card">
+                <h2>Backtest Astrology Signals</h2>
+                <form id="backtest-form" class="form-grid">
+                    <div class="form-group">
+                        <label>Index</label>
+                        <select id="bt-ticker">
+                            <option value="NIFTY_50">Nifty 50</option>
+                            <option value="SENSEX">Sensex</option>
+                            <option value="BANK_NIFTY">Bank Nifty</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Start Date</label><input type="date" id="bt-start" value="2024-01-01"></div>
+                    <div class="form-group"><label>End Date</label><input type="date" id="bt-end"></div>
+                    <div class="form-group">
+                        <label>Signal Type</label>
+                        <select id="bt-signal">
+                            <option value="composite">Composite (All Signals)</option>
+                            <option value="moon_nakshatra">Moon Nakshatra</option>
+                            <option value="planetary_transits">Planetary Transits</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">Run Backtest</button>
+                </form>
+            </div>
+            <div id="backtest-result" class="result-area"></div>
+        </section>
+        <!-- KAKSHA ASHTAKAVARGA TAB -->
+        <section id="tab-kaksha" class="tab-content">
+            <div class="card">
+                <h2>Kaksha Ashtakavarga — Prastara Bindu Timing</h2>
+                <form id="kaksha-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="kk-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="kk-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="kk-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="kk-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Ayanamsa</label>
+                        <select id="kk-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <div class="form-group"><label>Transit Date</label><input type="date" id="kk-transit-date"></div>
+                    <div class="form-group"><label>Transit Time</label><input type="time" id="kk-transit-time" value="09:15"></div>
+                    <div class="form-group"><label>Transit Place</label><input type="text" id="kk-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions"></div>
+                    <div class="form-group">
+                        <label>Mode</label>
+                        <select id="kk-mode">
+                            <option value="daily" selected>Daily Analysis</option>
+                            <option value="timeline">Timeline (multi-day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="kk-days-group">
+                        <label>Days (timeline)</label>
+                        <input type="number" id="kk-days" value="30" min="1" max="90">
+                    </div>
+                    <button type="submit" class="btn-primary">Analyse Kaksha</button>
+                </form>
+            </div>
+            <div id="kaksha-result" class="result-area"></div>
+        </section>
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: DIVISIONAL                                                    -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-divisional" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">📊 Divisional Charts</h2>
-      <form id="divisionalForm">
-        <div class="form-row">
-          <label>Name <input type="text" id="dv_name" required /></label>
-          <label>Birth Date <input type="date" id="dv_date" required /></label>
-        </div>
-        <div class="form-row">
-          <label>Birth Time <input type="time" id="dv_time" required /></label>
-          <label>Birth Place <input type="text" id="dv_place" required /></label>
-        </div>
-        <fieldset class="form-section">
-          <legend>Charts to compute</legend>
-          <label class="checkbox-label"><input type="checkbox" value="D2" checked /> D2 Hora (Wealth)</label>
-          <label class="checkbox-label"><input type="checkbox" value="D3" /> D3 Drekkana (Partners)</label>
-          <label class="checkbox-label"><input type="checkbox" value="D9" checked /> D9 Navamsha (Strength)</label>
-          <label class="checkbox-label"><input type="checkbox" value="D10" checked /> D10 Dashamsha (Career)</label>
-        </fieldset>
-        <div class="api-row">
-          <label>API Base <input type="text" id="dv_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-        <button type="submit" class="btn-primary">📊 Calculate D-Charts</button>
-      </form>
-    </div>
-    <div id="divResultPanel" class="card wide-card results-panel" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Divisional Chart Results</h3>
-        <button type="button" class="close-results" data-target="divResultPanel">Close</button>
-      </div>
-      <div id="divStatus" class="status-bar"></div>
-      <div id="divResults" class="div-display"></div>
-    </div>
-  </div>
-</section>
+        <!-- SBC DAILY SIGNAL TAB -->
+        <section id="tab-sbc-signal" class="tab-content">
+            <div class="card">
+                <h2>SBC Daily NSE/BSE Signal</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Quick Latta + Navatara market signal from Sarvatobhadra Chakra</p>
+                <form id="sbc-signal-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="ss-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="ss-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="time" id="ss-time" required class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="ss-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Ayanamsa</label>
+                        <select id="ss-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <div class="form-group"><label>Transit Date</label><input type="date" id="ss-transit-date"></div>
+                    <div class="form-group"><label>Transit Time</label><input type="time" id="ss-transit-time" value="09:15"></div>
+                    <div class="form-group"><label>Transit Place</label><input type="text" id="ss-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions"></div>
+                    <button type="submit" class="btn-primary">Get SBC Signal</button>
+                </form>
+            </div>
+            <div id="sbc-signal-result" class="result-area"></div>
+        </section>
+    </main>
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: SARVATOBHADRA                                                 -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-sarvatobhadra" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">🌀 Sarvatobhadra Chakra</h2>
-      <p class="card-desc">Cast the Sarvatobhadra Chakra from your natal birth details.</p>
-      <form id="sbcForm">
-        <div class="form-row">
-          <label>Name <input type="text" id="sbc_name" placeholder="Your name" required /></label>
-          <label>Date <input type="date" id="sbc_date" required /></label>
-        </div>
-        <div class="form-row">
-          <label>Time <input type="time" id="sbc_time" required /></label>
-          <label>Place <input type="text" id="sbc_place" placeholder="City, State, India" required /></label>
-        </div>
-        <label>Ayanamsa
-          <select id="sbc_ayanamsa">
-            <option value="lahiri" selected>Lahiri</option>
-            <option value="raman">Raman</option>
-            <option value="krishnamurti">KP</option>
-          </select>
-        </label>
-        <fieldset class="form-section">
-          <legend>📅 Transit Date (for Vedha/Latta Analysis)</legend>
-          <div class="form-row">
-            <label>Date <input type="date" id="sbc_transit_date" /></label>
-            <label>Time <input type="time" id="sbc_transit_time" value="09:15" /></label>
-          </div>
-          <label>Place <input type="text" id="sbc_transit_place" value="Mumbai, Maharashtra, India" /></label>
-        </fieldset>
-        <div class="api-row">
-          <label>API Base <input type="text" id="sbc_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-        <button type="submit" class="btn-primary">🌀 Cast Sarvatobhadra Chakra</button>
-      </form>
-    </div>
-    <div id="sbcResultPanel" class="card wide-card results-panel" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Sarvatobhadra Chakra Results</h3>
-        <button type="button" class="close-results" data-target="sbcResultPanel">Close</button>
-      </div>
-      <div id="sbcStatus" class="status-bar"></div>
-      <div id="sbcResults" class="sbc-display"></div>
-    </div>
-  </div>
-</section>
+    <footer>
+        <p>Financial Astrology Engine v3.0 — Vedic Astrology × NSE/BSE</p>
+        <p class="disclaimer">Disclaimer: Astrological predictions are for educational/research purposes only. Not financial advice.</p>
+    </footer>
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: ASHTAKAVARGA                                                  -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-ashtakavarga" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">🔢 Ashtakavarga</h2>
-      <form id="ashtakavargaForm">
-        <div class="form-row">
-          <label>Name <input type="text" id="av_name" required /></label>
-          <label>Birth Date <input type="date" id="av_date" required /></label>
-        </div>
-        <div class="form-row">
-          <label>Birth Time <input type="time" id="av_time" required /></label>
-          <label>Birth Place <input type="text" id="av_place" required /></label>
-        </div>
-        <div class="form-row">
-          <label>Transit From Date <input type="date" id="av_from" /></label>
-          <label>Days Ahead <input type="number" id="av_days" value="180" min="30" max="365" /></label>
-        </div>
-        <div class="api-row">
-          <label>API Base <input type="text" id="av_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-        <button type="submit" class="btn-primary">🔢 Calculate Ashtakavarga</button>
-      </form>
-    </div>
-    <div id="avResultPanel" class="card wide-card results-panel" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Ashtakavarga + Transit Predictions</h3>
-        <button type="button" class="close-results" data-target="avResultPanel">Close</button>
-      </div>
-      <div id="avStatus" class="status-bar"></div>
-      <div id="avResults" class="av-display"></div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: YOGAS                                                         -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-yogas" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">✨ Financial Yoga Detector</h2>
-      <form id="yogaForm">
-        <div class="form-row">
-          <label>Name <input type="text" id="y_name" required /></label>
-          <label>Birth Date <input type="date" id="y_date" required /></label>
-        </div>
-        <div class="form-row">
-          <label>Birth Time <input type="time" id="y_time" required /></label>
-          <label>Birth Place <input type="text" id="y_place" required /></label>
-        </div>
-        <div class="api-row">
-          <label>API Base <input type="text" id="y_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-        <button type="submit" class="btn-primary">✨ Detect Yogas</button>
-      </form>
-    </div>
-    <div id="yogaResultPanel" class="card wide-card results-panel" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Yoga Analysis</h3>
-        <button type="button" class="close-results" data-target="yogaResultPanel">Close</button>
-      </div>
-      <div id="yogaStatus" class="status-bar"></div>
-      <div id="yogaResults" class="yoga-display"></div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TAB: ALERTS                                                        -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-alerts" class="tab-section">
-  <div class="section-grid">
-    <div class="card input-card">
-      <h2 class="card-title">🔔 Transit Alert System</h2>
-      <form id="alertForm">
-        <div class="form-row">
-          <label>Date <input type="date" id="al_date" required /></label>
-          <label>Time <input type="time" id="al_time" value="09:15" /></label>
-        </div>
-        <label>Location <input type="text" id="al_place" value="Mumbai, Maharashtra, India" /></label>
-        <label>Days Ahead <input type="number" id="al_days" value="90" min="7" max="365" /></label>
-        <fieldset class="form-section">
-          <legend>Natal Chart (Optional)</legend>
-          <div class="form-row">
-            <label>Birth Date <input type="date" id="al_natal_date" /></label>
-            <label>Birth Time <input type="time" id="al_natal_time" /></label>
-          </div>
-          <label>Birth Place <input type="text" id="al_natal_place" placeholder="Birth city, India" /></label>
-        </fieldset>
-        <div class="api-row">
-          <label>API Base <input type="text" id="al_apiBase" placeholder="http://127.0.0.1:8010" /></label>
-        </div>
-        <button type="submit" class="btn-primary">🔔 Generate Alerts</button>
-      </form>
-    </div>
-    <div id="alertResultPanel" class="card wide-card results-panel" style="display:none">
-      <div class="results-header">
-        <h3 class="card-title">Active & Upcoming Alerts</h3>
-        <button type="button" class="close-results" data-target="alertResultPanel">Close</button>
-      </div>
-      <div id="alertStatus" class="status-bar"></div>
-      <div id="alertResults" class="alerts-display"></div>
-    </div>
-  </div>
-</section>
-
-</main>
-
-<!-- Loading Overlay -->
-<div id="loadingOverlay" class="loading-overlay" style="display:none">
-  <div class="loading-content">
-    <div class="spinner"></div>
-    <p id="loadingText">Calculating planetary positions...</p>
-  </div>
-</div>
-
-<script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
