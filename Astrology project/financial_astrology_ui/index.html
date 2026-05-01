@@ -25,6 +25,7 @@
             <button class="nav-btn" data-tab="backtest">Backtest</button>
             <button class="nav-btn" data-tab="kaksha">Kaksha AV</button>
             <button class="nav-btn" data-tab="sbc-signal">SBC Signal</button>
+            <button class="nav-btn" data-tab="shodasvarga">Shodasvarga</button>
         </nav>
     </header>
 
@@ -34,9 +35,9 @@
             <span class="master-label">Birth Data</span>
             <div class="master-fields">
                 <div class="mf"><label>Name</label><input type="text" id="master-name" value="Himanshu" placeholder="Name"></div>
-                <div class="mf"><label>Date (DD-MM-YYYY)</label><input type="text" id="master-date" placeholder="DD-MM-YYYY" maxlength="10" autocomplete="off"></div>
-                <div class="mf"><label>Time</label><input type="time" id="master-time" placeholder="HH:MM"></div>
-                <div class="mf"><label>Place</label><input type="text" id="master-place" value="Mumbai, Maharashtra, India" list="city-suggestions" placeholder="City, State, Country"></div>
+                <div class="mf"><label>Date (DD-MM-YYYY)</label><input type="text" id="master-date" value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" autocomplete="off"></div>
+                <div class="mf"><label>Time</label><input type="text" id="master-time" value="23:10" placeholder="HH:MM or HH:MM AM/PM" maxlength="10" autocomplete="off" class="birth-time"></div>
+                <div class="mf"><label>Place</label><input type="text" id="master-place" value="Ujjain, Madhya Pradesh, India" list="city-suggestions" placeholder="City, State, Country"></div>
             </div>
             <button type="button" id="master-apply-btn" class="btn-apply">Apply to All Tabs</button>
         </div>
@@ -44,7 +45,7 @@
 
     <!-- City autocomplete datalist -->
     <datalist id="city-suggestions">
-        <option value="Mumbai, Maharashtra, India">
+        <option value="Ujjain, Madhya Pradesh, India">
         <option value="Delhi, India">
         <option value="New Delhi, India">
         <option value="Bangalore, India">
@@ -98,7 +99,7 @@
                     </div>
                     <div class="form-group">
                         <label>Place</label>
-                        <input type="text" id="p-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions">
+                        <input type="text" id="p-transit-place" value="Ujjain, Madhya Pradesh, India" list="city-suggestions">
                     </div>
                     <div class="form-group">
                         <label>Ayanamsa</label>
@@ -113,8 +114,8 @@
                             <summary>+ Add Natal Chart (personalized prediction)</summary>
                             <div class="form-grid" style="margin-top:12px">
                                 <div class="form-group"><label>Name</label><input type="text" id="p-natal-name" placeholder="Your name" class="birth-name"></div>
-                                <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="p-natal-date" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                                <div class="form-group"><label>Birth Time</label><input type="time" id="p-natal-time" class="birth-time"></div>
+                                <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="p-natal-date" value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                                <div class="form-group"><label>Birth Time</label><input type="text" id="p-natal-time" value="23:10" placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
                                 <div class="form-group"><label>Birth Place</label><input type="text" id="p-natal-place" placeholder="City, State, Country" list="city-suggestions" class="birth-place"></div>
                             </div>
                         </details>
@@ -144,9 +145,9 @@
                 <h2>Vedic Birth Chart</h2>
                 <form id="chart-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="c-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="c-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="c-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="c-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="c-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="c-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="c-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <div class="form-group">
                         <label>Ayanamsa</label>
                         <select id="c-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
@@ -163,9 +164,9 @@
                 <h2>Shadbala — Six-fold Planetary Strength</h2>
                 <form id="shadbala-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="sb-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sb-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="sb-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="sb-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sb-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="sb-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="sb-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <button type="submit" class="btn-primary">Calculate Shadbala</button>
                 </form>
             </div>
@@ -178,9 +179,9 @@
                 <h2>🔢 Ashtakavarga — Planetary Strength Analysis</h2>
                 <form id="ashtakavarga-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="av-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="av-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="av-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="av-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="av-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="av-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="av-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <div class="form-group"><label>Transit From Date</label><input type="date" id="av-transit-date"></div>
                     <div class="form-group"><label>Days Ahead</label><input type="number" id="av-days-ahead" value="180" min="1" max="365"></div>
                     <button type="submit" class="btn-primary">🔢 Calculate Ashtakavarga</button>
@@ -195,16 +196,16 @@
                 <h2>🌀 Sarvatobhadra Chakra — Complete Vedic Analysis</h2>
                 <form id="sarvatobhadra-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="sbc-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sbc-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="sbc-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="sbc-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sbc-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="sbc-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="sbc-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <div class="form-group">
                         <label>Ayanamsa</label>
                         <select id="sbc-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
                     </div>
                     <div class="form-group"><label>Transit Date (for Vedha/Latta)</label><input type="date" id="sbc-transit-date"></div>
                     <div class="form-group"><label>Transit Time</label><input type="time" id="sbc-transit-time" value="09:15"></div>
-                    <div class="form-group"><label>Transit Place</label><input type="text" id="sbc-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions"></div>
+                    <div class="form-group"><label>Transit Place</label><input type="text" id="sbc-transit-place" value="Ujjain, Madhya Pradesh, India" list="city-suggestions"></div>
                     <button type="submit" class="btn-primary">🌀 Cast Sarvatobhadra Chakra</button>
                 </form>
             </div>
@@ -217,9 +218,9 @@
                 <h2>📅 Strength Calendar — Parashara Light Planetary Strength</h2>
                 <form id="strength-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="sc-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sc-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="sc-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="sc-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sc-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="sc-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="sc-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <div class="form-group">
                         <label>Calendar Type</label>
                         <select id="sc-calendar-type">
@@ -238,13 +239,17 @@
         <!-- KP TAB -->
         <section id="tab-kp" class="tab-content">
             <div class="card">
-                <h2>KP (Krishnamurti Paddhati) System</h2>
+                <h2>Advanced KP (Krishnamurti Paddhati) System</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">4-Step Significator • Cuspal Sub-Lord Theory • Promise/Denial • DBA Matching • Ruling Planets</p>
                 <form id="kp-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="kp-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="kp-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="kp-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="kp-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="kp-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="kp-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="kp-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <div class="form-group"><label>Transit Date (for RP)</label><input type="date" id="kp-transit-date"></div>
+                    <div class="form-group"><label>Transit Time</label><input type="text" id="kp-transit-time" value="09:15" placeholder="HH:MM or HH:MM AM/PM" maxlength="10"></div>
+                    <div class="form-group"><label>Transit Place</label><input type="text" id="kp-transit-place" value="Ujjain, Madhya Pradesh, India" list="city-suggestions"></div>
+                    <div class="form-group"><label>KP Horary # (1–249)</label><input type="number" id="kp-horary" min="1" max="249" placeholder="Optional"></div>
                     <button type="submit" class="btn-primary">Run KP Analysis</button>
                 </form>
             </div>
@@ -257,9 +262,9 @@
                 <h2>Vimshottari Dasha</h2>
                 <form id="dasha-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="d-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="d-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="d-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="d-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="d-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="d-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="d-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <button type="submit" class="btn-primary">Calculate Dasha</button>
                 </form>
             </div>
@@ -300,16 +305,16 @@
                 <h2>Kaksha Ashtakavarga — Prastara Bindu Timing</h2>
                 <form id="kaksha-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="kk-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="kk-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="kk-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="kk-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="kk-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="kk-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="kk-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <div class="form-group">
                         <label>Ayanamsa</label>
                         <select id="kk-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
                     </div>
                     <div class="form-group"><label>Transit Date</label><input type="date" id="kk-transit-date"></div>
                     <div class="form-group"><label>Transit Time</label><input type="time" id="kk-transit-time" value="09:15"></div>
-                    <div class="form-group"><label>Transit Place</label><input type="text" id="kk-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions"></div>
+                    <div class="form-group"><label>Transit Place</label><input type="text" id="kk-transit-place" value="Ujjain, Madhya Pradesh, India" list="city-suggestions"></div>
                     <div class="form-group">
                         <label>Mode</label>
                         <select id="kk-mode">
@@ -334,20 +339,40 @@
                 <p style="color:var(--text-dim);margin-bottom:12px">Quick Latta + Navatara market signal from Sarvatobhadra Chakra</p>
                 <form id="sbc-signal-form" class="form-grid">
                     <div class="form-group"><label>Name</label><input type="text" id="ss-name" value="Himanshu" required class="birth-name"></div>
-                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="ss-date" required placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
-                    <div class="form-group"><label>Birth Time</label><input type="time" id="ss-time" required class="birth-time"></div>
-                    <div class="form-group"><label>Birth Place</label><input type="text" id="ss-place" value="Mumbai, Maharashtra, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="ss-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="ss-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="ss-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
                     <div class="form-group">
                         <label>Ayanamsa</label>
                         <select id="ss-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
                     </div>
                     <div class="form-group"><label>Transit Date</label><input type="date" id="ss-transit-date"></div>
                     <div class="form-group"><label>Transit Time</label><input type="time" id="ss-transit-time" value="09:15"></div>
-                    <div class="form-group"><label>Transit Place</label><input type="text" id="ss-transit-place" value="Mumbai, Maharashtra, India" list="city-suggestions"></div>
+                    <div class="form-group"><label>Transit Place</label><input type="text" id="ss-transit-place" value="Ujjain, Madhya Pradesh, India" list="city-suggestions"></div>
                     <button type="submit" class="btn-primary">Get SBC Signal</button>
                 </form>
             </div>
             <div id="sbc-signal-result" class="result-area"></div>
+        </section>
+
+        <!-- SHODASVARGA TAB -->
+        <section id="tab-shodasvarga" class="tab-content">
+            <div class="card">
+                <h2>Shodasvarga — 16 Divisional Charts (D1–D60)</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Diamond-style charts with Vimshottari Dasha • North &amp; South Indian layouts</p>
+                <form id="shodasvarga-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="sv-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="sv-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="sv-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="sv-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Ayanamsa</label>
+                        <select id="sv-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <button type="submit" class="btn-primary">Calculate Shodasvarga</button>
+                </form>
+            </div>
+            <div id="shodasvarga-result" class="result-area"></div>
         </section>
     </main>
 

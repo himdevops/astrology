@@ -382,6 +382,10 @@ footer {
 .disclaimer { font-size: 0.7rem; margin-top: 4px; color: var(--text-dim); opacity: 0.7; }
 
 /* ─── Responsive ─── */
+/* ── Shodasvarga Tab ──────────────────────────────────────── */
+.sv-current-dasha { background: rgba(212,168,67,0.08) !important; }
+.sv-mini-chart-card:hover { border-color: #d4a843 !important; transform: scale(1.02); }
+
 @media (max-width: 768px) {
     header { padding: 16px 16px 0; }
     h1 { font-size: 1.3rem; }
@@ -390,4 +394,5 @@ footer {
     .metrics-grid { grid-template-columns: repeat(2, 1fr); }
     .weekly-grid { grid-template-columns: repeat(3, 1fr); }
     nav { justify-content: flex-start; }
+    #sv-chart-area { grid-template-columns: 1fr !important; }
 }
