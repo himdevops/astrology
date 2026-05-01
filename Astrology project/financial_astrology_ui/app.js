@@ -449,6 +449,30 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
     const natalPlanets = data.planet_positions || [];
     const grid = data.chakra_grid || [];
 
+    /* ── Latta fallback descriptions (used if backend data missing) ── */
+    const LATTA_EFFECTS_UI = {
+        Sun: "Financial loss; setbacks from authority",
+        Moon: "Excessive financial loss; emotional disturbances",
+        Mars: "Wounds, injuries, property disputes",
+        Mercury: "Loss of position, status, reputation",
+        Jupiter: "Loss of wisdom, prestige, good fortune",
+        Venus: "Quarrels, discord, relationship disruptions",
+        Saturn: "Disease, sorrow, chronic delays, legal issues",
+        Rahu: "Grief, unhappiness, deception, shocks",
+        Ketu: "Confusion, accidents, hidden problems"
+    };
+    const LATTA_NSE_UI = {
+        Sun: "PSU/Govt stocks impacted; avoid large trades",
+        Moon: "Consumer/FMCG stocks down; market weak",
+        Mars: "Defense/Real estate under pressure",
+        Mercury: "IT/Telecom underperformance",
+        Jupiter: "Banking/Finance sector risk",
+        Venus: "FMCG/Luxury sector volatile",
+        Saturn: "Infrastructure/Oil sustained pressure",
+        Rahu: "Tech/Foreign stocks crash risk",
+        Ketu: "Pharma/Chemicals uncertain"
+    };
+
     /* ── Build nakshatra→cell position map from grid data ───── */
     const nakCellMap = {};
     for (let r = 0; r < grid.length; r++) {
@@ -617,60 +641,87 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
     }
 
     /* ── Build info strip HTML for a list of nakshatras ──────── */
-    function buildInfoStrip(nakList, orientation){
+    function buildInfoStrip(nakList, orientation, side){
         var isVert = orientation === 'vertical';
+        var isLeft = side === 'left';
+        var isRight = side === 'right';
 
         if(isVert){
-            /* Vertical strips (left/right) — 9 slots: header + 7 nak rows + spacer
-               Grid rows: [0]=corner, [1-7]=nakshatras, [8]=corner
-               Strip: [header], [7 nak rows matching grid rows 1-7], [spacer for row 8] */
+            /* Vertical strips — Parashara's Light style:
+               Left side:  4 3 2 1 | T# | Nak  (padas closest to grid on right edge)
+               Right side: Nak | T# | 1 2 3 4  (padas closest to grid on left edge) */
             var rows = '';
-            /* Header row (aligns with grid row 0 / corner) */
+            /* Header row */
             rows += '<div class="sbc-strip-row-v sbc-strip-hdr-row">';
-            rows += '<div class="sbc-sv-hdr">Nak</div><div class="sbc-sv-hdr">T#</div>';
-            rows += '<div class="sbc-sv-hdr sbc-sv-pada-hdr">1</div><div class="sbc-sv-hdr sbc-sv-pada-hdr">2</div>';
-            rows += '<div class="sbc-sv-hdr sbc-sv-pada-hdr">3</div><div class="sbc-sv-hdr sbc-sv-pada-hdr">4</div>';
+            if(isLeft){
+                rows += '<div class="sbc-sv-hdr sbc-sv-ph">4</div><div class="sbc-sv-hdr sbc-sv-ph">3</div>';
+                rows += '<div class="sbc-sv-hdr sbc-sv-ph">2</div><div class="sbc-sv-hdr sbc-sv-ph">1</div>';
+                rows += '<div class="sbc-sv-hdr">T#</div><div class="sbc-sv-hdr">Nak</div>';
+            } else {
+                rows += '<div class="sbc-sv-hdr">Nak</div><div class="sbc-sv-hdr">T#</div>';
+                rows += '<div class="sbc-sv-hdr sbc-sv-ph">1</div><div class="sbc-sv-hdr sbc-sv-ph">2</div>';
+                rows += '<div class="sbc-sv-hdr sbc-sv-ph">3</div><div class="sbc-sv-hdr sbc-sv-ph">4</div>';
+            }
             rows += '</div>';
-            /* 7 nakshatra rows (align with grid rows 1-7) */
+
+            /* 7 nakshatra rows */
             nakList.forEach(function(nak){
                 var navInfo = getNavataraFor(nak);
                 var taraNum = navInfo ? (navInfo.tara_number || '—') : '—';
+                var taraName = navInfo ? (navInfo.tara || '') : '';
                 var quality = navInfo ? (navInfo.quality || 'neutral') : 'neutral';
-                var qColor = quality === 'auspicious' ? '#1a8c1a' : quality === 'inauspicious' ? '#cc1a1a' : '#8b7700';
-                var shortNak = nak.length > 8 ? nak.slice(0,7)+'.' : nak;
+                var qColor = quality === 'auspicious' ? '#22aa22' : quality === 'inauspicious' ? '#dd3333' : '#aa8800';
+                var shortNak = nak.length > 9 ? nak.slice(0,8)+'.' : nak;
                 var isVedha = isNakVedhaAffected(nak);
                 var rowCls = isVedha ? ' sbc-sv-vedha' : '';
+                var taraSign = quality === 'auspicious' ? '+' : quality === 'inauspicious' ? '-' : '';
+
                 rows += '<div class="sbc-strip-row-v'+rowCls+'">';
-                rows += '<div class="sbc-sv-cell sbc-sv-nak" title="'+nak+'">'+shortNak+'</div>';
-                rows += '<div class="sbc-sv-cell sbc-sv-tara" style="color:'+qColor+'">'+taraNum+'</div>';
-                for(var p=1; p<=4; p++){
-                    var padaCls = isVedha ? ' sbc-pada-hit' : '';
-                    rows += '<div class="sbc-sv-cell sbc-sv-pada'+padaCls+'">'+p+'</div>';
+                if(isLeft){
+                    /* Padas 4,3,2,1 then T# then Nak */
+                    for(var p=4; p>=1; p--){
+                        var pCls = isVedha ? ' sbc-pada-hit' : '';
+                        rows += '<div class="sbc-sv-cell sbc-sv-pada'+pCls+'">'+p+'</div>';
+                    }
+                    rows += '<div class="sbc-sv-cell sbc-sv-tara" style="color:'+qColor+'" title="'+taraName+'">'+taraNum+taraSign+'</div>';
+                    rows += '<div class="sbc-sv-cell sbc-sv-nak" title="'+nak+'">'+shortNak+'</div>';
+                } else {
+                    /* Nak then T# then Padas 1,2,3,4 */
+                    rows += '<div class="sbc-sv-cell sbc-sv-nak" title="'+nak+'">'+shortNak+'</div>';
+                    rows += '<div class="sbc-sv-cell sbc-sv-tara" style="color:'+qColor+'" title="'+taraName+'">'+taraNum+taraSign+'</div>';
+                    for(var p=1; p<=4; p++){
+                        var pCls = isVedha ? ' sbc-pada-hit' : '';
+                        rows += '<div class="sbc-sv-cell sbc-sv-pada'+pCls+'">'+p+'</div>';
+                    }
                 }
                 rows += '</div>';
             });
-            /* Spacer (aligns with grid row 8 / corner) */
+            /* Spacer for grid row 8 */
             rows += '<div class="sbc-strip-spacer"></div>';
             return '<div class="sbc-strip-col">'+rows+'</div>';
         }
 
-        /* Horizontal strips (top/bottom) — header row + one column per nakshatra */
-        var html = '<table class="sbc-strip-table"><thead><tr>';
-        html += '<th class="sbc-sh-hdr"></th>';
-        nakList.forEach(function(nak){
-            var shortNak = nak.length > 8 ? nak.slice(0,7)+'.' : nak;
-            html += '<th class="sbc-sh-hdr sbc-sh-nak" title="'+nak+'">'+shortNak+'</th>';
-        });
-        html += '</tr></thead><tbody>';
+        /* ── Horizontal strips (top/bottom) ───────────────────── */
+        /* Parashara's Light style: Nak row, Tara# row, then Pd 1-4 rows */
+        var html = '<table class="sbc-strip-table">';
 
-        /* Tara row */
+        /* Nak header row */
+        html += '<tr><td class="sbc-sh-label"></td>';
+        nakList.forEach(function(nak){
+            var shortNak = nak.length > 9 ? nak.slice(0,8)+'.' : nak;
+            html += '<td class="sbc-sh-hdr sbc-sh-nak" title="'+nak+'">'+shortNak+'</td>';
+        });
+        html += '</tr>';
+
+        /* Tara# row */
         html += '<tr><td class="sbc-sh-label">Tara#</td>';
         nakList.forEach(function(nak){
             var navInfo = getNavataraFor(nak);
             var taraNum = navInfo ? (navInfo.tara_number || '—') : '—';
             var quality = navInfo ? (navInfo.quality || 'neutral') : 'neutral';
-            var qColor = quality === 'auspicious' ? '#1a8c1a' : quality === 'inauspicious' ? '#cc1a1a' : '#8b7700';
-            html += '<td class="sbc-sh-cell" style="color:'+qColor+'">'+taraNum+'</td>';
+            var qColor = quality === 'auspicious' ? '#22aa22' : quality === 'inauspicious' ? '#dd3333' : '#aa8800';
+            var taraSign = quality === 'auspicious' ? '+' : quality === 'inauspicious' ? '-' : '';
+            html += '<td class="sbc-sh-cell sbc-sh-tara" style="color:'+qColor+'">'+taraNum+taraSign+'</td>';
         });
         html += '</tr>';
 
@@ -684,7 +735,7 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
             });
             html += '</tr>';
         }
-        html += '</tbody></table>';
+        html += '</table>';
         return html;
     }
 
@@ -710,28 +761,33 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
             .sbc-strip-left{grid-column:1/2;grid-row:2/3;display:flex;align-items:stretch}
             .sbc-strip-right{grid-column:3/4;grid-row:2/3;display:flex;align-items:stretch}
 
-            /* Vertical strip (left/right) */
+            /* Vertical strip (left/right) — Parashara's Light style */
             .sbc-strip-col{display:grid;grid-template-rows:auto repeat(7,1fr) auto;width:100%;height:100%}
-            .sbc-strip-col .sbc-strip-row-v{display:grid;grid-template-columns:60px 24px 18px 18px 18px 18px;gap:0;align-items:center;border-bottom:1px solid rgba(212,168,67,0.1)}
-            .sbc-strip-col .sbc-strip-hdr-row{background:rgba(26,26,46,0.9);border-bottom:1px solid rgba(212,168,67,0.25)}
+            .sbc-strip-col .sbc-strip-row-v{display:grid;grid-template-columns:22px 22px 22px 22px 28px 68px;gap:0;align-items:center;border-bottom:1px solid rgba(212,168,67,0.12)}
+            .sbc-strip-left .sbc-strip-col .sbc-strip-row-v{grid-template-columns:22px 22px 22px 22px 28px 68px}
+            .sbc-strip-right .sbc-strip-col .sbc-strip-row-v{grid-template-columns:68px 28px 22px 22px 22px 22px}
+            .sbc-strip-col .sbc-strip-hdr-row{background:rgba(26,26,46,0.9);border-bottom:1px solid rgba(212,168,67,0.3)}
             .sbc-strip-col .sbc-strip-spacer{}
-            .sbc-sv-hdr{font-size:0.55rem;font-weight:700;color:#d4a843;text-align:center;padding:3px 2px}
-            .sbc-sv-pada-hdr{font-size:0.5rem}
-            .sbc-sv-cell{font-size:0.6rem;padding:2px 3px;color:#c8b880;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-            .sbc-sv-nak{text-align:left;font-weight:600;color:#ddd;padding-left:4px}
-            .sbc-sv-tara{font-weight:700}
-            .sbc-sv-pada{font-size:0.55rem;color:#888;border-left:1px solid rgba(212,168,67,0.06)}
+            .sbc-sv-hdr{font-size:0.6rem;font-weight:700;color:#d4a843;text-align:center;padding:3px 2px}
+            .sbc-sv-ph{font-size:0.6rem;font-weight:700;color:#d4a843;background:rgba(212,168,67,0.08)}
+            .sbc-sv-cell{font-size:0.65rem;padding:3px 2px;color:#c8b880;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .sbc-sv-nak{font-weight:600;color:#e0d8c0;padding:2px 4px;font-size:0.62rem}
+            .sbc-strip-left .sbc-sv-nak{text-align:right}
+            .sbc-strip-right .sbc-sv-nak{text-align:left}
+            .sbc-sv-tara{font-weight:700;font-size:0.65rem}
+            .sbc-sv-pada{font-size:0.65rem;color:#aaa;border:1px solid rgba(212,168,67,0.1);background:rgba(255,255,255,0.02);min-height:100%}
             .sbc-sv-vedha{background:rgba(255,0,0,0.06)}
-            .sbc-pada-hit{background:rgba(255,50,50,0.18);color:#ff6666!important;font-weight:700}
+            .sbc-pada-hit{background:rgba(255,50,50,0.2)!important;color:#ff6666!important;font-weight:700;border-color:rgba(255,60,60,0.3)!important}
 
-            /* Horizontal strip (top/bottom) */
+            /* Horizontal strip (top/bottom) — Parashara's Light style */
             .sbc-strip-table{width:100%;border-collapse:collapse;border-spacing:0}
-            .sbc-strip-table th,.sbc-strip-table td{padding:2px 3px;text-align:center;font-size:0.58rem;border:1px solid rgba(212,168,67,0.08)}
-            .sbc-sh-hdr{background:rgba(26,26,46,0.9);color:#d4a843;font-weight:700;font-size:0.58rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-            .sbc-sh-nak{min-width:60px}
-            .sbc-sh-label{font-size:0.52rem;font-weight:700;color:#d4a843;background:rgba(26,26,46,0.8);padding:2px 4px;text-align:right;white-space:nowrap}
-            .sbc-sh-cell{color:#c8b880;font-size:0.55rem}
-            .sbc-sh-pada{color:#888;font-size:0.5rem}
+            .sbc-strip-table td{padding:3px 2px;text-align:center;font-size:0.6rem;border:1px solid rgba(212,168,67,0.1)}
+            .sbc-sh-hdr{background:rgba(26,26,46,0.9);color:#d4a843;font-weight:700;font-size:0.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 3px}
+            .sbc-sh-nak{min-width:50px}
+            .sbc-sh-label{font-size:0.58rem;font-weight:700;color:#d4a843;background:rgba(26,26,46,0.8);padding:3px 5px;text-align:right;white-space:nowrap;width:40px}
+            .sbc-sh-cell{color:#c8b880;font-size:0.6rem}
+            .sbc-sh-tara{font-weight:700;font-size:0.62rem}
+            .sbc-sh-pada{color:#aaa;font-size:0.6rem;background:rgba(255,255,255,0.02)}
 
             /* ── Grid Wrapper ─────────────────────────────────── */
             .sbc-grid-wrap{position:relative;grid-column:2/3;grid-row:2/3}
@@ -851,23 +907,210 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 </table>
             </div>
 
-            <!-- Latta Hits -->
-            ${lattaHits.length ? '<div class="card"><h2>Latta Analysis</h2><table class="data-table"><thead><tr><th>Planet</th><th>Kicks</th><th>Dir</th><th>Severity</th><th>Effect</th></tr></thead><tbody>' + lattaHits.map(function(l){ return '<tr><td style="font-weight:600">'+l.planet+'</td><td>'+(l.kicked_nakshatra||'—')+'</td><td>'+(l.direction||'—')+'</td><td style="color:'+(l.severity==='HIGH'?'var(--red)':'var(--gold)')+'">'+(l.severity||'—')+'</td><td>'+(l.effect||l.nse_impact||'—')+'</td></tr>'; }).join('') + '</tbody></table></div>' : '<div></div>'}
+            <!-- Latta Analysis — All planets with full kick details -->
+            <div class="card">
+                <h2>Latta Analysis</h2>
+                <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px">
+                    Each planet kicks a specific nakshatra at a fixed offset. Retrograde reverses the kick direction.
+                </p>
+                <table class="data-table">
+                    <thead><tr>
+                        <th>Planet</th>
+                        <th>Transiting</th>
+                        <th>Dir</th>
+                        <th>Kicks Nakshatra</th>
+                        <th>Severity</th>
+                        <th>Effect</th>
+                        <th>NSE Impact</th>
+                    </tr></thead>
+                    <tbody>
+                        ${(function(){
+                            var pa = sbc.planet_analyses || [];
+                            if(!pa.length) return '<tr><td colspan="7" style="color:var(--text-muted)">No planet data available</td></tr>';
+                            return pa.map(function(p){
+                                var lt = p.latta || {};
+                                if(!lt.kicked_nakshatra) return '';
+                                /* Check if this latta actually hits a bindu or inauspicious tara */
+                                var hits = p.latta_hits || [];
+                                var severity = hits.length ? hits[0].severity : 'LOW';
+                                var binduHit = hits.length ? hits[0].bindu_type : '';
+                                var taraHit = hits.length ? hits[0].tara : '';
+                                var sevColor = severity === 'CRITICAL' ? '#ff3d00' : severity === 'HIGH' ? 'var(--red)' : severity === 'MODERATE' ? 'var(--gold)' : '#888';
+                                var dirIcon = lt.direction === 'forward' ? '→' : '←';
+                                var dirLabel = lt.direction === 'forward' ? 'Fwd ' + dirIcon : 'Bwd ' + dirIcon;
+                                if(p.retrograde) dirLabel += ' (R)';
+                                var kickLabel = lt.kicked_nakshatra;
+                                if(binduHit) kickLabel += ' <span style="color:var(--red);font-weight:700">(' + binduHit + ')</span>';
+                                else if(taraHit) kickLabel += ' <span style="color:var(--gold);font-size:0.75rem">(' + taraHit + ')</span>';
+                                var nature = p.nature || 'malefic';
+                                var planetColor = nature === 'benefic' ? 'var(--green)' : 'var(--red)';
+                                return '<tr>' +
+                                    '<td style="font-weight:600;color:' + planetColor + '">' + p.planet + '</td>' +
+                                    '<td>' + (p.nakshatra || '—') + '</td>' +
+                                    '<td style="font-family:monospace">' + dirLabel + '</td>' +
+                                    '<td>' + kickLabel + '</td>' +
+                                    '<td style="color:' + sevColor + ';font-weight:600">' + severity + '</td>' +
+                                    '<td style="font-size:0.82rem">' + (lt.effect || LATTA_EFFECTS_UI[p.planet] || '—') + '</td>' +
+                                    '<td style="font-size:0.78rem;color:var(--text-muted)">' + (lt.nse_impact || LATTA_NSE_UI[p.planet] || '—') + '</td>' +
+                                '</tr>';
+                            }).filter(Boolean).join('');
+                        })()}
+                    </tbody>
+                </table>
+                ${lattaHits.length ? '<div style="margin-top:8px;padding:6px 10px;background:rgba(255,60,0,0.08);border:1px solid rgba(255,60,0,0.2);border-radius:4px"><span style="color:var(--red);font-weight:700">⚠ Active Latta Hits: ' + lattaHits.length + '</span> — ' + lattaHits.map(function(l){ return '<b>' + l.planet + '</b> kicks <b>' + (l.kicked_nak || l.kicked_nakshatra) + '</b>' + (l.bindu_type ? ' (' + l.bindu_type + ' bindu)' : ''); }).join(', ') + '</div>' : ''}</div>
         </div>
 
-        <!-- Transit Planets -->
+        <!-- ═══ ADVANCED SBC v3.5 — Transit Planets with Graha Bala & Nature ═══ -->
         <div class="card">
-            <h2>Transit Planets</h2>
+            <h2>Transit Planets — Graha Bala & Nature</h2>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">
+                Dynamic nature per Khemraj Shlokas 55-56. Graha Bala = Sign strength × Motion multiplier (Shlokas 161-167).
+            </p>
             <table class="data-table">
-                <thead><tr><th>Planet</th><th>Nakshatra</th><th>Sign</th><th>Longitude</th><th>Speed</th><th>Retro</th></tr></thead>
+                <thead><tr>
+                    <th>Planet</th><th>Nakshatra</th><th>Sign</th><th>Nature</th><th>Reason</th>
+                    <th>Vedha Mode</th><th>Graha Bala</th><th>Sign Rel.</th><th>Motion</th>
+                </tr></thead>
                 <tbody>
-                    ${transitPlanets.map(function(tp){ return '<tr><td style="font-weight:600">'+tp.planet+'</td><td>'+(tp.nakshatra||'—')+'</td><td>'+(tp.sign||'—')+'</td><td>'+(tp.longitude!=null?tp.longitude.toFixed(2):'—')+'</td><td>'+(tp.speed!=null?tp.speed.toFixed(4):'—')+'</td><td>'+(tp.retrograde?'<span style="color:var(--red)">R</span>':'—')+'</td></tr>'; }).join('')}
+                    ${(sbc.planet_analyses || []).map(function(p){
+                        var gb = p.graha_bala || {};
+                        var nd = p.nature_detail || {};
+                        var natureColor = p.nature === 'benefic' ? 'var(--green)' : 'var(--red)';
+                        var reason = nd.reason || 'inherent';
+                        var reasonLabel = reason === 'ksheena_chandra' ? 'क्षीण Moon (waning)' :
+                                          reason === 'krura_yukta_budha' ? 'क्रूरयुक्त (malefic conj.)' :
+                                          reason === 'inherent' ? '—' : reason;
+                        var balaVal = gb.graha_bala != null ? gb.graha_bala.toFixed(2) : '—';
+                        var balaColor = gb.graha_bala >= 1.5 ? '#22cc44' : gb.graha_bala >= 0.75 ? 'var(--gold)' : gb.graha_bala >= 0.25 ? '#ff8c00' : 'var(--red)';
+                        var modeLabel = p.vedha_mode === 'three_way' ? '3-Way (all dirs)' :
+                                        p.vedha_mode === 'sthana' ? 'Sthana (max)' :
+                                        p.vedha_mode === 'front' ? 'Front (nearest)' :
+                                        p.vedha_mode === 'left' ? 'Left (fast)' :
+                                        p.vedha_mode === 'right' ? 'Right (retro)' : p.vedha_mode || '—';
+                        return '<tr>' +
+                            '<td style="font-weight:700;color:' + natureColor + '">' + p.planet +
+                                (p.retrograde ? ' <span style="color:var(--red);font-size:0.7rem">R</span>' : '') + '</td>' +
+                            '<td>' + (p.nakshatra || '—') + '</td>' +
+                            '<td>' + (p.sign || '—') + '</td>' +
+                            '<td style="color:' + natureColor + ';font-weight:600;text-transform:uppercase">' + (p.nature || '—') + '</td>' +
+                            '<td style="font-size:0.78rem">' + reasonLabel + '</td>' +
+                            '<td style="font-size:0.78rem">' + modeLabel + '</td>' +
+                            '<td style="font-weight:700;color:' + balaColor + '">' + balaVal + '</td>' +
+                            '<td style="font-size:0.78rem">' + (gb.sign_relation || '—') + '</td>' +
+                            '<td style="font-size:0.78rem">' + (gb.motion || '—') + '</td>' +
+                        '</tr>';
+                    }).join('')}
                 </tbody>
             </table>
         </div>
 
-        <!-- Vedha Hits -->
-        ${vedhaHits.length ? '<div class="card"><h2>Vedha Analysis</h2><table class="data-table"><thead><tr><th>Planet</th><th>From</th><th>To</th><th>Type</th><th>Nature</th><th>Classification</th></tr></thead><tbody>' + vedhaHits.slice(0,20).map(function(v){ return '<tr><td style="font-weight:600">'+(v.planet||'—')+'</td><td>'+(v.from_entity||'—')+'</td><td>'+(v.to_entity||'—')+'</td><td>'+(v.vedha_type||v.type||'—')+'</td><td style="color:'+(v.nature==='papa_vedha'?'var(--red)':'var(--green)')+'">'+(v.nature||'—')+'</td><td>'+(v.classification||'—')+'</td></tr>'; }).join('') + '</tbody></table>' + (vedhaHits.length>20 ? '<p style="color:var(--text-muted);margin-top:8px">Showing 20 of '+vedhaHits.length+' vedha hits</p>' : '') + '</div>' : ''}
+        <!-- ═══ Vedha Analysis with Temporal States ═══ -->
+        ${vedhaHits.length ? '<div class="card"><h2>Vedha Analysis — Temporal States</h2>' +
+            '<p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">' +
+            'Dagdha (दग्ध) = past/fading | Jwalita (ज्वलित) = present/active | Dhumita (धूमित) = future/building — Shlokas 103-106</p>' +
+            '<table class="data-table"><thead><tr><th>Planet</th><th>From Nak</th><th>Vedha Entity</th><th>Direction</th><th>Mode</th><th>Nature</th><th>Temporal</th><th>Strength</th></tr></thead><tbody>' +
+            vedhaHits.slice(0,25).map(function(v){
+                var ts = v.temporal_state || {};
+                var tsState = ts.state || '—';
+                var tsHindi = ts.state_hindi || '';
+                var tsColor = tsState === 'jwalita' ? '#ff3d00' : tsState === 'dhumita' ? 'var(--gold)' : tsState === 'dagdha' ? '#888' : '#555';
+                var tsIcon = tsState === 'jwalita' ? '🔥' : tsState === 'dhumita' ? '💨' : tsState === 'dagdha' ? '⚫' : '';
+                var natureColor = v.nature === 'papa_vedha' ? 'var(--red)' : 'var(--green)';
+                var natureLabel = v.nature === 'papa_vedha' ? 'Papa (पाप)' : 'Shubha (शुभ)';
+                var modeLabel = v.vedha_mode === 'three_way' ? '3-Way' : v.vedha_mode === 'front' ? 'Front' :
+                                v.vedha_mode === 'left' ? 'Left' : v.vedha_mode === 'right' ? 'Right' :
+                                v.vedha_mode === 'sthana' ? 'Sthana' : v.vedha_speed_type || '—';
+                var mult = v.strength_multiplier != null ? v.strength_multiplier.toFixed(2) + 'x' : '—';
+                return '<tr>' +
+                    '<td style="font-weight:600">' + (v.planet || '—') + '</td>' +
+                    '<td>' + (v.from_nak || '—') + '</td>' +
+                    '<td>' + (v.to_entity || '—') + (v.bindu_type ? ' <span style="color:var(--red);font-weight:700">(' + v.bindu_type + ')</span>' : '') + '</td>' +
+                    '<td>' + (v.vedha_direction || '—') + '</td>' +
+                    '<td>' + modeLabel + '</td>' +
+                    '<td style="color:' + natureColor + '">' + natureLabel + '</td>' +
+                    '<td style="color:' + tsColor + ';font-weight:600">' + tsIcon + ' ' + tsState + (tsHindi ? ' (' + tsHindi + ')' : '') + '</td>' +
+                    '<td style="font-weight:600">' + mult + '</td>' +
+                '</tr>';
+            }).join('') + '</tbody></table>' +
+            (vedhaHits.length > 25 ? '<p style="color:var(--text-muted);margin-top:8px;font-size:0.8rem">Showing 25 of ' + vedhaHits.length + ' vedha hits</p>' : '') +
+        '</div>' : ''}
+
+        <!-- ═══ Ubhayato Vedha — Double-Sided Malefic Detection ═══ -->
+        ${(function(){
+            var uv = sbc.ubhayato_vedha || [];
+            if(!uv.length) return '';
+            return '<div class="card" style="border-left:3px solid var(--red)">' +
+                '<h2 style="color:var(--red)">⚠ Ubhayato Vedha — Double-Sided Malefic</h2>' +
+                '<p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">' +
+                'Shloka 220: When 2+ malefic planets vedha the same entity from opposite sides → maximum destruction signal.</p>' +
+                '<table class="data-table"><thead><tr><th>Entity</th><th>Malefic Planets</th><th>Directions</th><th>Type</th><th>Severity</th><th>Financial Signal</th></tr></thead><tbody>' +
+                uv.map(function(u){
+                    var sevColor = u.severity === 'EXTREME' ? '#ff3d00' : 'var(--red)';
+                    var typeLabel = u.is_true_ubhayato ? 'Ubhayato (उभयतो)' : 'Multi-Malefic';
+                    return '<tr>' +
+                        '<td style="font-weight:700">' + u.entity + '</td>' +
+                        '<td style="color:var(--red)">' + u.planets.join(', ') + '</td>' +
+                        '<td>' + u.directions.join(', ') + '</td>' +
+                        '<td style="font-weight:600">' + typeLabel + '</td>' +
+                        '<td style="color:' + sevColor + ';font-weight:700;font-size:0.9rem">' + u.severity + '</td>' +
+                        '<td style="font-size:0.78rem">' + (u.financial || '—') + '</td>' +
+                    '</tr>';
+                }).join('') + '</tbody></table></div>';
+        })()}
+
+        <!-- ═══ 8 Upagraha Sub-Planets ═══ -->
+        ${(function(){
+            var upas = sbc.upagrahas || [];
+            var upaHits = sbc.upagraha_hits || [];
+            if(!upas.length) return '';
+            return '<div class="card">' +
+                '<h2>8 Upagraha — Sub-Planets from Sun</h2>' +
+                '<p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">' +
+                'Shlokas 250-260: Shadow sub-planets calculated from Sun\'s nakshatra. All malefic — add affliction points.</p>' +
+                '<table class="data-table"><thead><tr><th>Upagraha</th><th>Nakshatra</th><th>Offset</th><th>Effect</th><th>Financial</th><th>Bindu Hit</th></tr></thead><tbody>' +
+                upas.map(function(u){
+                    var hit = upaHits.find(function(h){ return h.upagraha === u.name; });
+                    var hitLabel = hit ? '<span style="color:var(--red);font-weight:700">' + (hit.bindu_type || hit.tara || 'YES') + '</span>' : '<span style="color:#666">—</span>';
+                    var rowStyle = hit ? 'background:rgba(255,0,0,0.05)' : '';
+                    return '<tr style="' + rowStyle + '">' +
+                        '<td style="font-weight:600;color:var(--gold)">' + u.name + '</td>' +
+                        '<td>' + u.nakshatra + '</td>' +
+                        '<td>' + u.offset_from_sun + ' from Sun</td>' +
+                        '<td style="font-size:0.78rem">' + u.effect + '</td>' +
+                        '<td style="font-size:0.78rem;color:var(--text-muted)">' + u.financial + '</td>' +
+                        '<td>' + hitLabel + '</td>' +
+                    '</tr>';
+                }).join('') + '</tbody></table>' +
+                (upaHits.length ? '<div style="margin-top:8px;padding:6px 10px;background:rgba(255,140,0,0.08);border:1px solid rgba(255,140,0,0.2);border-radius:4px">' +
+                    '<span style="color:#ff8c00;font-weight:700">⚠ ' + upaHits.length + ' Upagraha hitting sensitive points</span></div>' : '') +
+            '</div>';
+        })()}
+
+        <!-- ═══ Commodity & Sector Impact Map ═══ -->
+        <div class="card">
+            <h2>Commodity & Sector Impact</h2>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">
+                Shlokas 245-246: Malefic vedha → commodities expensive. Benefic vedha → commodities cheap. Per-planet sector mapping.
+            </p>
+            <table class="data-table">
+                <thead><tr><th>Planet</th><th>Nature</th><th>Commodities</th><th>NSE Sectors</th><th>Impact</th></tr></thead>
+                <tbody>
+                    ${(sbc.planet_analyses || []).map(function(p){
+                        var cm = p.commodity || {};
+                        if(!cm.commodities) return '';
+                        var natureColor = p.nature === 'benefic' ? 'var(--green)' : 'var(--red)';
+                        var impact = p.nature === 'benefic' ? (cm.benefic_effect || '—') : (cm.malefic_effect || '—');
+                        return '<tr>' +
+                            '<td style="font-weight:600;color:' + natureColor + '">' + p.planet + '</td>' +
+                            '<td style="color:' + natureColor + ';text-transform:uppercase;font-weight:600;font-size:0.78rem">' + (p.nature || '—') + '</td>' +
+                            '<td style="font-size:0.78rem">' + (cm.commodities || []).join(', ') + '</td>' +
+                            '<td style="font-size:0.78rem;color:var(--gold)">' + (cm.nse_sectors || []).join(', ') + '</td>' +
+                            '<td style="font-size:0.78rem">' + impact + '</td>' +
+                        '</tr>';
+                    }).filter(Boolean).join('')}
+                </tbody>
+            </table>
+        </div>
     `;
 
     /* ══════════════════════════════════════════════════════════
@@ -877,10 +1120,10 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
     var stripBot = document.getElementById('sbc-strip-bottom');
     var stripLeft = document.getElementById('sbc-strip-left');
     var stripRight = document.getElementById('sbc-strip-right');
-    if(stripTop) stripTop.innerHTML = buildInfoStrip(TOP_NAK, 'horizontal');
-    if(stripBot) stripBot.innerHTML = buildInfoStrip(BOT_NAK, 'horizontal');
-    if(stripLeft) stripLeft.innerHTML = buildInfoStrip(LEFT_NAK, 'vertical');
-    if(stripRight) stripRight.innerHTML = buildInfoStrip(RIGHT_NAK, 'vertical');
+    if(stripTop) stripTop.innerHTML = buildInfoStrip(TOP_NAK, 'horizontal', 'top');
+    if(stripBot) stripBot.innerHTML = buildInfoStrip(BOT_NAK, 'horizontal', 'bottom');
+    if(stripLeft) stripLeft.innerHTML = buildInfoStrip(LEFT_NAK, 'vertical', 'left');
+    if(stripRight) stripRight.innerHTML = buildInfoStrip(RIGHT_NAK, 'vertical', 'right');
 
     /* ══════════════════════════════════════════════════════════
        Build the interactive 9x9 SBC Grid (Parashara's Light style)
@@ -1099,10 +1342,16 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 document.querySelectorAll('.sbc-tara-num').forEach(function(t){
                     t.style.display = on ? '' : 'none';
                 });
-                /* Also toggle info strips */
+                /* Toggle info strip VISIBILITY (not display) to keep layout stable.
+                   Using visibility:hidden preserves the element's space in the CSS Grid,
+                   so the main grid + vedha label don't shift position. */
                 ['sbc-strip-top','sbc-strip-bottom','sbc-strip-left','sbc-strip-right'].forEach(function(id){
                     var el = document.getElementById(id);
-                    if(el) el.style.display = on ? '' : 'none';
+                    if(el) {
+                        el.style.visibility = on ? '' : 'hidden';
+                        el.style.opacity = on ? '1' : '0';
+                        el.style.pointerEvents = on ? '' : 'none';
+                    }
                 });
             }
         });
@@ -1135,8 +1384,10 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
 
             /* Filter vedha lines for this planet only */
             var planetLines = [];
+            var matchedPlanet = null;
             vedhaLinesAll.forEach(function(pl){
                 if (pl.planet !== planetName) return;
+                matchedPlanet = pl;
                 var nature = pl.nature || 'malefic';
                 var isPapa = (nature === 'malefic' || nature === 'papa');
                 var lineStyle = pl.line_style || 'solid';
@@ -1167,18 +1418,56 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 var y2 = vl.to[0] * cellH + cellH/2;
 
                 var color = vl.isPapa ? '#ff2222' : '#22cc44';
+                var sw = '2.5';
+                if (vl.lineStyle === 'thick') sw = '3.5';
+                if (vl.lineStyle === 'double') sw = '4';
+                if (vl.lineStyle === 'dotted') sw = '2';
                 var line = document.createElementNS('http://www.w3.org/2000/svg','line');
                 line.setAttribute('x1', x1);
                 line.setAttribute('y1', y1);
                 line.setAttribute('x2', x2);
                 line.setAttribute('y2', y2);
                 line.setAttribute('stroke', color);
-                line.setAttribute('stroke-width', vl.isPapa ? '3' : '2.5');
+                line.setAttribute('stroke-width', sw);
                 line.setAttribute('stroke-opacity', '0.75');
                 line.setAttribute('stroke-linecap', 'round');
-                if(vl.lineStyle === 'dashed' || !vl.isPapa) line.setAttribute('stroke-dasharray', '6,3');
+                if (vl.lineStyle === 'dashed') line.setAttribute('stroke-dasharray', '8,4');
+                if (vl.lineStyle === 'double') line.setAttribute('stroke-dasharray', '2,3');
+                if (vl.lineStyle === 'dotted') line.setAttribute('stroke-dasharray', '3,3');
                 svg.appendChild(line);
             });
+
+            /* Show vedha type label below the grid — anchored to sbc-master-wrap (NOT inside the CSS Grid) */
+            var vedhaLabel = document.getElementById('sbc-vedha-label');
+            if (!vedhaLabel) {
+                vedhaLabel = document.createElement('div');
+                vedhaLabel.id = 'sbc-vedha-label';
+                vedhaLabel.style.cssText = 'text-align:center;padding:6px;font-size:12px;color:#d4a843;margin-top:4px;';
+                /* Insert into sbc-master-wrap (parent of sbc-chart-area) so it stays stable when info strips toggle */
+                var masterWrap = wrap.closest('.sbc-master-wrap');
+                if (masterWrap) {
+                    var chartArea = masterWrap.querySelector('.sbc-chart-area');
+                    if (chartArea && chartArea.nextSibling) {
+                        masterWrap.insertBefore(vedhaLabel, chartArea.nextSibling);
+                    } else {
+                        masterWrap.appendChild(vedhaLabel);
+                    }
+                } else {
+                    /* Fallback: insert after the chart area parent */
+                    wrap.parentNode.parentNode.appendChild(vedhaLabel);
+                }
+            }
+            if (matchedPlanet) {
+                var mode = matchedPlanet.vedha_mode || matchedPlanet.vedha_side || 'both';
+                var sideLabel = mode === 'front' ? 'Front Vedha (सामने — nearest only)' :
+                                mode === 'left'  ? 'Left Vedha (बाई — fast, full line)' :
+                                mode === 'right' ? 'Right Vedha (दाहिनी — retro, full line)' :
+                                mode === 'sthana' ? 'Sthana Vedha (stationary — full, max power)' :
+                                matchedPlanet.vedha_type || '3-Way Vedha (all directions)';
+                vedhaLabel.innerHTML = '<b>' + planetName + '</b>: ' + sideLabel +
+                    ' | Lines: ' + matchedPlanet.lines.length +
+                    ' | Strength: ' + (matchedPlanet.strength_multiplier || 1.0) + 'x';
+            }
 
             /* Show vedha checkbox SVG if hidden */
             svg.style.display = '';
@@ -1200,6 +1489,8 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
         if (selectedTransitPlanet === planetName) {
             /* Clicking same planet again → deselect, restore all vedha lines */
             selectedTransitPlanet = null;
+            var lbl = document.getElementById('sbc-vedha-label');
+            if (lbl) lbl.innerHTML = '';
             drawVedhaLines();
         } else {
             /* Select this planet → draw only its vedha lines */
@@ -1217,7 +1508,8 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
     legendHtml += '<span><span style="display:inline-block;width:16px;height:16px;background:#3366aa;border-radius:50%;border:2px solid #7799cc;vertical-align:middle;margin-right:4px;"></span> Natal</span>';
     legendHtml += '<span><span style="display:inline-block;width:16px;height:16px;background:#dd4400;border-radius:2px;border:2px solid #ffcc00;vertical-align:middle;margin-right:4px;"></span> Transit <span style="color:#aaa;font-size:10px;">(click for vedha)</span></span>';
     legendHtml += '<span><span style="display:inline-block;width:16px;height:2px;background:#ff2222;vertical-align:middle;margin-right:4px;"></span> Papa Vedha</span>';
-    legendHtml += '<span><span style="display:inline-block;width:16px;height:2px;background:#22cc44;vertical-align:middle;margin-right:4px;border-top:1px dashed #22cc44;"></span> Shubha Vedha</span>';
+    legendHtml += '<span><span style="display:inline-block;width:16px;height:2px;background:#22cc44;vertical-align:middle;margin-right:4px;"></span> Shubha Vedha</span>';
+    legendHtml += '<span style="color:#888;font-size:10px;">Lines: ── full | ╌╌ retro | ━━ fast | ··· front</span>';
     legendHtml += '</div>';
     var gridWrap = document.getElementById('sbc-grid-wrap');
     if (gridWrap) gridWrap.insertAdjacentHTML('afterend', legendHtml);
