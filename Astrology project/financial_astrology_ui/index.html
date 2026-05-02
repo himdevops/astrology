@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Financial Astrology Engine v3.0 — NSE/BSE</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260502">
 </head>
 <body>
     <header>
@@ -26,6 +26,8 @@
             <button class="nav-btn" data-tab="kaksha">Kaksha AV</button>
             <button class="nav-btn" data-tab="sbc-signal">SBC Signal</button>
             <button class="nav-btn" data-tab="shodasvarga">Shodasvarga</button>
+            <button class="nav-btn" data-tab="gochar">Gochar</button>
+            <button class="nav-btn" data-tab="gold" style="color:#FFD700;font-weight:700">Gold</button>
         </nav>
     </header>
 
@@ -137,6 +139,173 @@
                 </form>
             </div>
             <div id="panchang-result" class="result-area"></div>
+
+            <!-- ADVANCED MUHURTA SECTION -->
+            <div class="card" style="margin-top:18px;border:1px solid var(--gold);border-radius:10px">
+                <h2 style="color:var(--gold-light)">Advanced Muhurta — Muhurta Martanda</h2>
+                <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px">Comprehensive electional astrology: Panchanga Shuddhi, Tara Bala, Chandra Bala, Doshas, 25+ activity-specific rules</p>
+                <div class="form-grid">
+                    <div class="form-group"><label>Date</label><input type="date" id="am-date"></div>
+                    <div class="form-group"><label>Time</label><input type="time" id="am-time" value="09:15"></div>
+                    <div class="form-group"><label>Place</label><input type="text" id="am-place" value="Mumbai, Maharashtra, India" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Activity</label>
+                        <select id="am-activity" style="padding:6px;border-radius:4px;background:var(--bg-card);color:var(--text);border:1px solid var(--border)">
+                            <option value="vyapara">Vyapara (Business/Trade)</option>
+                            <option value="vivaha">Vivaha (Marriage)</option>
+                            <option value="griha_pravesh">Griha Pravesh (House Entry)</option>
+                            <option value="yatra">Yatra (Travel/Journey)</option>
+                            <option value="vidya_arambha">Vidya Arambha (Education)</option>
+                            <option value="upanayana">Upanayana (Sacred Thread)</option>
+                            <option value="bhumi_puja">Bhumi Puja (Foundation Stone)</option>
+                            <option value="krishi">Krishi (Agriculture)</option>
+                            <option value="aushadha">Aushadha (Medical Treatment)</option>
+                            <option value="shastra_kriya">Shastra Kriya (Surgery)</option>
+                            <option value="vastra_dharana">Vastra Dharana (New Clothes)</option>
+                            <option value="ratna_dharana">Ratna Dharana (Gem Wearing)</option>
+                            <option value="vaahan">Vaahan (Vehicle Purchase)</option>
+                            <option value="naamkaran">Naamkaran (Naming Ceremony)</option>
+                            <option value="anna_prashana">Anna Prashana (First Feeding)</option>
+                            <option value="mundan">Mundan (First Haircut)</option>
+                            <option value="vivad_nyaya">Vivad/Nyaya (Court/Legal)</option>
+                            <option value="daan">Daan (Charity/Donation)</option>
+                            <option value="puja_havan">Puja & Havan (Worship)</option>
+                            <option value="devalaya">Devalaya (Temple Construction)</option>
+                            <option value="loan_debt">Runa (Loan/Borrowing)</option>
+                            <option value="santan_prapti">Santan (Conception)</option>
+                            <option value="pratishtha">Pratishtha (Idol Installation)</option>
+                            <option value="gold_purchase">Swarna Kray (Gold Purchase)</option>
+                            <option value="property_purchase">Bhu Kray (Property Purchase)</option>
+                            <option value="rasoi_arambha">Rasoi Arambha (Kitchen Start)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Birth Nakshatra (optional)</label>
+                        <select id="am-birth-nak" style="padding:6px;border-radius:4px;background:var(--bg-card);color:var(--text);border:1px solid var(--border)">
+                            <option value="">— Not specified —</option>
+                            <option>Ashwini</option><option>Bharani</option><option>Krittika</option>
+                            <option>Rohini</option><option>Mrigashira</option><option>Ardra</option>
+                            <option>Punarvasu</option><option>Pushya</option><option>Ashlesha</option>
+                            <option>Magha</option><option>Purva Phalguni</option><option>Uttara Phalguni</option>
+                            <option>Hasta</option><option>Chitra</option><option>Swati</option>
+                            <option>Vishakha</option><option>Anuradha</option><option>Jyeshtha</option>
+                            <option>Mula</option><option>Purva Ashadha</option><option>Uttara Ashadha</option>
+                            <option>Shravana</option><option>Dhanishtha</option><option>Shatabhisha</option>
+                            <option>Purva Bhadrapada</option><option>Uttara Bhadrapada</option><option>Revati</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Birth Moon Sign (optional)</label>
+                        <select id="am-birth-moon" style="padding:6px;border-radius:4px;background:var(--bg-card);color:var(--text);border:1px solid var(--border)">
+                            <option value="">— Not specified —</option>
+                            <option>Aries</option><option>Taurus</option><option>Gemini</option>
+                            <option>Cancer</option><option>Leo</option><option>Virgo</option>
+                            <option>Libra</option><option>Scorpio</option><option>Sagittarius</option>
+                            <option>Capricorn</option><option>Aquarius</option><option>Pisces</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="am-fetch" class="btn-primary" style="margin-top:10px;font-weight:700">ANALYZE MUHURTA</button>
+            </div>
+            <div id="am-result" class="result-area"></div>
+
+            <!-- ── AUTOMATED MUHURTA FINDER ────────────────────────── -->
+            <div class="card" style="margin-top:20px;border-top:3px solid var(--gold)">
+                <h2 style="color:var(--gold)">Automated Muhurta Finder</h2>
+                <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:12px">
+                    Find all auspicious dates for any activity over 1-12 months. Personalized with birth nakshatra &amp; moon sign.
+                </p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Person Name</label>
+                        <input type="text" id="mf-name" placeholder="e.g. Priya" class="birth-name">
+                    </div>
+                    <div class="form-group">
+                        <label>Activity</label>
+                        <select id="mf-activity">
+                            <option value="vivaha">Vivaha (Marriage)</option>
+                            <option value="griha_pravesh">Griha Pravesh (House Entry)</option>
+                            <option value="yatra">Yatra (Travel/Journey)</option>
+                            <option value="vyapara">Vyapara (Business/Trade)</option>
+                            <option value="vidya_arambha">Vidya Arambha (Education Start)</option>
+                            <option value="upanayana">Upanayana (Sacred Thread)</option>
+                            <option value="bhumi_puja">Bhumi Puja (Foundation Stone)</option>
+                            <option value="krishi">Krishi (Agriculture/Sowing)</option>
+                            <option value="aushadha">Aushadha (Medical Treatment)</option>
+                            <option value="shastra_kriya">Shastra Kriya (Surgery)</option>
+                            <option value="vastra_dharana">Vastra Dharana (New Clothes)</option>
+                            <option value="ratna_dharana">Ratna Dharana (Gem Wearing)</option>
+                            <option value="vaahan">Vaahan (Vehicle Purchase)</option>
+                            <option value="naamkaran">Naamkaran (Naming Ceremony)</option>
+                            <option value="anna_prashana">Anna Prashana (First Feeding)</option>
+                            <option value="mundan">Mundan (First Haircut)</option>
+                            <option value="vivad_nyaya">Vivad/Nyaya (Court/Legal)</option>
+                            <option value="daan">Daan (Charity/Donation)</option>
+                            <option value="puja_havan">Puja &amp; Havan (Worship)</option>
+                            <option value="devalaya">Devalaya (Temple Construction)</option>
+                            <option value="loan_debt">Runa (Loan/Borrowing)</option>
+                            <option value="santan_prapti">Santan (Conception)</option>
+                            <option value="pratishtha">Pratishtha (Idol Installation)</option>
+                            <option value="gold_purchase">Swarna Kray (Gold Purchase)</option>
+                            <option value="property_purchase">Bhu Kray (Property Purchase)</option>
+                            <option value="rasoi_arambha">Rasoi Arambha (Kitchen/Food Start)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="mf-date" value="2026-05-02">
+                    </div>
+                    <div class="form-group">
+                        <label>Months Ahead</label>
+                        <select id="mf-months">
+                            <option value="1">1 Month</option>
+                            <option value="2">2 Months</option>
+                            <option value="3">3 Months</option>
+                            <option value="6" selected>6 Months</option>
+                            <option value="9">9 Months</option>
+                            <option value="12">12 Months</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Birth Nakshatra (optional)</label>
+                        <select id="mf-nak">
+                            <option value="">— Not specified —</option>
+                            <option>Ashwini</option><option>Bharani</option><option>Krittika</option>
+                            <option>Rohini</option><option>Mrigashira</option><option>Ardra</option>
+                            <option>Punarvasu</option><option>Pushya</option><option>Ashlesha</option>
+                            <option>Magha</option><option>Purva Phalguni</option><option>Uttara Phalguni</option>
+                            <option>Hasta</option><option>Chitra</option><option>Swati</option>
+                            <option>Vishakha</option><option>Anuradha</option><option>Jyeshtha</option>
+                            <option>Mula</option><option>Purva Ashadha</option><option>Uttara Ashadha</option>
+                            <option>Shravana</option><option>Dhanishta</option><option>Shatabhisha</option>
+                            <option>Purva Bhadrapada</option><option>Uttara Bhadrapada</option><option>Revati</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Birth Moon Sign (optional)</label>
+                        <select id="mf-moon">
+                            <option value="">— Not specified —</option>
+                            <option>Aries</option><option>Taurus</option><option>Gemini</option>
+                            <option>Cancer</option><option>Leo</option><option>Virgo</option>
+                            <option>Libra</option><option>Scorpio</option><option>Sagittarius</option>
+                            <option>Capricorn</option><option>Aquarius</option><option>Pisces</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Min Score Filter</label>
+                        <select id="mf-min-score">
+                            <option value="0">Show All Dates</option>
+                            <option value="25">Average+ (≥25)</option>
+                            <option value="50" selected>Good+ (≥50)</option>
+                            <option value="75">Excellent Only (≥75)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Place</label>
+                        <input type="text" id="mf-place" value="Mumbai, Maharashtra, India">
+                    </div>
+                </div>
+                <button id="mf-fetch" class="btn-primary" style="margin-top:10px;font-weight:700">FIND AUSPICIOUS DATES</button>
+            </div>
+            <div id="mf-result" class="result-area"></div>
         </section>
 
         <!-- BIRTH CHART TAB -->
@@ -249,7 +418,7 @@
                     <div class="form-group"><label>Transit Date (for RP)</label><input type="date" id="kp-transit-date"></div>
                     <div class="form-group"><label>Transit Time</label><input type="text" id="kp-transit-time" value="09:15" placeholder="HH:MM or HH:MM AM/PM" maxlength="10"></div>
                     <div class="form-group"><label>Transit Place</label><input type="text" id="kp-transit-place" value="Ujjain, Madhya Pradesh, India" list="city-suggestions"></div>
-                    <div class="form-group"><label>KP Horary # (1–249)</label><input type="number" id="kp-horary" min="1" max="249" placeholder="Optional"></div>
+                    <div class="form-group"><label>KP Horary # (1–249)</label><input type="number" id="kp-horary-num" min="1" max="249" placeholder="Optional"></div>
                     <button type="submit" class="btn-primary">Run KP Analysis</button>
                 </form>
             </div>
@@ -374,6 +543,41 @@
             </div>
             <div id="shodasvarga-result" class="result-area"></div>
         </section>
+        <!-- GOCHAR (TRANSIT) TAB -->
+        <section id="tab-gochar" class="tab-content">
+            <div class="card">
+                <h2>Gochar Panchang — Planet Transits</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">All planet sign changes, nakshatra changes, pada changes, retrograde dates &amp; degrees</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+                    <div class="form-group" style="margin:0"><label>Start Date</label><input type="date" id="gochar-start" required></div>
+                    <div class="form-group" style="margin:0"><label>End Date</label><input type="date" id="gochar-end" required></div>
+                    <div class="form-group" style="margin:0">
+                        <label>Ayanamsa</label>
+                        <select id="gochar-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <button id="gochar-fetch" class="btn-primary">Get Transits</button>
+                </div>
+            </div>
+            <div id="gochar-result" class="result-area"></div>
+        </section>
+
+        <section id="tab-gold" class="tab-content">
+            <div class="card">
+                <h2 style="color:#FFD700">Gold Price Predictor — Vedic Astrology</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Based on Sarvatobhadra Chakra Ardha Prakaran (Khemraj Publishers) — Shlokas 245-246, 345-406</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+                    <div class="form-group" style="margin:0"><label>Start Date</label><input type="text" id="gold-start" class="gold-date" placeholder="DD-MM-YYYY" maxlength="10" style="width:120px" required></div>
+                    <div class="form-group" style="margin:0"><label>End Date</label><input type="text" id="gold-end" class="gold-date" placeholder="DD-MM-YYYY" maxlength="10" style="width:120px" required></div>
+                    <div class="form-group" style="margin:0">
+                        <label>Ayanamsa</label>
+                        <select id="gold-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <button id="gold-fetch" class="btn-primary" style="background:#FFD700;color:#000;font-weight:700">Predict Gold</button>
+                </div>
+            </div>
+            <div id="gold-result" class="result-area"></div>
+        </section>
+
     </main>
 
     <footer>
@@ -381,6 +585,6 @@
         <p class="disclaimer">Disclaimer: Astrological predictions are for educational/research purposes only. Not financial advice.</p>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=20260503g"></script>
 </body>
 </html>

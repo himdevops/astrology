@@ -282,6 +282,365 @@ document.getElementById('panchang-form').addEventListener('submit', async (e) =>
     `;
 });
 
+// ─── ADVANCED MUHURTA ────────────────────────────────────────
+var amPColor = function(n){
+    var c = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080'};
+    return c[n]||'#ccc';
+};
+document.getElementById('am-fetch').addEventListener('click', async function(){
+    var resultEl = document.getElementById('am-result');
+    resultEl.innerHTML = '<p style="color:var(--text-muted)">Analyzing muhurta...</p>';
+    try {
+        var amBody = {
+            date: document.getElementById('am-date').value || body.date,
+            time: document.getElementById('am-time').value || '09:15',
+            place: document.getElementById('am-place').value || body.place,
+            activity: document.getElementById('am-activity').value,
+            birth_nakshatra: document.getElementById('am-birth-nak').value || null,
+            birth_moon_sign: document.getElementById('am-birth-moon').value || null,
+            ayanamsa: 'lahiri'
+        };
+        var resp = await fetch(API + '/muhurta/advanced', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(amBody)
+        });
+        if (!resp.ok) throw new Error('API error ' + resp.status);
+        var d = await resp.json();
+        var a = d.analysis || {};
+        var fa = a.final_analysis || {};
+        var ps = a.panchanga_shuddhi || {};
+        var psum = d.panchanga_summary || {};
+        var hora = d.hora || {};
+
+        var h = '';
+
+        /* ── Verdict Banner ── */
+        var vBg = fa.verdict_type === 'excellent' ? 'rgba(0,200,100,0.15)' :
+                  fa.verdict_type === 'good' ? 'rgba(0,200,100,0.10)' :
+                  fa.verdict_type === 'mixed' ? 'rgba(255,193,7,0.12)' :
+                  fa.verdict_type === 'bad' ? 'rgba(255,152,0,0.12)' : 'rgba(255,60,60,0.15)';
+        h += '<div style="background:'+vBg+';border:2px solid '+(fa.color||'var(--gold)')+';border-radius:12px;padding:20px;text-align:center;margin-bottom:16px">';
+        h += '<div style="font-size:0.82rem;color:var(--text-dim)">'+fa.activity+' ('+fa.activity_hi+')</div>';
+        h += '<div style="font-size:0.78rem;color:var(--text-dim);margin-top:2px">'+d.date+' '+d.time+' | '+d.weekday+' ('+d.weekday_hi+')</div>';
+        h += '<div style="font-size:2rem;font-weight:900;color:'+(fa.color||'var(--gold)')+';margin:8px 0;letter-spacing:1px">'+fa.verdict+'</div>';
+        h += '<div style="font-size:0.88rem;color:var(--text-dim)">'+fa.verdict_hi+'</div>';
+        h += '<div style="font-size:1.1rem;font-weight:700;color:'+(fa.color||'var(--gold)')+';margin-top:6px">Score: '+(fa.final_score*100).toFixed(0)+'%</div>';
+        h += '</div>';
+
+        /* ── Panchanga Summary ── */
+        h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">';
+        h += '<div class="metric"><div class="label">Tithi</div><div class="value gold">'+(psum.tithi||'')+'</div></div>';
+        h += '<div class="metric"><div class="label">Nakshatra</div><div class="value gold">'+(psum.nakshatra||'')+'</div></div>';
+        h += '<div class="metric"><div class="label">Yoga</div><div class="value gold">'+(psum.yoga||'')+'</div></div>';
+        h += '<div class="metric"><div class="label">Karana</div><div class="value '+(psum.karana==='Vishti'?'red':'gold')+'">'+(psum.karana||'')+'</div></div>';
+        h += '<div class="metric"><div class="label">Lagna</div><div class="value gold">'+(d.lagna_sign||'')+'</div></div>';
+        h += '<div class="metric"><div class="label">Hora</div><div class="value" style="color:'+amPColor(hora.hora_lord)+'">'+(hora.hora_lord||'')+'</div><div class="label">'+(hora.good_for||'').substring(0,30)+'</div></div>';
+        h += '</div>';
+
+        /* ── Panchanga Shuddhi Table ── */
+        h += '<h3 style="color:var(--gold-light);font-size:0.9rem;margin-top:14px">Panchanga Shuddhi — '+(ps.verdict||'')+'</h3>';
+        h += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+        h += '<thead><tr><th>Element</th><th>Value</th><th>Nature</th><th>Pure?</th><th>Score</th><th>Note</th></tr></thead><tbody>';
+        (ps.checks||[]).forEach(function(c){
+            var rowBg = c.is_pure ? 'rgba(0,200,100,0.06)' : 'rgba(255,80,80,0.06)';
+            h += '<tr style="background:'+rowBg+'">';
+            h += '<td style="font-weight:700">'+c.element+' <span style="color:var(--text-dim);font-size:0.7rem">'+c.element_hi+'</span></td>';
+            h += '<td style="font-weight:600">'+(c.value||'')+(c.value_hi?' ('+c.value_hi+')':'')+'</td>';
+            h += '<td>'+(c.nature||'')+(c.nature_hi?' '+c.nature_hi:'')+'</td>';
+            h += '<td style="font-weight:700;color:'+(c.is_pure?'var(--green)':'var(--red)')+'">'+( c.is_pure?'&#10003;':'&#10007;')+'</td>';
+            h += '<td style="font-weight:600">'+(c.score>0?'+':'')+c.score.toFixed(1)+'</td>';
+            h += '<td style="font-size:0.72rem;color:var(--text-dim)">'+c.note+'</td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+        h += '<div style="font-size:0.82rem;margin-top:6px;font-weight:700;color:'+(ps.is_fully_pure?'var(--green)':'var(--gold)')+'">'+ps.pure_count+'/'+ps.total_elements+' Elements Pure — '+(ps.verdict_hi||'')+'</div>';
+
+        /* ── Doshas ── */
+        var doshas = a.doshas || [];
+        if (doshas.length > 0) {
+            h += '<h3 style="color:var(--red);font-size:0.9rem;margin-top:14px">&#9888; Doshas Detected ('+doshas.length+')</h3>';
+            doshas.forEach(function(dd){
+                var sevColor = dd.severity === 'Very High' ? '#ff3d00' : dd.severity === 'High' ? '#ff5722' : '#ff9800';
+                h += '<div style="padding:8px 12px;background:rgba(255,60,60,0.08);border-left:3px solid '+sevColor+';border-radius:4px;margin-bottom:6px;font-size:0.82rem">';
+                h += '<strong style="color:'+sevColor+'">'+dd.dosha+' ('+dd.dosha_hi+')</strong> <span style="color:var(--text-dim)">['+dd.severity+']</span>';
+                h += '<div style="color:var(--text);margin-top:2px">'+dd.description+'</div>';
+                h += '<div style="color:var(--text-dim);font-style:italic;font-size:0.75rem;margin-top:2px">Remedy: '+dd.remedy+'</div>';
+                h += '</div>';
+            });
+        }
+
+        /* ── Tara Bala ── */
+        if (a.tara_bala) {
+            var tb = a.tara_bala;
+            var tbColor = tb.score >= 0 ? 'var(--green)' : 'var(--red)';
+            h += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px">';
+            h += '<div style="flex:1;min-width:240px;padding:12px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.3);border-radius:8px">';
+            h += '<div style="font-size:0.85rem;font-weight:700;color:var(--gold-light)">Tara Bala</div>';
+            h += '<div style="font-size:1.3rem;font-weight:900;color:'+tbColor+';margin:4px 0">'+tb.tara_name+' ('+tb.tara_name_hi+')</div>';
+            h += '<div style="font-size:0.78rem">Tara #'+tb.tara_number+' | Group '+tb.tara_group+' | '+tb.nature+'</div>';
+            h += '<div style="font-size:0.78rem;color:var(--text-dim);margin-top:4px">'+tb.advice+'</div>';
+            h += '<div style="font-size:0.72rem;color:var(--text-dim)">Birth: '+tb.birth_nakshatra+' → Transit: '+tb.transit_nakshatra+'</div>';
+            h += '</div>';
+
+            /* ── Chandra Bala ── */
+            if (a.chandra_bala) {
+                var cb = a.chandra_bala;
+                var cbColor = cb.is_strong ? 'var(--green)' : 'var(--red)';
+                h += '<div style="flex:1;min-width:240px;padding:12px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.3);border-radius:8px">';
+                h += '<div style="font-size:0.85rem;font-weight:700;color:var(--gold-light)">Chandra Bala</div>';
+                h += '<div style="font-size:1.3rem;font-weight:900;color:'+cbColor+';margin:4px 0">'+cb.house_name+' ('+cb.house_name_hi+')</div>';
+                h += '<div style="font-size:0.78rem">House '+cb.house_from_moon+' from Moon | '+cb.nature+'</div>';
+                h += '<div style="font-size:0.78rem;color:var(--text-dim);margin-top:4px">'+cb.advice+'</div>';
+                h += '<div style="font-size:0.72rem;color:var(--text-dim)">'+cb.birth_moon_sign+' → '+cb.transit_moon_sign+'</div>';
+                h += '</div>';
+            }
+            h += '</div>';
+        }
+
+        /* ── Activity Fitness Table ── */
+        h += '<h3 style="color:var(--gold-light);font-size:0.9rem;margin-top:14px">Activity Fitness: '+fa.activity+'</h3>';
+        h += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+        h += '<thead><tr><th>Check</th><th>Value</th><th>Suitable?</th><th>Score</th></tr></thead><tbody>';
+        if (a.nakshatra_fitness) {
+            var nf = a.nakshatra_fitness;
+            h += '<tr style="background:'+(nf.is_recommended?'rgba(0,200,100,0.06)':'rgba(255,80,80,0.06)')+'"><td>Nakshatra</td><td>'+nf.nakshatra+' ('+nf.classification+')</td>';
+            h += '<td style="color:'+(nf.is_recommended?'var(--green)':'var(--red)')+'">'+( nf.is_recommended?'&#10003; Recommended':'&#10007; Not ideal')+'</td>';
+            h += '<td>'+(nf.score>0?'+':'')+nf.score.toFixed(1)+'</td></tr>';
+        }
+        if (a.tithi_fitness) {
+            var tf = a.tithi_fitness;
+            h += '<tr style="background:'+(tf.is_recommended?'rgba(0,200,100,0.06)':'rgba(255,80,80,0.06)')+'"><td>Tithi</td><td>'+tf.paksha+' '+tf.tithi+'</td>';
+            h += '<td style="color:'+(tf.is_recommended?'var(--green)':'var(--red)')+'">'+( tf.is_recommended?'&#10003; Suitable':'&#10007; Not ideal')+'</td>';
+            h += '<td>'+(tf.score>0?'+':'')+tf.score.toFixed(1)+'</td></tr>';
+        }
+        if (a.vara_fitness) {
+            var vf = a.vara_fitness;
+            h += '<tr style="background:'+(vf.is_recommended?'rgba(0,200,100,0.06)':vf.is_avoided?'rgba(255,80,80,0.06)':'')+'"><td>Vara (Day)</td><td>'+vf.vara+'</td>';
+            h += '<td style="color:'+(vf.is_recommended?'var(--green)':vf.is_avoided?'var(--red)':'var(--text)')+'">'+( vf.is_recommended?'&#10003; Good':vf.is_avoided?'&#10007; Avoid':'~ Neutral')+'</td>';
+            h += '<td>'+(vf.score>0?'+':'')+vf.score.toFixed(1)+'</td></tr>';
+        }
+        if (a.lagna_shuddhi) {
+            var ls = a.lagna_shuddhi;
+            h += '<tr style="background:'+(ls.is_pure?'rgba(0,200,100,0.06)':'rgba(255,80,80,0.06)')+'"><td>Lagna</td><td>'+ls.lagna_sign+'</td>';
+            h += '<td style="color:'+(ls.is_pure?'var(--green)':'var(--red)')+'">'+( ls.is_pure?'&#10003; Suitable':'&#10007; Not ideal')+'</td>';
+            h += '<td>'+(ls.score>0?'+':'')+ls.score.toFixed(1)+'</td></tr>';
+        }
+        h += '</tbody></table></div>';
+
+        /* ── Score Breakdown ── */
+        h += '<h3 style="color:var(--gold-light);font-size:0.9rem;margin-top:14px">Score Breakdown</h3>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">';
+        (fa.score_breakdown||[]).forEach(function(sb){
+            var sbColor = sb.score >= 0.5 ? '#00c864' : sb.score >= 0 ? '#ffc107' : '#ff5722';
+            h += '<div style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;font-size:0.75rem;min-width:120px">';
+            h += '<div style="color:var(--text-dim)">'+sb.component+' ('+sb.weight+')</div>';
+            h += '<div style="font-weight:700;color:'+sbColor+'">'+(sb.score>0?'+':'')+sb.score.toFixed(2)+'</div>';
+            h += '</div>';
+        });
+        h += '</div>';
+
+        /* ── Warnings & Positives ── */
+        if (fa.positives && fa.positives.length) {
+            h += '<div style="margin-top:8px">';
+            fa.positives.forEach(function(p){
+                h += '<div style="font-size:0.78rem;color:var(--green);margin-bottom:3px">&#10003; '+p+'</div>';
+            });
+            h += '</div>';
+        }
+        if (fa.warnings && fa.warnings.length) {
+            h += '<div style="margin-top:6px">';
+            fa.warnings.forEach(function(w){
+                h += '<div style="font-size:0.78rem;color:var(--red);margin-bottom:3px">&#9888; '+w+'</div>';
+            });
+            h += '</div>';
+        }
+
+        /* ── Activity Notes ── */
+        if (fa.activity_notes) {
+            h += '<div style="margin-top:10px;padding:8px 12px;background:rgba(212,168,67,0.08);border-radius:6px;font-size:0.78rem;color:var(--text-dim);font-style:italic">';
+            h += '<strong style="color:var(--gold)">Note:</strong> '+fa.activity_notes;
+            h += '</div>';
+        }
+
+        resultEl.innerHTML = h;
+    } catch(err) {
+        resultEl.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+    }
+});
+
+// ─── AUTOMATED MUHURTA FINDER ──────────────────────────────
+document.getElementById('mf-fetch').addEventListener('click', async () => {
+    var resultEl = document.getElementById('mf-result');
+
+    try {
+        var data = await apiCall('/muhurta/find-dates', {
+            activity: document.getElementById('mf-activity').value,
+            start_date: document.getElementById('mf-date').value,
+            person_name: document.getElementById('mf-name').value || '',
+            months_ahead: parseInt(document.getElementById('mf-months').value),
+            birth_nakshatra: document.getElementById('mf-nak').value || null,
+            birth_moon_sign: document.getElementById('mf-moon').value || null,
+            min_score: parseFloat(document.getElementById('mf-min-score').value),
+            place: document.getElementById('mf-place').value,
+        }, resultEl);
+
+        if (!data) return; // apiCall already showed the error
+        if (data.error) {
+            resultEl.innerHTML = '<p style="color:var(--red)">Error: ' + data.error + '</p>';
+            return;
+        }
+
+        var h = '';
+        var pName = data.person_name ? data.person_name : '';
+        var s = data.summary || {};
+
+        // Header
+        h += '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid var(--gold);border-radius:12px;padding:20px;margin-bottom:16px">';
+        h += '<h2 style="color:var(--gold);margin:0 0 8px">Muhurta Finder Results</h2>';
+        if (pName) h += '<p style="color:var(--text);margin:2px 0"><strong>Person:</strong> ' + pName + '</p>';
+        h += '<p style="color:var(--text);margin:2px 0"><strong>Activity:</strong> ' + (data.activity_name||data.activity) + ' (' + (data.activity_name_hi||'') + ')</p>';
+        h += '<p style="color:var(--text);margin:2px 0"><strong>Range:</strong> ' + (data.search_range?data.search_range.start_date:'') + ' → ' + (data.search_range?data.search_range.end_date:'') + ' (' + (data.search_range?data.search_range.months:'') + ' months)</p>';
+        if (data.birth_details && (data.birth_details.nakshatra || data.birth_details.moon_sign)) {
+            h += '<p style="color:var(--text);margin:2px 0"><strong>Birth:</strong> ';
+            if (data.birth_details.nakshatra) h += 'Nak: ' + data.birth_details.nakshatra + ' ';
+            if (data.birth_details.moon_sign) h += 'Moon: ' + data.birth_details.moon_sign;
+            h += '</p>';
+        }
+        h += '<p style="color:var(--text);margin:2px 0"><strong>Days Scanned:</strong> ' + (data.total_days_scanned||0) + '</p>';
+        h += '</div>';
+
+        // Summary chips
+        h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">';
+        h += '<div style="background:#0a5c36;border-radius:8px;padding:10px 18px;text-align:center"><div style="font-size:1.6em;font-weight:700;color:#00ff88">' + (s.excellent||0) + '</div><div style="color:#aaa;font-size:0.8em">Excellent</div></div>';
+        h += '<div style="background:#2a4a0a;border-radius:8px;padding:10px 18px;text-align:center"><div style="font-size:1.6em;font-weight:700;color:#88ff00">' + (s.good||0) + '</div><div style="color:#aaa;font-size:0.8em">Good</div></div>';
+        h += '<div style="background:#4a3a0a;border-radius:8px;padding:10px 18px;text-align:center"><div style="font-size:1.6em;font-weight:700;color:#ffaa00">' + (s.average||0) + '</div><div style="color:#aaa;font-size:0.8em">Average</div></div>';
+        h += '<div style="background:#4a0a0a;border-radius:8px;padding:10px 18px;text-align:center"><div style="font-size:1.6em;font-weight:700;color:#ff4444">' + (s.poor||0) + '</div><div style="color:#aaa;font-size:0.8em">Poor</div></div>';
+        h += '</div>';
+
+        // Store all dates globally for show more/less
+        var allDates = data.all_dates || [];
+        window._mfAllDates = allDates;
+        window._mfShowAll = false;
+
+        function renderMfDates(dates, showAll) {
+            var out = '';
+            if (dates.length === 0) {
+                return '<p style="color:var(--text-dim)">No dates found matching the criteria. Try lowering the min score filter or extending the range.</p>';
+            }
+            var displayDates = showAll ? dates : dates.slice(0, 20);
+            out += '<div style="display:grid;gap:12px">';
+            for (var i = 0; i < displayDates.length; i++) {
+                var d = displayDates[i];
+                var sc = d.score || 0;
+                var borderColor = sc >= 75 ? '#00ff88' : sc >= 50 ? '#88ff00' : sc >= 25 ? '#ffaa00' : '#ff4444';
+                var bgGrad = sc >= 75 ? 'linear-gradient(135deg,#0a2e1a,#0a3e1a)' : sc >= 50 ? 'linear-gradient(135deg,#1a2e0a,#1a3e0a)' : sc >= 25 ? 'linear-gradient(135deg,#2e2a0a,#3e2a0a)' : 'linear-gradient(135deg,#2e0a0a,#3e0a0a)';
+                var badge = sc >= 75 ? 'EXCELLENT' : sc >= 50 ? 'GOOD' : sc >= 25 ? 'AVERAGE' : 'AVOID';
+
+                out += '<div style="background:' + bgGrad + ';border:1px solid ' + borderColor + ';border-radius:10px;padding:14px;position:relative">';
+                out += '<div style="position:absolute;top:8px;right:10px;background:' + borderColor + ';color:#000;font-weight:700;font-size:0.75em;padding:2px 10px;border-radius:12px">#' + (i+1) + ' ' + badge + '</div>';
+
+                out += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
+                out += '<div style="font-size:1.3em;font-weight:700;color:' + borderColor + '">' + d.date + '</div>';
+                out += '<div style="color:var(--text-dim)">' + (d.weekday||'') + ' (' + (d.weekday_hi||'') + ')</div>';
+                out += '<div style="background:rgba(255,255,255,0.1);border-radius:6px;padding:4px 10px;font-weight:700;color:' + borderColor + '">Score: ' + sc + '</div>';
+                out += '</div>';
+
+                out += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;font-size:0.85em">';
+                out += '<span style="background:rgba(255,215,0,0.15);padding:2px 8px;border-radius:4px;color:var(--gold)">' + (d.tithi||'') + '</span>';
+                out += '<span style="background:rgba(0,206,209,0.15);padding:2px 8px;border-radius:4px;color:#00ced1">' + (d.nakshatra||'') + ' (' + (d.nakshatra_lord||'') + ')</span>';
+                out += '<span style="background:rgba(255,105,180,0.15);padding:2px 8px;border-radius:4px;color:#ff69b4">Yoga: ' + (d.yoga||'') + '</span>';
+                out += '<span style="background:rgba(100,149,237,0.15);padding:2px 8px;border-radius:4px;color:#6495ed">' + (d.karana||'') + '</span>';
+                out += '<span style="background:rgba(255,165,0,0.15);padding:2px 8px;border-radius:4px;color:#ffa500">Moon: ' + (d.moon_sign||'') + '</span>';
+                if (d.lagna_sign) out += '<span style="background:rgba(148,103,189,0.15);padding:2px 8px;border-radius:4px;color:#9467bd">Lagna: ' + d.lagna_sign + '</span>';
+                out += '</div>';
+
+                if (d.tara_bala || d.chandra_bala) {
+                    out += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:0.82em">';
+                    if (d.tara_bala) {
+                        var tb = d.tara_bala;
+                        var tbColor = tb.is_good ? '#00ff88' : '#ff4444';
+                        out += '<span style="color:' + tbColor + '">Tara: ' + (tb.tara_name||'') + ' (' + (tb.nature||'') + ')</span>';
+                    }
+                    if (d.chandra_bala) {
+                        var cb = d.chandra_bala;
+                        var cbColor = cb.is_strong ? '#00ff88' : '#ff4444';
+                        out += '<span style="color:' + cbColor + '">Chandra Bala: House ' + (cb.house||'') + ' (' + (cb.strength||'') + ')</span>';
+                    }
+                    out += '</div>';
+                }
+
+                if (d.doshas && d.doshas.length > 0) {
+                    out += '<div style="font-size:0.82em;margin-bottom:4px">';
+                    for (var di = 0; di < d.doshas.length; di++) {
+                        var ds = d.doshas[di];
+                        var dsColor = ds.severity === 'high' ? '#ff4444' : ds.severity === 'medium' ? '#ffaa00' : '#ffcc00';
+                        out += '<span style="color:' + dsColor + ';margin-right:8px">&#9888; ' + (ds.name||ds.dosha||'') + '</span>';
+                    }
+                    out += '</div>';
+                }
+
+                if (d.positives && d.positives.length > 0) {
+                    out += '<div style="font-size:0.8em;color:#00ff88;margin-top:4px">';
+                    for (var pi = 0; pi < Math.min(d.positives.length, 3); pi++) {
+                        out += '&#10003; ' + d.positives[pi] + '  ';
+                    }
+                    if (d.positives.length > 3) out += '(+' + (d.positives.length-3) + ' more)';
+                    out += '</div>';
+                }
+                if (d.warnings && d.warnings.length > 0) {
+                    out += '<div style="font-size:0.8em;color:#ff6666;margin-top:2px">';
+                    for (var wi = 0; wi < Math.min(d.warnings.length, 2); wi++) {
+                        out += '&#10007; ' + d.warnings[wi] + '  ';
+                    }
+                    if (d.warnings.length > 2) out += '(+' + (d.warnings.length-2) + ' more)';
+                    out += '</div>';
+                }
+
+                out += '</div>';
+            }
+            out += '</div>';
+
+            // Show All / Show Top 20 toggle
+            if (dates.length > 20) {
+                out += '<div style="text-align:center;margin-top:14px">';
+                if (showAll) {
+                    out += '<button id="mf-toggle" class="btn-primary" style="font-size:0.9em;padding:8px 24px">Show Top 20 Only</button>';
+                    out += '<p style="color:var(--text-dim);font-size:0.82em;margin-top:6px">Showing all ' + dates.length + ' dates</p>';
+                } else {
+                    out += '<button id="mf-toggle" class="btn-primary" style="font-size:0.9em;padding:8px 24px">Show All ' + dates.length + ' Dates</button>';
+                    out += '<p style="color:var(--text-dim);font-size:0.82em;margin-top:6px">Showing top 20 of ' + dates.length + ' dates</p>';
+                }
+                out += '</div>';
+            }
+            return out;
+        }
+
+        h += renderMfDates(allDates, false);
+        resultEl.innerHTML = h;
+
+        // Attach toggle handler
+        var toggleBtn = document.getElementById('mf-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                window._mfShowAll = !window._mfShowAll;
+                // Re-render just the dates portion (keep header + summary)
+                var headerEnd = resultEl.innerHTML.indexOf('<div style="display:grid;gap:12px">');
+                if (headerEnd < 0) headerEnd = resultEl.innerHTML.indexOf('<p style="color:var(--text-dim)">No dates');
+                var headerHtml = headerEnd > 0 ? resultEl.innerHTML.substring(0, headerEnd) : '';
+                resultEl.innerHTML = headerHtml + renderMfDates(window._mfAllDates, window._mfShowAll);
+                // Re-attach toggle
+                var newToggle = document.getElementById('mf-toggle');
+                if (newToggle) {
+                    newToggle.addEventListener('click', arguments.callee);
+                }
+            });
+        }
+    } catch(err) {
+        resultEl.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+    }
+});
+
 // ─── BIRTH CHART ────────────────────────────────────────────
 document.getElementById('chart-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1714,7 +2073,7 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
     if (transitDate) body.transit_date = transitDate;
     const transitTime = document.getElementById('kp-transit-time').value;
     if (transitTime) body.transit_time = parseTimeInput(transitTime);
-    const horaryNum = document.getElementById('kp-horary').value;
+    const horaryNum = document.getElementById('kp-horary-num').value;
     if (horaryNum) body.kp_horary_number = parseInt(horaryNum);
 
     const data = await apiCall('/kp', body, resultEl);
@@ -1775,6 +2134,8 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
         {id:'kp-dba',      label:'DBA Analysis'},
         {id:'kp-horary',   label:'KP Horary'},
         {id:'kp-moonnl',   label:'Moon NL/SL/SSL'},
+        {id:'kp-prashna',  label:'Prashna Yes/No'},
+        {id:'kp-match',    label:'Match Prediction'},
     ];
 
     var html = '<div class="kp-subtab-bar" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px;border-bottom:1px solid #333;padding-bottom:8px">';
@@ -2249,9 +2610,18 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
 
     /* ═══ TAB: KP Horary ═════════════════════════════════════ */
     html += '<div class="kp-tab-pane" id="kp-horary" style="display:none">';
+    html += '<div class="card"><h2 style="color:var(--gold-light)">KP Horary (Prashna)</h2>';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:12px">Think of a number between 1 and 249. That number sets the Ascendant for your Prashna chart.</p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">KP Number (1–249)</label><input type="number" id="kp-horary-inline" min="1" max="249" value="'+(horary?horary.input_number:'')+'" placeholder="1–249" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.9rem;width:100px;font-weight:700"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Query Date</label><input type="date" id="kp-horary-date" value="'+today+'" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Query Time</label><input type="text" id="kp-horary-time" value="'+new Date().toTimeString().slice(0,5)+'" placeholder="HH:MM" maxlength="10" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:100px"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Place</label><input type="text" id="kp-horary-place" value="'+(body.place||'Ujjain, Madhya Pradesh, India')+'" list="city-suggestions" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:200px"></div>';
+    html += '<button id="kp-horary-fetch" class="btn-primary" style="font-size:0.82rem;padding:7px 16px">Run Horary Analysis</button>';
+    html += '</div>';
     if (horary) {
-        html += '<div class="card"><h2 style="color:var(--gold-light)">KP Horary (Prashna)</h2>';
-        html += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
+        html += '<div id="kp-horary-result">';
+        html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">';
         html += '<div class="metric"><div class="label">KP Number</div><div class="value gold">'+horary.input_number+'</div></div>';
         html += '<div class="metric"><div class="label">Sign</div><div class="value">'+horary.sign+'</div></div>';
         html += '<div class="metric"><div class="label">Nakshatra</div><div class="value">'+horary.nakshatra+' P'+horary.pada+'</div></div>';
@@ -2261,9 +2631,9 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
         html += '<div class="metric"><div class="label">Sub-Sub Lord</div><div class="value" style="color:'+pColor(horary.sub_sub_lord)+'">'+horary.sub_sub_lord+'</div></div>';
         html += '</div></div>';
     } else {
-        html += '<div class="card"><p style="color:var(--text-muted)">Enter a KP Horary Number (1-249) to see Prashna analysis.</p></div>';
+        html += '<div id="kp-horary-result"><p style="color:var(--text-muted);font-style:italic">Enter a KP number above and click "Run Horary Analysis"</p></div>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     /* ═══ TAB: Moon NL/SL/SSL Daily Timeline ═══════════════════ */
     html += '<div class="kp-tab-pane" id="kp-moonnl" style="display:none">';
@@ -2278,6 +2648,135 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
     html += '</div>';
     html += '<div id="kp-moonnl-result"></div>';
     html += '</div></div>';
+
+    /* ═══ TAB: Prashna Yes/No ══════════════════════════════════ */
+    html += '<div class="kp-tab-pane" id="kp-prashna" style="display:none">';
+    html += '<div class="card"><h2 style="color:var(--gold-light)">KP Prashna — Yes / No</h2>';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:12px">Think of your question and a number between 1–249. The cuspal sub-lord of the relevant house decides the answer. Ruling Planets cross-validate timing.</p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">KP Number (1–249)</label><input type="number" id="kp-prashna-num" min="1" max="249" placeholder="1–249" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.9rem;width:90px;font-weight:700"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Question Type</label>';
+    html += '<select id="kp-prashna-qtype" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;min-width:180px">';
+    var prashnaOptions = [
+        {v:'marriage', l:'Marriage / Partnership'}, {v:'wealth', l:'Wealth / Finance'},
+        {v:'job', l:'Will I Get the Job?'}, {v:'promotion', l:'Promotion'},
+        {v:'transfer', l:'Transfer'}, {v:'health', l:'Health Recovery'},
+        {v:'travel_short', l:'Short Journey'}, {v:'travel_foreign', l:'Foreign Travel'},
+        {v:'foreign_settle', l:'Foreign Settlement'}, {v:'visa', l:'Visa / Immigration'},
+        {v:'court_case', l:'Court Case / Legal'}, {v:'speculation', l:'Speculation / Stock Market'},
+        {v:'buy_property', l:'Buy Property'}, {v:'sell_property', l:'Sell Property'},
+        {v:'education', l:'Exams / Education'}, {v:'competitive_exam', l:'Competitive Exam'},
+        {v:'children', l:'Children'}, {v:'love_affair', l:'Love Affair'},
+        {v:'loan', l:'Get Loan'}, {v:'recovery_money', l:'Recover Money'},
+        {v:'debt_freedom', l:'Debt Freedom'}, {v:'interview', l:'Interview Call'},
+        {v:'contract', l:'Get Contract'}, {v:'lottery', l:'Lottery / Prize'},
+        {v:'vehicle', l:'Get Vehicle'}, {v:'business_profit', l:'Business Profit'},
+        {v:'partnership', l:'Business Partnership'}, {v:'election', l:'Win Election'},
+        {v:'appeal', l:'Appeal Success'}, {v:'lost_item', l:'Recover Lost Item'},
+        {v:'general_success', l:'General Success'}
+    ];
+    prashnaOptions.forEach(function(o){ html += '<option value="'+o.v+'">'+o.l+'</option>'; });
+    html += '</select></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Query Date</label><input type="date" id="kp-prashna-date" value="'+today+'" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Query Time</label><input type="text" id="kp-prashna-time" value="'+new Date().toTimeString().slice(0,5)+'" placeholder="HH:MM" maxlength="10" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:100px"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Place</label><input type="text" id="kp-prashna-place" value="'+(body.place||'Ujjain, Madhya Pradesh, India')+'" list="city-suggestions" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:200px"></div>';
+    html += '<button id="kp-prashna-fetch" class="btn-primary" style="font-size:0.82rem;padding:7px 16px;font-weight:700">GET ANSWER</button>';
+    html += '</div>';
+    html += '<div id="kp-prashna-result"><p style="color:var(--text-muted);font-style:italic">Enter KP number, select question type, and click "GET ANSWER"</p></div>';
+    html += '</div>';
+
+    /* ═══ EVENT PROMISE CHECKER (inside Prashna tab) ═════════ */
+    html += '<div class="card" style="margin-top:16px;border:1px solid var(--gold)">';
+    html += '<h3 style="color:var(--gold-light);margin-bottom:6px">Event Promise Checker — Will It Happen?</h3>';
+    html += '<p style="color:var(--text-dim);font-size:0.78rem;margin-bottom:10px">Check if the natal chart PROMISES a specific event using KP 3-way sub-lord theory. Examines the primary cusp sub-lord, its star lord, and sub-lord significations.</p>';
+
+    // Question type dropdown
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:10px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Event Type</label><select id="kp-promise-qtype" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.85rem;min-width:200px">';
+    prashnaOptions.forEach(function(o){ html += '<option value="'+o.v+'">'+o.l+'</option>'; });
+    html += '</select></div>';
+    html += '<button id="kp-promise-fetch" class="btn-primary" style="font-size:0.82rem;padding:7px 16px;font-weight:700">CHECK PROMISE</button>';
+    html += '</div>';
+    html += '<div id="kp-promise-result"><p style="color:var(--text-muted);font-style:italic">Select an event type and click "CHECK PROMISE" to analyse the natal chart</p></div>';
+    html += '</div>';
+
+    /* ═══ DBA TIMING FINDER (inside Prashna tab) ═════════════ */
+    html += '<div class="card" style="margin-top:16px;border:1px solid #333">';
+    html += '<h3 style="color:var(--gold-light);margin-bottom:6px">DBA Timing Finder — When Will It Happen?</h3>';
+    html += '<p style="color:var(--text-dim);font-size:0.78rem;margin-bottom:10px">Find the best future Dasha-Bhukti-Antara windows for any event. Uses natal chart significators to identify periods when DBA lords activate the relevant houses.</p>';
+
+    // Mode toggle
+    html += '<div style="display:flex;gap:8px;margin-bottom:10px">';
+    html += '<label style="font-size:0.78rem;color:var(--text-dim);display:flex;align-items:center;gap:4px"><input type="radio" name="dba-mode" value="natal" checked> Natal (Birth Data)</label>';
+    html += '<label style="font-size:0.78rem;color:var(--text-dim);display:flex;align-items:center;gap:4px"><input type="radio" name="dba-mode" value="prashna"> Prashna (Horary)</label>';
+    html += '</div>';
+
+    // Inputs row 1
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:10px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Question Type</label>';
+    html += '<select id="kp-dba-qtype" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;min-width:180px">';
+    prashnaOptions.forEach(function(o){ html += '<option value="'+o.v+'">'+o.l+'</option>'; });
+    html += '</select></div>';
+    html += '<div id="dba-kp-num-wrap" style="display:none;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">KP Number</label><input type="number" id="kp-dba-num" min="1" max="249" placeholder="1–249" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.9rem;width:90px;font-weight:700"></div>';
+    html += '</div>';
+
+    // Date range row
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:10px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Search From</label><input type="date" id="kp-dba-start" value="'+today+'" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem"></div>';
+    // Default end = 2 years from now
+    var twoYearsLater = new Date(); twoYearsLater.setFullYear(twoYearsLater.getFullYear()+2);
+    var endDefault = twoYearsLater.toISOString().slice(0,10);
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Search Until</label><input type="date" id="kp-dba-end" value="'+endDefault+'" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--gold-light)">Validate Event Date</label><input type="date" id="kp-dba-validate" placeholder="Known event date" style="padding:6px 8px;border-radius:4px;border:1px solid var(--gold);background:#1a1a2e;color:#eee;font-size:0.82rem" title="Enter a known past event date to check if DBA was favorable"></div>';
+    html += '<button id="kp-dba-fetch" class="btn-primary" style="font-size:0.82rem;padding:7px 16px;font-weight:700">FIND BEST TIMING</button>';
+    html += '</div>';
+    html += '<div id="kp-dba-result"><p style="color:var(--text-muted);font-style:italic">Select question type, set date range, and click "FIND BEST TIMING". Optionally enter a known event date to validate.</p></div>';
+    html += '</div>';
+
+    html += '</div>';
+
+    /* ═══ TAB: Match Prediction ════════════════════════════════ */
+    html += '<div class="kp-tab-pane" id="kp-match" style="display:none">';
+    html += '<div class="card"><h2 style="color:var(--gold-light)">KP Match Prediction — Who Wins?</h2>';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:12px">Think of a number 1–249 while asking "Who will win?" H6 sub-lord decides victory, H12 = opponent\'s victory. Ruling Planets confirm timing.</p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">KP Number (1–249)</label><input type="number" id="kp-match-num" min="1" max="249" placeholder="1–249" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.9rem;width:90px;font-weight:700"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Match Type</label>';
+    html += '<select id="kp-match-type" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem">';
+    var matchTypes = [
+        {v:'cricket', l:'Cricket'}, {v:'football', l:'Football'},
+        {v:'tennis', l:'Tennis'}, {v:'kabaddi', l:'Kabaddi'},
+        {v:'hockey', l:'Hockey'}, {v:'boxing', l:'Boxing / Wrestling'},
+        {v:'election', l:'Election'}, {v:'competition', l:'General Competition'},
+        {v:'court_case', l:'Court Case'}, {v:'business', l:'Business Competition'},
+        {v:'exam', l:'Competitive Exam'}
+    ];
+    matchTypes.forEach(function(o){ html += '<option value="'+o.v+'">'+o.l+'</option>'; });
+    html += '</select></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Your Team / Side</label><input type="text" id="kp-match-teama" value="" placeholder="e.g. India, CSK" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:140px"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Opponent</label><input type="text" id="kp-match-teamb" value="" placeholder="e.g. Australia, MI" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:140px"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Query Date</label><input type="date" id="kp-match-date" value="'+today+'" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Query Time</label><input type="text" id="kp-match-time" value="'+new Date().toTimeString().slice(0,5)+'" placeholder="HH:MM" maxlength="10" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:100px"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Place</label><input type="text" id="kp-match-place" value="'+(body.place||'Ujjain, Madhya Pradesh, India')+'" list="city-suggestions" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:200px"></div>';
+    html += '<button id="kp-match-fetch" class="btn-primary" style="font-size:0.82rem;padding:7px 16px;font-weight:700">PREDICT WINNER</button>';
+    html += '</div>';
+    html += '<div id="kp-match-result"><p style="color:var(--text-muted);font-style:italic">Enter KP number, team names, and click "PREDICT WINNER"</p></div>';
+    html += '</div></div>';
+
+    /* ═══ TOSS PREDICTION (inside Match tab) ═══════════════════ */
+    html += '<div class="card" style="margin-top:16px;border:1px solid #333">';
+    html += '<h3 style="color:var(--gold-light);margin-bottom:6px">Toss Prediction — Who Wins the Toss?</h3>';
+    html += '<p style="color:var(--text-dim);font-size:0.78rem;margin-bottom:10px">Think of a <b>SEPARATE</b> KP number (1–249) while asking "Who will win the toss?" Use the moment you think of the number — NOT the actual toss time.</p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:10px">';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">KP Number for Toss</label><input type="number" id="kp-toss-num" min="1" max="249" placeholder="1–249" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.9rem;width:90px;font-weight:700"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Your Team</label><input type="text" id="kp-toss-teama" value="" placeholder="e.g. CSK" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:120px"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:0.7rem;color:var(--text-dim)">Opponent</label><input type="text" id="kp-toss-teamb" value="" placeholder="e.g. MI" style="padding:6px 8px;border-radius:4px;border:1px solid #444;background:#1a1a2e;color:#eee;font-size:0.82rem;width:120px"></div>';
+    html += '<button id="kp-toss-fetch" class="btn-primary" style="font-size:0.82rem;padding:7px 16px;font-weight:700">PREDICT TOSS</button>';
+    html += '</div>';
+    html += '<div id="kp-toss-result"><p style="color:var(--text-muted);font-style:italic">Enter a separate KP number for toss prediction</p></div>';
+    html += '</div>';
 
     resultEl.innerHTML = html;
 
@@ -2347,24 +2846,23 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
             /* Inner diamond: connect midpoints of sides */
             svg += '<polygon points="'+mx+','+T+' '+R+','+my+' '+mx+','+B+' '+L+','+my+'" fill="none" stroke="#555" stroke-width="1"/>';
 
-            /* House text positions — North Indian standard:
-               H1=top center diamond, H2=upper-left inner, H3=left-upper outer,
-               H4=left-lower outer, H5=lower-left inner, H6=bottom center diamond,
-               H7=lower-right inner, H8=right-lower outer, H9=right-upper outer,
-               H10=upper-right inner, H11 & H12 use remaining spaces */
+            /* House text positions — North Indian (counter-clockwise from top):
+               H1=top diamond, H2=upper-left, H3=left-upper, H4=left diamond,
+               H5=left-lower, H6=lower-left, H7=bottom diamond, H8=lower-right,
+               H9=right-lower, H10=right diamond, H11=right-upper, H12=upper-right */
             var hPos = [
                 /* H1  */ {x:mx-20, y:T+25},
-                /* H2  */ {x:L+15,  y:T+25},
-                /* H3  */ {x:L+12,  y:my-28},
-                /* H4  */ {x:L+12,  y:my+12},
-                /* H5  */ {x:L+15,  y:B-48},
-                /* H6  */ {x:mx-20, y:B-48},
-                /* H7  */ {x:R-75,  y:B-48},
-                /* H8  */ {x:R-75,  y:my+12},
-                /* H9  */ {x:R-75,  y:my-28},
-                /* H10 */ {x:R-75,  y:T+25},
-                /* H11 */ {x:mx-20, y:my-18},
-                /* H12 */ {x:mx-20, y:my+12},
+                /* H2  */ {x:L+10,  y:T+18},
+                /* H3  */ {x:L+10,  y:my-25},
+                /* H4  */ {x:L+10,  y:my+5},
+                /* H5  */ {x:L+10,  y:B-45},
+                /* H6  */ {x:mx-45, y:B-30},
+                /* H7  */ {x:mx-20, y:B-48},
+                /* H8  */ {x:R-70,  y:B-45},
+                /* H9  */ {x:R-70,  y:my+5},
+                /* H10 */ {x:R-70,  y:my-25},
+                /* H11 */ {x:R-70,  y:T+18},
+                /* H12 */ {x:mx+5,  y:T+18},
             ];
 
             for (var i = 1; i <= 12; i++) {
@@ -2446,6 +2944,113 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
     if (rpNowBtn) rpNowBtn.addEventListener('click', function(){ fetchRP(false); });
     if (rpCustomBtn) rpCustomBtn.addEventListener('click', function(){ fetchRP(true); });
 
+    /* ═══ KP Horary inline fetch handler ═════════════════════ */
+    var horaryBtn = document.getElementById('kp-horary-fetch');
+    if (horaryBtn) {
+        horaryBtn.addEventListener('click', async function(){
+            var kpNum = parseInt(document.getElementById('kp-horary-inline').value);
+            if (!kpNum || kpNum < 1 || kpNum > 249) {
+                document.getElementById('kp-horary-result').innerHTML = '<p style="color:var(--red)">Please enter a valid KP number between 1 and 249</p>';
+                return;
+            }
+            var resultDiv = document.getElementById('kp-horary-result');
+            resultDiv.innerHTML = '<p style="color:var(--text-muted)">Running Horary Analysis for KP #'+kpNum+'...</p>';
+            try {
+                var hBody = {
+                    name: body.name,
+                    date: document.getElementById('kp-horary-date').value || body.date,
+                    time: parseTimeInput(document.getElementById('kp-horary-time').value) || body.time,
+                    place: document.getElementById('kp-horary-place').value || body.place,
+                    ayanamsa: 'krishnamurti',
+                    kp_horary_number: kpNum
+                };
+                var resp = await fetch(API + '/kp', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(hBody)
+                });
+                if (!resp.ok) throw new Error('API error ' + resp.status);
+                var hData = await resp.json();
+                var h = hData.kp_analysis && hData.kp_analysis.horary ? hData.kp_analysis.horary : null;
+                if (!h) { resultDiv.innerHTML = '<p style="color:var(--red)">No horary data returned</p>'; return; }
+
+                var hhtml = '';
+                hhtml += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px">';
+                hhtml += '<div class="metric"><div class="label">KP Number</div><div class="value gold">'+h.input_number+'</div></div>';
+                hhtml += '<div class="metric"><div class="label">Sign</div><div class="value">'+h.sign+'</div></div>';
+                hhtml += '<div class="metric"><div class="label">Nakshatra</div><div class="value">'+h.nakshatra+' P'+h.pada+'</div></div>';
+                hhtml += '<div class="metric"><div class="label">Sign Lord</div><div class="value" style="color:'+pColor(h.sign_lord)+'">'+h.sign_lord+'</div></div>';
+                hhtml += '<div class="metric"><div class="label">Star Lord (NL)</div><div class="value" style="color:'+pColor(h.star_lord)+'">'+h.star_lord+'</div></div>';
+                hhtml += '<div class="metric"><div class="label">Sub Lord (SL)</div><div class="value" style="color:'+pColor(h.sub_lord)+'">'+h.sub_lord+'</div></div>';
+                hhtml += '<div class="metric"><div class="label">Sub-Sub Lord (SSL)</div><div class="value" style="color:'+pColor(h.sub_sub_lord)+'">'+h.sub_sub_lord+'</div></div>';
+                hhtml += '</div>';
+
+                /* Show cuspal sub-lord verdicts from the full KP analysis */
+                var kpa = hData.kp_analysis;
+                if (kpa && kpa.cuspal_sublords && kpa.cuspal_sublords.length) {
+                    hhtml += '<h3 style="color:var(--gold-light);margin-top:16px;font-size:0.9rem">Cuspal Sub-Lord Verdicts</h3>';
+                    hhtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                    hhtml += '<thead><tr><th>Cusp</th><th>Sign</th><th>Star Lord</th><th>Sub Lord</th><th>Sub-Sub</th><th>Verdict</th></tr></thead><tbody>';
+                    kpa.cuspal_sublords.forEach(function(c){
+                        var vColor = c.verdict === 'PROMISE' ? 'var(--green)' : c.verdict === 'DENIAL' ? 'var(--red)' : 'var(--text-muted)';
+                        hhtml += '<tr>';
+                        hhtml += '<td style="font-weight:700">H'+c.house+'</td>';
+                        hhtml += '<td>'+c.sign+'</td>';
+                        hhtml += '<td style="color:'+pColor(c.star_lord)+'">'+c.star_lord+'</td>';
+                        hhtml += '<td style="font-weight:700;color:'+pColor(c.sub_lord)+'">'+c.sub_lord+'</td>';
+                        hhtml += '<td style="color:'+pColor(c.sub_sub_lord||'')+'">'+( c.sub_sub_lord||'-')+'</td>';
+                        hhtml += '<td style="font-weight:700;color:'+vColor+'">'+( c.verdict||'-')+'</td>';
+                        hhtml += '</tr>';
+                    });
+                    hhtml += '</tbody></table></div>';
+                }
+
+                /* Show significators summary */
+                if (kpa && kpa.significators && kpa.significators.length) {
+                    hhtml += '<h3 style="color:var(--gold-light);margin-top:16px;font-size:0.9rem">Planet Significators (4-Step)</h3>';
+                    hhtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                    hhtml += '<thead><tr><th>Planet</th><th>Signified Houses</th><th>Strong Houses</th></tr></thead><tbody>';
+                    kpa.significators.forEach(function(s){
+                        var houses = (s.signified_houses||[]).join(', ');
+                        var strong = (s.strong_houses||s.signified_houses||[]).join(', ');
+                        hhtml += '<tr><td style="font-weight:700;color:'+pColor(s.planet)+'">'+s.planet+'</td>';
+                        hhtml += '<td>'+houses+'</td><td>'+strong+'</td></tr>';
+                    });
+                    hhtml += '</tbody></table></div>';
+                }
+
+                /* Show ruling planets if available */
+                if (kpa && kpa.ruling_planets && kpa.ruling_planets.ranked) {
+                    hhtml += '<h3 style="color:var(--gold-light);margin-top:16px;font-size:0.9rem">Ruling Planets</h3>';
+                    hhtml += '<div style="font-size:0.82rem;color:var(--text)">';
+                    kpa.ruling_planets.ranked.forEach(function(r, idx){
+                        if (idx > 0) hhtml += ', ';
+                        hhtml += '<span style="color:'+pColor(r.planet)+';font-weight:700">'+r.planet+'</span><span style="color:var(--text-dim)">('+r.count+'x)</span>';
+                    });
+                    hhtml += '</div>';
+                }
+
+                /* Financial house groups */
+                if (kpa && kpa.financial) {
+                    hhtml += '<h3 style="color:var(--gold-light);margin-top:16px;font-size:0.9rem">Financial House Groups</h3>';
+                    hhtml += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+                    Object.keys(kpa.financial).forEach(function(group){
+                        var fg = kpa.financial[group];
+                        if (!fg) return;
+                        var verdict = fg.verdict || fg.signal || '-';
+                        var vClr = verdict === 'BULLISH' || verdict === 'PROMISE' ? 'var(--green)' : verdict === 'BEARISH' || verdict === 'DENIAL' ? 'var(--red)' : 'var(--gold)';
+                        hhtml += '<div class="metric"><div class="label">'+group+'</div><div class="value" style="color:'+vClr+';font-size:0.85rem">'+verdict+'</div></div>';
+                    });
+                    hhtml += '</div>';
+                }
+
+                resultDiv.innerHTML = hhtml;
+            } catch(err) {
+                resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+            }
+        });
+    }
+
     /* ═══ Moon NL/SL/SSL Timeline handler ═════════════════════ */
     var moonNLBtn = document.getElementById('kp-fetch-moonnl');
     if (moonNLBtn) {
@@ -2515,6 +3120,832 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
                 });
                 nhtml += '</tbody></table></div>';
                 resultDiv.innerHTML = nhtml;
+            } catch(err) {
+                resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+            }
+        });
+    }
+
+    /* ═══ Prashna Yes/No handler ═════════════════════════════════ */
+    var prashnaBtn = document.getElementById('kp-prashna-fetch');
+    if (prashnaBtn) {
+        prashnaBtn.addEventListener('click', async function(){
+            var kpNum = parseInt(document.getElementById('kp-prashna-num').value);
+            if (!kpNum || kpNum < 1 || kpNum > 249) {
+                document.getElementById('kp-prashna-result').innerHTML = '<p style="color:var(--red)">Please enter a valid KP number between 1 and 249</p>';
+                return;
+            }
+            var qType = document.getElementById('kp-prashna-qtype').value;
+            var resultDiv = document.getElementById('kp-prashna-result');
+            resultDiv.innerHTML = '<p style="color:var(--text-muted)">Analyzing Prashna for KP #'+kpNum+' ('+qType+')...</p>';
+            try {
+                var pBody = {
+                    name: body.name,
+                    date: body.date,
+                    time: body.time,
+                    place: document.getElementById('kp-prashna-place').value || body.place,
+                    ayanamsa: 'krishnamurti',
+                    kp_number: kpNum,
+                    question_type: qType,
+                    query_date: document.getElementById('kp-prashna-date').value,
+                    query_time: parseTimeInput(document.getElementById('kp-prashna-time').value)
+                };
+                var resp = await fetch(API + '/kp/prashna-yesno', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(pBody)
+                });
+                if (!resp.ok) throw new Error('API error ' + resp.status);
+                var pData = await resp.json();
+                var pr = pData.prashna;
+                if (!pr) { resultDiv.innerHTML = '<p style="color:var(--red)">No prashna data returned</p>'; return; }
+
+                var phtml = '';
+
+                /* ── Big verdict banner ── */
+                var vBg = pr.verdict_type === 'positive' ? 'rgba(0,200,100,0.15)' : pr.verdict_type === 'negative' ? 'rgba(255,60,60,0.15)' : 'rgba(212,168,67,0.15)';
+                var vBorder = pr.verdict_type === 'positive' ? '#00c864' : pr.verdict_type === 'negative' ? '#ff3c3c' : 'var(--gold)';
+                var vColor = pr.verdict_type === 'positive' ? '#00e874' : pr.verdict_type === 'negative' ? '#ff4444' : 'var(--gold)';
+                phtml += '<div style="background:'+vBg+';border:2px solid '+vBorder+';border-radius:10px;padding:20px;text-align:center;margin-bottom:18px">';
+                phtml += '<div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:4px">'+pr.question_label+'</div>';
+                phtml += '<div style="font-size:2.4rem;font-weight:900;color:'+vColor+';letter-spacing:2px">'+pr.verdict+'</div>';
+                phtml += '<div style="font-size:0.85rem;color:var(--text-dim);margin-top:4px">Confidence: '+pr.confidence_score+'%</div>';
+                phtml += '</div>';
+
+                /* ── KP Horary details ── */
+                if (pr.horary_kp) {
+                    var hk = pr.horary_kp;
+                    phtml += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">';
+                    phtml += '<div class="metric"><div class="label">KP #</div><div class="value gold">'+pr.kp_number+'</div></div>';
+                    phtml += '<div class="metric"><div class="label">Sign</div><div class="value">'+hk.sign+'</div></div>';
+                    phtml += '<div class="metric"><div class="label">Nakshatra</div><div class="value">'+hk.nakshatra+' P'+hk.pada+'</div></div>';
+                    phtml += '<div class="metric"><div class="label">Sign Lord</div><div class="value" style="color:'+pColor(hk.sign_lord)+'">'+hk.sign_lord+'</div></div>';
+                    phtml += '<div class="metric"><div class="label">Star Lord</div><div class="value" style="color:'+pColor(hk.star_lord)+'">'+hk.star_lord+'</div></div>';
+                    phtml += '<div class="metric"><div class="label">Sub Lord</div><div class="value" style="color:'+pColor(hk.sub_lord)+'">'+hk.sub_lord+'</div></div>';
+                    phtml += '<div class="metric"><div class="label">Sub-Sub</div><div class="value" style="color:'+pColor(hk.sub_sub_lord)+'">'+hk.sub_sub_lord+'</div></div>';
+                    phtml += '</div>';
+                }
+
+                /* ── Primary house analysis ── */
+                phtml += '<h3 style="color:var(--gold-light);margin-top:14px;font-size:0.9rem">Primary House Analysis (H'+pr.primary_house+')</h3>';
+                phtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.82rem"><tbody>';
+                phtml += '<tr><td style="color:var(--text-dim);width:200px">Primary House</td><td style="font-weight:700">House '+pr.primary_house+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Cusp Sub Lord</td><td style="font-weight:700;color:'+pColor(pr.cusp_sub_lord)+'">'+pr.cusp_sub_lord+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Cusp Star Lord</td><td style="color:'+pColor(pr.cusp_star_lord)+'">'+pr.cusp_star_lord+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Sub Lord Signifies Houses</td><td>'+(pr.sub_lord_signifies||[]).join(', ')+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Conductive Houses</td><td style="color:var(--green)">'+(pr.conductive_houses||[]).join(', ')+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Detrimental Houses</td><td style="color:var(--red)">'+(pr.detrimental_houses||[]).join(', ')+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Conductive Match</td><td style="font-weight:700;color:var(--green)">'+(pr.conductive_match && pr.conductive_match.length ? pr.conductive_match.join(', ') : 'None')+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Detrimental Match</td><td style="font-weight:700;color:var(--red)">'+(pr.detrimental_match && pr.detrimental_match.length ? pr.detrimental_match.join(', ') : 'None')+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Sub Lord Retrograde?</td><td style="color:'+(pr.is_sub_lord_retro ? 'var(--red)' : 'var(--green)')+'">'+( pr.is_sub_lord_retro ? 'YES (Retro)' : 'No (Direct)')+'</td></tr>';
+                phtml += '<tr><td style="color:var(--text-dim)">Star Lord Retrograde?</td><td style="color:'+(pr.is_star_lord_retro ? 'var(--red)' : 'var(--green)')+'">'+( pr.is_star_lord_retro ? 'YES (Retro)' : 'No (Direct)')+'</td></tr>';
+                phtml += '</tbody></table></div>';
+
+                /* ── Group cusp analysis ── */
+                if (pr.group_cusp_analysis && pr.group_cusp_analysis.length) {
+                    phtml += '<h3 style="color:var(--gold-light);margin-top:14px;font-size:0.9rem">Conductive House Cusps</h3>';
+                    phtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                    phtml += '<thead><tr><th>House</th><th>Sub Lord</th><th>Signifies</th><th>Verdict</th></tr></thead><tbody>';
+                    pr.group_cusp_analysis.forEach(function(gc){
+                        var gcColor = gc.verdict === 'PROMISE' ? 'var(--green)' : gc.verdict === 'DENIAL' ? 'var(--red)' : gc.verdict === 'MIXED' ? 'var(--gold)' : 'var(--text-dim)';
+                        phtml += '<tr><td style="font-weight:700">H'+gc.house+'</td>';
+                        phtml += '<td style="color:'+pColor(gc.sub_lord)+'">'+gc.sub_lord+'</td>';
+                        phtml += '<td>'+(gc.signifies||[]).join(', ')+'</td>';
+                        phtml += '<td style="font-weight:700;color:'+gcColor+'">'+gc.verdict+'</td></tr>';
+                    });
+                    phtml += '</tbody></table></div>';
+                }
+
+                /* ── Ruling Planets ── */
+                if (pr.ruling_planets) {
+                    var rp = pr.ruling_planets;
+                    phtml += '<h3 style="color:var(--gold-light);margin-top:14px;font-size:0.9rem">Ruling Planets at Query Moment</h3>';
+                    phtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                    phtml += '<thead><tr><th>Source</th><th>Planet</th></tr></thead><tbody>';
+                    (rp.rp_rows||[]).forEach(function(r){
+                        phtml += '<tr><td style="color:var(--text-dim)">'+r.source+'</td>';
+                        phtml += '<td style="font-weight:700;color:'+pColor(r.planet)+'">'+r.planet+'</td></tr>';
+                    });
+                    phtml += '</tbody></table></div>';
+
+                    if (rp.ranked && rp.ranked.length) {
+                        phtml += '<div style="margin-top:8px;font-size:0.82rem"><strong style="color:var(--gold)">Ranked RPs: </strong>';
+                        rp.ranked.forEach(function(r, idx){
+                            if (idx > 0) phtml += ', ';
+                            phtml += '<span style="color:'+pColor(r.planet)+';font-weight:700">'+r.planet+'</span><span style="color:var(--text-dim)">('+r.count+'x)</span>';
+                        });
+                        phtml += '</div>';
+                    }
+                }
+
+                /* ── Fruitful Significators ── */
+                if (pr.fruitful_significators && pr.fruitful_significators.length) {
+                    phtml += '<div style="margin-top:10px;padding:10px;background:rgba(0,200,100,0.08);border:1px solid var(--green);border-radius:6px">';
+                    phtml += '<div style="font-size:0.82rem;font-weight:700;color:var(--green)">Fruitful Significators (RP-matched): ';
+                    pr.fruitful_significators.forEach(function(f, idx){
+                        if (idx > 0) phtml += ', ';
+                        phtml += '<span style="color:'+pColor(f)+'">'+f+'</span>';
+                    });
+                    phtml += '</div></div>';
+                }
+
+                /* ── Reasoning ── */
+                if (pr.reasons && pr.reasons.length) {
+                    phtml += '<h3 style="color:var(--gold-light);margin-top:14px;font-size:0.9rem">Reasoning</h3>';
+                    phtml += '<div style="font-size:0.82rem;color:var(--text)">';
+                    pr.reasons.forEach(function(r, idx){
+                        var icon = r.indexOf('WARNING') >= 0 ? '&#9888;' : r.indexOf('STRONG') >= 0 ? '&#10003;' : r.indexOf('WEAK') >= 0 ? '&#10007;' : '&#8226;';
+                        var rColor = r.indexOf('WARNING') >= 0 ? 'var(--red)' : r.indexOf('STRONG') >= 0 ? 'var(--green)' : r.indexOf('WEAK') >= 0 ? 'var(--red)' : 'var(--text)';
+                        phtml += '<div style="margin-bottom:6px;color:'+rColor+'">'+icon+' '+r+'</div>';
+                    });
+                    phtml += '</div>';
+                }
+
+                resultDiv.innerHTML = phtml;
+            } catch(err) {
+                resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+            }
+        });
+    }
+
+    /* ═══ Event Promise Checker handler ═══════════════════════════ */
+    var promiseBtn = document.getElementById('kp-promise-fetch');
+    if (promiseBtn) {
+        promiseBtn.addEventListener('click', async function(){
+            var qType = document.getElementById('kp-promise-qtype').value;
+            var resultDiv = document.getElementById('kp-promise-result');
+            resultDiv.innerHTML = '<p style="color:var(--text-muted)">Checking chart promise...</p>';
+
+            try {
+                var promBody = {
+                    name: body.name,
+                    date: body.date,
+                    time: body.time,
+                    place: body.place,
+                    ayanamsa: 'krishnamurti',
+                    question_type: qType
+                };
+
+                var resp = await fetch(API + '/kp/event-promise', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(promBody)
+                });
+                if (!resp.ok) {
+                    var errBody = await resp.json().catch(function(){ return {}; });
+                    throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+                }
+                var pData = await resp.json();
+                var pr = pData.promise;
+                if (!pr) { resultDiv.innerHTML = '<p style="color:var(--red)">No promise data returned</p>'; return; }
+
+                var phtml = '';
+
+                /* ── Verdict Banner ── */
+                var vColor = pr.verdict_color === 'green' ? '#00ff88' : pr.verdict_color === 'gold' ? 'var(--gold-light)' : pr.verdict_color === 'orange' ? '#ff9900' : '#ff4444';
+                var vBg = pr.verdict_color === 'green' ? 'rgba(0,255,100,0.08)' : pr.verdict_color === 'gold' ? 'rgba(212,168,67,0.08)' : pr.verdict_color === 'orange' ? 'rgba(255,150,0,0.08)' : 'rgba(255,50,50,0.08)';
+                var vBorder = pr.verdict_color === 'green' ? 'var(--green)' : pr.verdict_color === 'gold' ? 'var(--gold)' : pr.verdict_color === 'orange' ? '#ff9900' : 'var(--red)';
+                phtml += '<div style="background:'+vBg+';border:2px solid '+vBorder+';border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">';
+                phtml += '<div style="font-size:0.82rem;color:var(--text-dim)">'+pr.label+'</div>';
+                phtml += '<div style="font-size:1.5rem;font-weight:800;color:'+vColor+';margin:6px 0">'+pr.verdict+'</div>';
+                phtml += '<div style="font-size:0.85rem;color:var(--text)">Promise Score: <b>'+pr.promise_score+'</b> | Levels Conductive: <b>'+pr.levels_conductive+'/3</b> | Levels Detrimental: <b>'+pr.levels_detrimental+'/3</b></div>';
+                phtml += '<div style="font-size:0.78rem;color:var(--text-dim);margin-top:4px">Primary House: '+pr.primary_house+' | Conductive: '+pr.conductive.join(', ')+' | Detrimental: '+pr.detrimental.join(', ')+'</div>';
+                phtml += '</div>';
+
+                /* ── 3-Way Sub-Lord Analysis ── */
+                phtml += '<div style="background:rgba(100,100,200,0.06);border:1px solid #444;border-radius:8px;padding:14px;margin-bottom:14px">';
+                phtml += '<div style="font-size:0.9rem;font-weight:700;color:var(--gold-light);margin-bottom:10px">3-Way Sub-Lord Analysis — House '+pr.primary_house+' Cusp</div>';
+
+                // Cusp info
+                phtml += '<div style="font-size:0.82rem;margin-bottom:8px;color:var(--text-dim)">';
+                phtml += 'Cusp Sign Lord: <span style="color:'+pColor(pr.cusp_sign_lord)+'">'+pr.cusp_sign_lord+'</span> | ';
+                phtml += 'Star Lord: <span style="color:'+pColor(pr.cusp_star_lord)+'">'+pr.cusp_star_lord+'</span> | ';
+                phtml += 'Sub Lord: <span style="color:'+pColor(pr.cusp_sub_lord)+'"><b>'+pr.cusp_sub_lord+'</b></span>';
+                phtml += '</div>';
+
+                // Level 1: Sub-lord
+                var l1Color = pr.sub_lord_conductive.length > 0 ? (pr.sub_lord_detrimental.length > 0 ? '#ff9900' : 'var(--green)') : (pr.sub_lord_detrimental.length > 0 ? 'var(--red)' : 'var(--text-dim)');
+                phtml += '<div style="border-left:3px solid '+l1Color+';padding:8px 12px;margin-bottom:8px;background:rgba(0,0,0,0.15);border-radius:0 6px 6px 0">';
+                phtml += '<div style="font-size:0.82rem;font-weight:700;color:'+l1Color+'">LEVEL 1 — Sub-Lord: '+pr.cusp_sub_lord+'</div>';
+                phtml += '<div style="font-size:0.78rem;margin-top:2px">Signifies houses: <b>'+pr.sub_lord_signifies.join(', ')+'</b></div>';
+                if (pr.sub_lord_conductive.length) phtml += '<div style="font-size:0.78rem;color:var(--green)">Conductive hit: '+pr.sub_lord_conductive.join(', ')+' — PROMISE</div>';
+                if (pr.sub_lord_detrimental.length) phtml += '<div style="font-size:0.78rem;color:var(--red)">Detrimental hit: '+pr.sub_lord_detrimental.join(', ')+' — DENIAL</div>';
+                if (!pr.sub_lord_conductive.length && !pr.sub_lord_detrimental.length) phtml += '<div style="font-size:0.78rem;color:var(--text-dim)">No conductive or detrimental — neutral</div>';
+                phtml += '</div>';
+
+                // Level 2: Star lord
+                var l2Color = pr.star_lord_conductive.length > 0 ? (pr.star_lord_detrimental.length > 0 ? '#ff9900' : 'var(--green)') : (pr.star_lord_detrimental.length > 0 ? 'var(--red)' : 'var(--text-dim)');
+                phtml += '<div style="border-left:3px solid '+l2Color+';padding:8px 12px;margin-bottom:8px;background:rgba(0,0,0,0.15);border-radius:0 6px 6px 0">';
+                phtml += '<div style="font-size:0.82rem;font-weight:700;color:'+l2Color+'">LEVEL 2 — Star Lord of '+pr.cusp_sub_lord+': '+pr.sl_natal_star_lord+'</div>';
+                phtml += '<div style="font-size:0.78rem;margin-top:2px">Signifies houses: <b>'+pr.star_lord_signifies.join(', ')+'</b></div>';
+                if (pr.star_lord_conductive.length) phtml += '<div style="font-size:0.78rem;color:var(--green)">Conductive hit: '+pr.star_lord_conductive.join(', ')+' — source supports</div>';
+                if (pr.star_lord_detrimental.length) phtml += '<div style="font-size:0.78rem;color:var(--red)">Detrimental hit: '+pr.star_lord_detrimental.join(', ')+' — source opposes</div>';
+                if (!pr.star_lord_conductive.length && !pr.star_lord_detrimental.length) phtml += '<div style="font-size:0.78rem;color:var(--text-dim)">Neutral source</div>';
+                phtml += '</div>';
+
+                // Level 3: Sub-sub lord
+                var l3Color = pr.sub_sub_conductive.length > 0 ? (pr.sub_sub_detrimental.length > 0 ? '#ff9900' : 'var(--green)') : (pr.sub_sub_detrimental.length > 0 ? 'var(--red)' : 'var(--text-dim)');
+                phtml += '<div style="border-left:3px solid '+l3Color+';padding:8px 12px;margin-bottom:8px;background:rgba(0,0,0,0.15);border-radius:0 6px 6px 0">';
+                phtml += '<div style="font-size:0.82rem;font-weight:700;color:'+l3Color+'">LEVEL 3 — Sub-Lord of '+pr.cusp_sub_lord+': '+pr.sl_natal_sub_lord+'</div>';
+                phtml += '<div style="font-size:0.78rem;margin-top:2px">Signifies houses: <b>'+pr.sub_sub_signifies.join(', ')+'</b></div>';
+                if (pr.sub_sub_conductive.length) phtml += '<div style="font-size:0.78rem;color:var(--green)">Conductive hit: '+pr.sub_sub_conductive.join(', ')+' — delivery confirmed</div>';
+                if (pr.sub_sub_detrimental.length) phtml += '<div style="font-size:0.78rem;color:var(--red)">Detrimental hit: '+pr.sub_sub_detrimental.join(', ')+' — delivery blocked</div>';
+                if (!pr.sub_sub_conductive.length && !pr.sub_sub_detrimental.length) phtml += '<div style="font-size:0.78rem;color:var(--text-dim)">Neutral delivery</div>';
+                phtml += '</div>';
+
+                // Retrograde status
+                if (pr.retro_tier > 0) {
+                    var rColor = pr.retro_tier >= 2 ? 'var(--red)' : '#ff9900';
+                    phtml += '<div style="border-left:3px solid '+rColor+';padding:8px 12px;margin-bottom:8px;background:rgba(255,0,0,0.05);border-radius:0 6px 6px 0">';
+                    phtml += '<div style="font-size:0.82rem;font-weight:700;color:'+rColor+'">RETROGRADE — Tier '+pr.retro_tier+'</div>';
+                    phtml += '<div style="font-size:0.78rem;margin-top:2px">'+pr.retro_detail+'</div>';
+                    phtml += '</div>';
+                }
+
+                phtml += '</div>';
+
+                /* ── All Conductive Cusp Analysis ── */
+                if (pr.cusp_analysis && pr.cusp_analysis.length) {
+                    phtml += '<details style="margin-bottom:14px"><summary style="cursor:pointer;color:var(--gold-light);font-size:0.85rem;font-weight:700">';
+                    phtml += 'All Conductive House Cusp Analysis ('+pr.supporting_cusps+' support, '+pr.denying_cusps+' deny)';
+                    phtml += '</summary>';
+                    phtml += '<div style="overflow-x:auto;margin-top:6px"><table class="data-table" style="font-size:0.78rem">';
+                    phtml += '<thead><tr><th>House</th><th>Sub-Lord</th><th>Signifies</th><th>Cond</th><th>Detr</th><th>Star Lord</th><th>Star Cond</th><th>Sub-Lord</th><th>Sub Cond</th><th>Status</th></tr></thead><tbody>';
+                    pr.cusp_analysis.forEach(function(ca){
+                        var stColor = ca.status === 'SUPPORTS' ? 'var(--green)' : ca.status === 'DENIES' ? 'var(--red)' : ca.status === 'MIXED' ? '#ff9900' : 'var(--text-dim)';
+                        phtml += '<tr>';
+                        phtml += '<td style="font-weight:700">'+ca.house+'</td>';
+                        phtml += '<td style="color:'+pColor(ca.cusp_sub_lord)+'">'+ca.cusp_sub_lord+'</td>';
+                        phtml += '<td>'+ca.signifies.join(',')+'</td>';
+                        phtml += '<td style="color:var(--green)">'+(ca.conductive_hit.length ? ca.conductive_hit.join(',') : '-')+'</td>';
+                        phtml += '<td style="color:var(--red)">'+(ca.detrimental_hit.length ? ca.detrimental_hit.join(',') : '-')+'</td>';
+                        phtml += '<td style="color:'+pColor(ca.star_lord)+'">'+ca.star_lord+'</td>';
+                        phtml += '<td style="color:var(--green)">'+(ca.star_conductive.length ? ca.star_conductive.join(',') : '-')+'</td>';
+                        phtml += '<td style="color:'+pColor(ca.sub_lord)+'">'+ca.sub_lord+'</td>';
+                        phtml += '<td style="color:var(--green)">'+(ca.sub_conductive.length ? ca.sub_conductive.join(',') : '-')+'</td>';
+                        phtml += '<td style="color:'+stColor+';font-weight:700">'+ca.status+'</td>';
+                        phtml += '</tr>';
+                    });
+                    phtml += '</tbody></table></div></details>';
+                }
+
+                /* ── Detailed Reasoning ── */
+                if (pr.reasons && pr.reasons.length) {
+                    phtml += '<details style="margin-bottom:10px"><summary style="cursor:pointer;color:var(--text-dim);font-size:0.82rem;font-weight:700">Detailed Reasoning</summary>';
+                    phtml += '<div style="font-size:0.78rem;margin-top:6px">';
+                    pr.reasons.forEach(function(r){
+                        var rc = r.indexOf('PROMISE') >= 0 || r.indexOf('conductive') >= 0 || r.indexOf('supports') >= 0 || r.indexOf('confirmed') >= 0 || r.indexOf('self-promising') >= 0 ? 'var(--green)' : r.indexOf('DENIAL') >= 0 || r.indexOf('detrimental') >= 0 || r.indexOf('opposes') >= 0 || r.indexOf('blocked') >= 0 || r.indexOf('RETRO') >= 0 || r.indexOf('failure') >= 0 ? 'var(--red)' : r.indexOf('weakens') >= 0 || r.indexOf('mixed') >= 0 || r.indexOf('delayed') >= 0 ? '#ff9900' : 'var(--text)';
+                        phtml += '<div style="color:'+rc+';margin-bottom:4px">'+r+'</div>';
+                    });
+                    phtml += '</div></details>';
+                }
+
+                resultDiv.innerHTML = phtml;
+            } catch(err) {
+                resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+            }
+        });
+    }
+
+    /* ═══ DBA Timing Finder handler ════════════════════════════════ */
+    // Mode toggle: show/hide KP number field
+    var dbaRadios = document.querySelectorAll('input[name="dba-mode"]');
+    dbaRadios.forEach(function(r){
+        r.addEventListener('change', function(){
+            var wrap = document.getElementById('dba-kp-num-wrap');
+            if (wrap) wrap.style.display = this.value === 'prashna' ? 'flex' : 'none';
+        });
+    });
+
+    var dbaBtn = document.getElementById('kp-dba-fetch');
+    if (dbaBtn) {
+        dbaBtn.addEventListener('click', async function(){
+            var mode = document.querySelector('input[name="dba-mode"]:checked').value;
+            var qType = document.getElementById('kp-dba-qtype').value;
+            var resultDiv = document.getElementById('kp-dba-result');
+
+            // Validate prashna mode needs KP number
+            var kpNum = null;
+            if (mode === 'prashna') {
+                kpNum = parseInt(document.getElementById('kp-dba-num').value);
+                if (!kpNum || kpNum < 1 || kpNum > 249) {
+                    resultDiv.innerHTML = '<p style="color:var(--red)">Prashna mode requires a valid KP number (1–249)</p>';
+                    return;
+                }
+            }
+
+            resultDiv.innerHTML = '<p style="color:var(--text-muted)">Searching for best DBA timing windows...</p>';
+            try {
+                var dbaBody = {
+                    name: body.name,
+                    date: body.date,
+                    time: body.time,
+                    place: body.place,
+                    ayanamsa: 'krishnamurti',
+                    question_type: qType,
+                    mode: mode,
+                    search_start_date: document.getElementById('kp-dba-start').value,
+                    search_end_date: document.getElementById('kp-dba-end').value
+                };
+                if (kpNum) dbaBody.kp_number = kpNum;
+                var valDate = document.getElementById('kp-dba-validate').value;
+                if (valDate) dbaBody.validate_date = valDate;
+
+                var resp = await fetch(API + '/kp/dba-timing', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(dbaBody)
+                });
+                if (!resp.ok) {
+                    var errBody = await resp.json().catch(function(){ return {}; });
+                    throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+                }
+                var dData = await resp.json();
+                var t = dData.timing;
+                if (!t) { resultDiv.innerHTML = '<p style="color:var(--red)">No timing data returned</p>'; return; }
+
+                var dhtml = '';
+
+                /* ── Summary banner ── */
+                dhtml += '<div style="background:rgba(212,168,67,0.1);border:1px solid var(--gold);border-radius:8px;padding:14px;margin-bottom:16px;text-align:center">';
+                dhtml += '<div style="font-size:0.85rem;color:var(--text-dim)">'+t.label+'</div>';
+                dhtml += '<div style="font-size:1.4rem;font-weight:800;color:var(--gold-light);margin:4px 0">'+t.total_windows+' Timing Windows Found</div>';
+                dhtml += '<div style="font-size:0.78rem;color:var(--text-dim)">'+t.search_start+' to '+t.search_end+' | Conductive houses: '+t.conductive.join(', ')+' | Detrimental: '+t.detrimental.join(', ')+'</div>';
+                dhtml += '</div>';
+
+                /* ── Validation Result ── */
+                if (t.validation && !t.validation.error) {
+                    var v = t.validation;
+                    var vqColor = v.quality === 'EXCELLENT' ? '#00ff88' : v.quality === 'VERY GOOD' ? '#00cc66' : v.quality === 'GOOD' ? 'var(--gold-light)' : v.quality === 'FAIR' ? '#ff9900' : v.quality === 'WEAK' ? '#ff6666' : '#ff3333';
+                    var vBorder = v.quality === 'EXCELLENT' || v.quality === 'VERY GOOD' ? 'var(--green)' : v.quality === 'GOOD' || v.quality === 'FAIR' ? 'var(--gold)' : 'var(--red)';
+                    dhtml += '<div style="background:rgba(100,200,150,0.08);border:2px solid '+vBorder+';border-radius:8px;padding:14px;margin-bottom:16px">';
+                    dhtml += '<div style="font-size:0.9rem;font-weight:800;color:var(--gold-light);margin-bottom:8px">Event Validation: '+v.validate_date+'</div>';
+                    dhtml += '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:8px">';
+                    dhtml += '<div style="font-size:1.1rem;font-weight:800;color:'+vqColor+'">'+v.quality+'</div>';
+                    dhtml += '<div style="font-size:0.85rem">Score: <b>'+v.score+'</b></div>';
+                    dhtml += '<div style="font-size:0.85rem">Lords in conductive: <b>'+v.lords_conductive+'/3</b></div>';
+                    if (v.rank_in_search) dhtml += '<div style="font-size:0.85rem">Rank: <b>#'+v.rank_in_search+'</b> of '+v.total_windows+'</div>';
+                    dhtml += '</div>';
+                    dhtml += '<div style="font-size:0.85rem;margin-bottom:6px">';
+                    dhtml += 'DBA: <span style="color:'+pColor(v.dasha_lord)+'">'+v.dasha_lord+'</span> → ';
+                    dhtml += '<span style="color:'+pColor(v.bhukti_lord)+'">'+v.bhukti_lord+'</span> → ';
+                    dhtml += '<span style="color:'+pColor(v.antara_lord)+'">'+v.antara_lord+'</span>';
+                    dhtml += '</div>';
+                    dhtml += '<div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:4px">';
+                    dhtml += 'Dasha houses: '+v.dasha_houses.join(',')+' | Bhukti houses: '+v.bhukti_houses.join(',')+' | Antara houses: '+v.antara_houses.join(',');
+                    dhtml += '</div>';
+                    if (v.conductive_hit.length) dhtml += '<div style="font-size:0.78rem;color:var(--green)">Conductive houses hit: '+v.conductive_hit.join(', ')+'</div>';
+                    if (v.detrimental_hit.length) dhtml += '<div style="font-size:0.78rem;color:var(--red)">Detrimental houses hit: '+v.detrimental_hit.join(', ')+'</div>';
+                    dhtml += '<details style="margin-top:6px"><summary style="cursor:pointer;color:var(--text-dim);font-size:0.78rem">Analysis Details</summary>';
+                    dhtml += '<div style="font-size:0.78rem;margin-top:4px">';
+                    v.reasons.forEach(function(r){
+                        var rc = r.indexOf('NOT') >= 0 || r.indexOf('retro') >= 0 || r.indexOf('detrimental') >= 0 ? 'var(--red)' : r.indexOf('conductive') >= 0 || r.indexOf('Primary') >= 0 ? 'var(--green)' : 'var(--text)';
+                        dhtml += '<div style="color:'+rc+';margin-bottom:3px">'+r+'</div>';
+                    });
+                    dhtml += '</div></details>';
+                    dhtml += '</div>';
+                } else if (t.validation && t.validation.error) {
+                    dhtml += '<div style="background:rgba(255,50,50,0.08);border:1px solid var(--red);border-radius:6px;padding:10px;margin-bottom:14px">';
+                    dhtml += '<div style="font-size:0.82rem;color:var(--red)">Validation Error for '+t.validation.validate_date+': '+t.validation.error+'</div>';
+                    dhtml += '</div>';
+                }
+
+                /* ── Current DBA reference ── */
+                if (t.current_dba && t.current_dba.mahadasha) {
+                    var cd = t.current_dba;
+                    dhtml += '<div style="background:rgba(100,100,200,0.08);border:1px solid #555;border-radius:6px;padding:10px;margin-bottom:14px">';
+                    dhtml += '<div style="font-size:0.82rem;font-weight:700;color:var(--text)">Current Running DBA</div>';
+                    dhtml += '<div style="font-size:0.85rem;margin-top:4px">';
+                    dhtml += '<span style="color:'+pColor(cd.mahadasha)+'">'+cd.mahadasha+'</span> → ';
+                    dhtml += '<span style="color:'+pColor(cd.antardasha)+'">'+cd.antardasha+'</span> → ';
+                    dhtml += '<span style="color:'+pColor(cd.pratyantar)+'">'+cd.pratyantar+'</span>';
+                    dhtml += '</div></div>';
+                }
+
+                /* ── Planet signification summary ── */
+                if (t.planet_significations) {
+                    dhtml += '<details style="margin-bottom:14px"><summary style="cursor:pointer;color:var(--gold-light);font-size:0.85rem;font-weight:700">Planet House Significations</summary>';
+                    dhtml += '<div style="overflow-x:auto;margin-top:6px"><table class="data-table" style="font-size:0.78rem">';
+                    dhtml += '<thead><tr><th>Planet</th><th>Signifies Houses</th><th>Conductive</th><th>Detrimental</th></tr></thead><tbody>';
+                    var condSet = new Set(t.conductive);
+                    var detrSet = new Set(t.detrimental);
+                    Object.keys(t.planet_significations).forEach(function(pl){
+                        var hs = t.planet_significations[pl];
+                        var cond = hs.filter(function(h){ return condSet.has(h); });
+                        var detr = hs.filter(function(h){ return detrSet.has(h); });
+                        dhtml += '<tr><td style="font-weight:700;color:'+pColor(pl)+'">'+pl+'</td>';
+                        dhtml += '<td>'+hs.join(', ')+'</td>';
+                        dhtml += '<td style="color:var(--green)">'+(cond.length?cond.join(', '):'-')+'</td>';
+                        dhtml += '<td style="color:var(--red)">'+(detr.length?detr.join(', '):'-')+'</td></tr>';
+                    });
+                    dhtml += '</tbody></table></div></details>';
+                }
+
+                /* ── Top Windows Table ── */
+                var topW = t.top_windows || [];
+                if (topW.length) {
+                    dhtml += '<h3 style="color:var(--gold-light);font-size:0.9rem;margin-bottom:8px">Top '+topW.length+' Best Timing Windows</h3>';
+                    dhtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                    dhtml += '<thead><tr><th>#</th><th>Quality</th><th>Period</th><th>Dasha</th><th>Bhukti</th><th>Antara</th><th>Score</th><th>Conductive Hit</th></tr></thead><tbody>';
+                    topW.forEach(function(w, idx){
+                        var qBg = w.quality === 'EXCELLENT' ? 'rgba(0,200,100,0.15)' : w.quality === 'VERY GOOD' ? 'rgba(0,200,100,0.08)' : w.quality === 'GOOD' ? 'rgba(212,168,67,0.1)' : w.quality === 'FAIR' ? 'rgba(200,200,200,0.05)' : 'rgba(255,60,60,0.05)';
+                        var qColor = w.quality === 'EXCELLENT' ? '#00e874' : w.quality === 'VERY GOOD' ? '#00c864' : w.quality === 'GOOD' ? 'var(--gold)' : w.quality === 'FAIR' ? 'var(--text-dim)' : 'var(--red)';
+                        dhtml += '<tr style="background:'+qBg+'">';
+                        dhtml += '<td style="font-weight:700">'+(idx+1)+'</td>';
+                        dhtml += '<td style="font-weight:700;color:'+qColor+'">'+w.quality+'</td>';
+                        dhtml += '<td style="font-size:0.75rem;white-space:nowrap">'+w.start_date+'<br>to '+w.end_date+'</td>';
+                        dhtml += '<td style="color:'+pColor(w.dasha_lord)+';font-weight:700">'+w.dasha_lord+(w.dasha_retro?' (R)':'')+'</td>';
+                        dhtml += '<td style="color:'+pColor(w.bhukti_lord)+';font-weight:700">'+w.bhukti_lord+(w.bhukti_retro?' (R)':'')+'</td>';
+                        dhtml += '<td style="color:'+pColor(w.antara_lord)+';font-weight:700">'+w.antara_lord+(w.antara_retro?' (R)':'')+'</td>';
+                        dhtml += '<td style="font-weight:700">'+w.score+'</td>';
+                        dhtml += '<td style="color:var(--green)">'+(w.conductive_hit||[]).join(', ')+'</td>';
+                        dhtml += '</tr>';
+                    });
+                    dhtml += '</tbody></table></div>';
+
+                    /* ── Expandable details for each window ── */
+                    dhtml += '<div style="margin-top:12px">';
+                    topW.forEach(function(w, idx){
+                        if (idx >= 10) return; // Show details for top 10 only
+                        var qColor = w.quality === 'EXCELLENT' ? '#00e874' : w.quality === 'VERY GOOD' ? '#00c864' : w.quality === 'GOOD' ? 'var(--gold)' : 'var(--text-dim)';
+                        dhtml += '<details style="margin-bottom:6px;border:1px solid #333;border-radius:4px;padding:8px">';
+                        dhtml += '<summary style="cursor:pointer;font-size:0.82rem;color:'+qColor+';font-weight:700">#'+(idx+1)+' '+w.quality+' — '+w.dasha_lord+'/'+w.bhukti_lord+'/'+w.antara_lord+' ('+w.start_date+' to '+w.end_date+')</summary>';
+                        dhtml += '<div style="margin-top:6px;font-size:0.78rem">';
+                        dhtml += '<div style="margin-bottom:4px"><strong>Dasha houses:</strong> '+w.dasha_houses.join(', ')+' | <strong>Bhukti houses:</strong> '+w.bhukti_houses.join(', ')+' | <strong>Antara houses:</strong> '+w.antara_houses.join(', ')+'</div>';
+                        if (w.rp_match && w.rp_match.length) {
+                            dhtml += '<div style="margin-bottom:4px;color:var(--green)"><strong>RP Match:</strong> '+w.rp_match.join(', ')+' '+(w.rp_confirmed?'CONFIRMED':'')+'</div>';
+                        }
+                        dhtml += '<div>';
+                        (w.reasons||[]).forEach(function(r){
+                            var rColor = r.indexOf('conductive') >= 0 ? 'var(--green)' : r.indexOf('detrimental') >= 0 ? 'var(--red)' : r.indexOf('STRONGEST') >= 0 ? '#00e874' : r.indexOf('retro') >= 0 ? 'var(--red)' : 'var(--text)';
+                            dhtml += '<div style="margin-bottom:3px;color:'+rColor+'">&#8226; '+r+'</div>';
+                        });
+                        dhtml += '</div></div></details>';
+                    });
+                    dhtml += '</div>';
+                } else {
+                    dhtml += '<p style="color:var(--text-muted)">No favorable DBA windows found in the selected date range.</p>';
+                }
+
+                resultDiv.innerHTML = dhtml;
+            } catch(err) {
+                resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+            }
+        });
+    }
+
+    /* ═══ Match Prediction handler ═══════════════════════════════ */
+    var matchBtn = document.getElementById('kp-match-fetch');
+    if (matchBtn) {
+        matchBtn.addEventListener('click', async function(){
+            var kpNum = parseInt(document.getElementById('kp-match-num').value);
+            if (!kpNum || kpNum < 1 || kpNum > 249) {
+                document.getElementById('kp-match-result').innerHTML = '<p style="color:var(--red)">Please enter a valid KP number between 1 and 249</p>';
+                return;
+            }
+            var teamA = document.getElementById('kp-match-teama').value || 'Team A';
+            var teamB = document.getElementById('kp-match-teamb').value || 'Team B';
+            var resultDiv = document.getElementById('kp-match-result');
+            resultDiv.innerHTML = '<p style="color:var(--text-muted)">Predicting '+teamA+' vs '+teamB+' for KP #'+kpNum+'...</p>';
+            try {
+                var mBody = {
+                    name: body.name,
+                    date: body.date,
+                    time: body.time,
+                    place: document.getElementById('kp-match-place').value || body.place,
+                    ayanamsa: 'krishnamurti',
+                    kp_number: kpNum,
+                    match_type: document.getElementById('kp-match-type').value,
+                    team_a: teamA,
+                    team_b: teamB,
+                    query_date: document.getElementById('kp-match-date').value,
+                    query_time: parseTimeInput(document.getElementById('kp-match-time').value)
+                };
+                var resp = await fetch(API + '/kp/match-prediction', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(mBody)
+                });
+                if (!resp.ok) throw new Error('API error ' + resp.status);
+                var mData = await resp.json();
+                var mp = mData.prediction;
+                if (!mp) { resultDiv.innerHTML = '<p style="color:var(--red)">No prediction data returned</p>'; return; }
+
+                var mhtml = '';
+
+                /* ── Big winner banner ── */
+                var wBg, wBorder, wColor, wIcon;
+                if (mp.verdict_type === 'team_a') {
+                    wBg = 'rgba(0,200,100,0.18)'; wBorder = '#00c864'; wColor = '#00e874'; wIcon = '&#127942;';
+                } else if (mp.verdict_type === 'team_b') {
+                    wBg = 'rgba(255,80,80,0.18)'; wBorder = '#ff5050'; wColor = '#ff6666'; wIcon = '&#127942;';
+                } else if (mp.verdict_type === 'team_a_close') {
+                    wBg = 'rgba(0,200,100,0.10)'; wBorder = '#44aa66'; wColor = '#66cc88'; wIcon = '&#8680;';
+                } else if (mp.verdict_type === 'team_b_close') {
+                    wBg = 'rgba(255,80,80,0.10)'; wBorder = '#cc6666'; wColor = '#ee8888'; wIcon = '&#8680;';
+                } else {
+                    wBg = 'rgba(212,168,67,0.15)'; wBorder = 'var(--gold)'; wColor = 'var(--gold)'; wIcon = '&#9878;';
+                }
+
+                mhtml += '<div style="background:'+wBg+';border:2px solid '+wBorder+';border-radius:12px;padding:24px;text-align:center;margin-bottom:18px">';
+                mhtml += '<div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:2px">'+mp.match_type+'</div>';
+                mhtml += '<div style="font-size:1.1rem;color:var(--text);margin-bottom:8px;font-weight:600">'+mp.team_a+' <span style="color:var(--text-dim);font-weight:400">vs</span> '+mp.team_b+'</div>';
+                mhtml += '<div style="font-size:2.2rem;font-weight:900;color:'+wColor+';letter-spacing:1px">'+wIcon+' '+mp.verdict+'</div>';
+                mhtml += '<div style="font-size:0.85rem;color:var(--text-dim);margin-top:6px">Confidence: '+mp.confidence+'%</div>';
+                mhtml += '</div>';
+
+                /* ── Tournament Elimination Warning ── */
+                if (mp.is_eliminated) {
+                    mhtml += '<div style="background:rgba(255,40,40,0.15);border:2px solid #ff4444;border-radius:10px;padding:16px;text-align:center;margin-bottom:14px">';
+                    mhtml += '<div style="font-size:1.4rem;font-weight:900;color:#ff4444">&#9888; TEAM ELIMINATION ALERT</div>';
+                    mhtml += '<div style="font-size:0.88rem;color:#ff8888;margin-top:6px">6th cusp SL ('+mp.cusp_6_sub_lord+') signifies houses '+(mp.elimination_houses||[]).join(', ')+' at Level 1/2</div>';
+                    mhtml += '<div style="font-size:0.82rem;color:var(--text-dim);margin-top:4px">Houses 5, 4, 12 = team elimination in tournament context</div>';
+                    mhtml += '</div>';
+                }
+
+                /* ── Score bar ── */
+                var totalScore = mp.team_a_score + mp.team_b_score;
+                var pctA = totalScore > 0 ? Math.round(mp.team_a_score / totalScore * 100) : 50;
+                var pctB = 100 - pctA;
+                mhtml += '<div style="margin-bottom:16px">';
+                mhtml += '<div style="display:flex;justify-content:space-between;font-size:0.82rem;font-weight:700;margin-bottom:4px"><span style="color:#00e874">'+mp.team_a+' ('+mp.team_a_score+')</span><span style="color:#ff6666">'+mp.team_b+' ('+mp.team_b_score+')</span></div>';
+                mhtml += '<div style="height:14px;border-radius:7px;overflow:hidden;display:flex;background:#222">';
+                mhtml += '<div style="width:'+pctA+'%;background:linear-gradient(90deg,#00c864,#44ee88);transition:width 0.5s"></div>';
+                mhtml += '<div style="width:'+pctB+'%;background:linear-gradient(90deg,#ee4444,#ff6666);transition:width 0.5s"></div>';
+                mhtml += '</div></div>';
+
+                /* ── KP Horary details ── */
+                if (mp.horary_kp) {
+                    var hk = mp.horary_kp;
+                    mhtml += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">';
+                    mhtml += '<div class="metric"><div class="label">KP #</div><div class="value gold">'+mp.kp_number+'</div></div>';
+                    mhtml += '<div class="metric"><div class="label">Sign</div><div class="value">'+hk.sign+'</div></div>';
+                    mhtml += '<div class="metric"><div class="label">Nakshatra</div><div class="value">'+hk.nakshatra+' P'+hk.pada+'</div></div>';
+                    mhtml += '<div class="metric"><div class="label">Sign Lord</div><div class="value" style="color:'+pColor(hk.sign_lord)+'">'+hk.sign_lord+'</div></div>';
+                    mhtml += '<div class="metric"><div class="label">Star Lord</div><div class="value" style="color:'+pColor(hk.star_lord)+'">'+hk.star_lord+'</div></div>';
+                    mhtml += '<div class="metric"><div class="label">Sub Lord</div><div class="value" style="color:'+pColor(hk.sub_lord)+'">'+hk.sub_lord+'</div></div>';
+                    mhtml += '</div>';
+                }
+
+                /* ── Key Cusp Analysis ── */
+                mhtml += '<h3 style="color:var(--gold-light);margin-top:14px;font-size:0.9rem">Key Cusp Sub-Lord Analysis</h3>';
+                mhtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                mhtml += '<thead><tr><th>Cusp</th><th>Role</th><th>Sub Lord</th><th>Star Lord</th><th>Signifies Houses</th></tr></thead><tbody>';
+                (mp.cusp_details||[]).forEach(function(cd){
+                    var roleBg = cd.house === 6 || cd.house === 11 ? 'rgba(0,200,100,0.08)' : cd.house === 12 || cd.house === 5 ? 'rgba(255,80,80,0.08)' : '';
+                    mhtml += '<tr style="background:'+roleBg+'">';
+                    mhtml += '<td style="font-weight:700">H'+cd.house+'</td>';
+                    mhtml += '<td style="font-size:0.72rem;color:var(--text-dim)">'+cd.role+'</td>';
+                    mhtml += '<td style="font-weight:700;color:'+pColor(cd.sub_lord)+'">'+cd.sub_lord+'</td>';
+                    mhtml += '<td style="color:'+pColor(cd.star_lord)+'">'+cd.star_lord+'</td>';
+                    mhtml += '<td>'+(cd.signifies||[]).join(', ')+'</td>';
+                    mhtml += '</tr>';
+                });
+                mhtml += '</tbody></table></div>';
+
+                /* ── Retro status — 3-tier ── */
+                if (mp.retro_tier_6 > 0 || mp.retro_tier_12 > 0) {
+                    mhtml += '<div style="margin-top:10px;padding:8px 12px;background:rgba(255,60,60,0.1);border:1px solid var(--red);border-radius:6px;font-size:0.82rem;color:var(--red)">';
+                    if (mp.retro_tier_6 === 1) mhtml += '&#9888; 6th SL ('+mp.cusp_6_sub_lord+') Tier-1: Retro in star of Direct — '+mp.team_a+' result delayed<br>';
+                    else if (mp.retro_tier_6 === 2) mhtml += '&#9888; 6th SL ('+mp.cusp_6_sub_lord+') Tier-2: Retro in star of Retro — '+mp.team_a+' victory DENIED (total failure)<br>';
+                    else if (mp.retro_tier_6 === 3) mhtml += '&#9888; 6th SL ('+mp.cusp_6_sub_lord+') Tier-3: Direct in star of Retro — CANNOT give result for '+mp.team_a+'<br>';
+                    if (mp.retro_tier_12 === 1) mhtml += '&#9888; 12th SL ('+mp.cusp_12_sub_lord+') Tier-1: Retro in star of Direct — '+mp.team_b+' result delayed<br>';
+                    else if (mp.retro_tier_12 === 2) mhtml += '&#9888; 12th SL ('+mp.cusp_12_sub_lord+') Tier-2: Retro in star of Retro — '+mp.team_b+' victory DENIED<br>';
+                    else if (mp.retro_tier_12 === 3) mhtml += '&#9888; 12th SL ('+mp.cusp_12_sub_lord+') Tier-3: Direct in star of Retro — CANNOT give result for '+mp.team_b;
+                    mhtml += '</div>';
+                }
+
+                /* ── 4-Step Significator Detail ── */
+                mhtml += '<h3 style="color:var(--gold-light);margin-top:16px;font-size:0.9rem">4-Step Significator Analysis</h3>';
+                mhtml += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">';
+
+                /* 6th SL detail */
+                mhtml += '<div style="flex:1;min-width:280px;padding:12px;background:rgba(0,200,100,0.06);border:1px solid rgba(0,200,100,0.3);border-radius:8px">';
+                mhtml += '<div style="font-size:0.82rem;font-weight:700;color:#00e874;margin-bottom:8px">6th Cusp SL: <span style="color:'+pColor(mp.cusp_6_sub_lord)+'">'+mp.cusp_6_sub_lord+'</span> ('+mp.team_a+')</div>';
+                if (mp.cusp_6_L12 && mp.cusp_6_L12.length) {
+                    mhtml += '<div style="font-size:0.78rem;margin-bottom:4px"><span style="color:var(--gold);font-weight:700">L1/L2 (Strong):</span> <span style="color:#00e874;font-weight:600">H'+mp.cusp_6_L12.join(', H')+'</span></div>';
+                }
+                if (mp.cusp_6_L34 && mp.cusp_6_L34.length) {
+                    mhtml += '<div style="font-size:0.78rem;margin-bottom:4px"><span style="color:var(--text-dim)">L3/L4 (Weak):</span> H'+mp.cusp_6_L34.join(', H')+'</div>';
+                }
+                if (mp.sl6_4step) {
+                    mhtml += '<div style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px">';
+                    Object.keys(mp.sl6_4step).forEach(function(h){
+                        var lvls = mp.sl6_4step[h];
+                        var hNum = parseInt(h);
+                        var isWin = [6,10,11,1,2,3].indexOf(hNum) >= 0;
+                        var isLose = [12,5,4,7,8,9].indexOf(hNum) >= 0;
+                        var hColor = isWin ? '#00e874' : isLose ? '#ff6666' : 'var(--text)';
+                        mhtml += '<div>H'+h+': <span style="color:'+hColor+'">'+(Array.isArray(lvls)?lvls.join(', '):lvls)+'</span></div>';
+                    });
+                    mhtml += '</div>';
+                }
+                mhtml += '</div>';
+
+                /* 12th SL detail */
+                mhtml += '<div style="flex:1;min-width:280px;padding:12px;background:rgba(255,80,80,0.06);border:1px solid rgba(255,80,80,0.3);border-radius:8px">';
+                mhtml += '<div style="font-size:0.82rem;font-weight:700;color:#ff6666;margin-bottom:8px">12th Cusp SL: <span style="color:'+pColor(mp.cusp_12_sub_lord)+'">'+mp.cusp_12_sub_lord+'</span> ('+mp.team_b+')</div>';
+                if (mp.cusp_12_L12 && mp.cusp_12_L12.length) {
+                    mhtml += '<div style="font-size:0.78rem;margin-bottom:4px"><span style="color:var(--gold);font-weight:700">L1/L2 (Strong):</span> <span style="color:#ff6666;font-weight:600">H'+mp.cusp_12_L12.join(', H')+'</span></div>';
+                }
+                if (mp.cusp_12_L34 && mp.cusp_12_L34.length) {
+                    mhtml += '<div style="font-size:0.78rem;margin-bottom:4px"><span style="color:var(--text-dim)">L3/L4 (Weak):</span> H'+mp.cusp_12_L34.join(', H')+'</div>';
+                }
+                if (mp.sl12_4step) {
+                    mhtml += '<div style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px">';
+                    Object.keys(mp.sl12_4step).forEach(function(h){
+                        var lvls = mp.sl12_4step[h];
+                        var hNum = parseInt(h);
+                        var isWin = [12,5,4,7,8,9].indexOf(hNum) >= 0;
+                        var isLose = [6,10,11,1,2,3].indexOf(hNum) >= 0;
+                        var hColor = isWin ? '#ff6666' : isLose ? '#00e874' : 'var(--text)';
+                        mhtml += '<div>H'+h+': <span style="color:'+hColor+'">'+(Array.isArray(lvls)?lvls.join(', '):lvls)+'</span></div>';
+                    });
+                    mhtml += '</div>';
+                }
+                mhtml += '</div>';
+                mhtml += '</div>';
+
+                /* ── Moon Nakshatra for Bilateral Series ── */
+                if (mp.moon_nakshatra) {
+                    var mn = mp.moon_nakshatra;
+                    mhtml += '<div style="margin-bottom:14px;padding:12px;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.3);border-radius:8px">';
+                    mhtml += '<div style="font-size:0.85rem;font-weight:700;color:var(--gold-light);margin-bottom:6px">&#127769; Moon Nakshatra — Bilateral Series Indicator</div>';
+                    mhtml += '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:0.82rem">';
+                    mhtml += '<div><span style="color:var(--text-dim)">Moon in:</span> <span style="font-weight:600">'+mn.nakshatra+'</span> ('+mn.moon_sign+')</div>';
+                    mhtml += '<div><span style="color:var(--text-dim)">Nak Lord:</span> <span style="font-weight:700;color:'+pColor(mn.nak_lord)+'">'+mn.nak_lord+'</span></div>';
+                    mhtml += '</div>';
+                    if (mn.nak_lord_signifies_L12 && mn.nak_lord_signifies_L12.length) {
+                        mhtml += '<div style="font-size:0.78rem;margin-top:6px"><span style="color:var(--gold)">Nak Lord Strong Houses (L1/L2):</span> H'+mn.nak_lord_signifies_L12.join(', H')+'</div>';
+                    }
+                    if (mn.nak_lord_signifies_all && mn.nak_lord_signifies_all.length) {
+                        mhtml += '<div style="font-size:0.78rem;margin-top:2px"><span style="color:var(--text-dim)">All Significations:</span> H'+mn.nak_lord_signifies_all.join(', H')+'</div>';
+                    }
+                    mhtml += '<div style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;font-style:italic">In a bilateral series, same horary chart applies to all matches. Moon\'s transiting nakshatra lord on match day determines result.</div>';
+                    mhtml += '</div>';
+                }
+
+                /* ── Ruling Planets ── */
+                if (mp.ruling_planets) {
+                    var rp = mp.ruling_planets;
+                    mhtml += '<h3 style="color:var(--gold-light);margin-top:14px;font-size:0.9rem">Ruling Planets at Query Moment</h3>';
+                    mhtml += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                    mhtml += '<thead><tr><th>Source</th><th>Planet</th></tr></thead><tbody>';
+                    (rp.rp_rows||[]).forEach(function(r){
+                        mhtml += '<tr><td style="color:var(--text-dim)">'+r.source+'</td>';
+                        mhtml += '<td style="font-weight:700;color:'+pColor(r.planet)+'">'+r.planet+'</td></tr>';
+                    });
+                    mhtml += '</tbody></table></div>';
+                    if (rp.ranked && rp.ranked.length) {
+                        mhtml += '<div style="margin-top:6px;font-size:0.82rem"><strong style="color:var(--gold)">Ranked: </strong>';
+                        rp.ranked.forEach(function(r, idx){
+                            if (idx > 0) mhtml += ', ';
+                            mhtml += '<span style="color:'+pColor(r.planet)+';font-weight:700">'+r.planet+'</span><span style="color:var(--text-dim)">('+r.count+'x)</span>';
+                        });
+                        mhtml += '</div>';
+                    }
+                }
+
+                /* ── Fruitful Significators ── */
+                if ((mp.fruitful_team_a && mp.fruitful_team_a.length) || (mp.fruitful_team_b && mp.fruitful_team_b.length)) {
+                    mhtml += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">';
+                    if (mp.fruitful_team_a && mp.fruitful_team_a.length) {
+                        mhtml += '<div style="flex:1;min-width:200px;padding:10px;background:rgba(0,200,100,0.08);border:1px solid var(--green);border-radius:6px">';
+                        mhtml += '<div style="font-size:0.78rem;color:var(--green);font-weight:700">'+mp.team_a+' Fruitful Sigs (RP-matched):</div>';
+                        mhtml += '<div style="font-size:0.85rem;margin-top:4px">';
+                        mp.fruitful_team_a.forEach(function(f, idx){ if(idx>0)mhtml+=', '; mhtml+='<span style="color:'+pColor(f)+';font-weight:700">'+f+'</span>'; });
+                        mhtml += '</div></div>';
+                    }
+                    if (mp.fruitful_team_b && mp.fruitful_team_b.length) {
+                        mhtml += '<div style="flex:1;min-width:200px;padding:10px;background:rgba(255,80,80,0.08);border:1px solid var(--red);border-radius:6px">';
+                        mhtml += '<div style="font-size:0.78rem;color:var(--red);font-weight:700">'+mp.team_b+' Fruitful Sigs (RP-matched):</div>';
+                        mhtml += '<div style="font-size:0.85rem;margin-top:4px">';
+                        mp.fruitful_team_b.forEach(function(f, idx){ if(idx>0)mhtml+=', '; mhtml+='<span style="color:'+pColor(f)+';font-weight:700">'+f+'</span>'; });
+                        mhtml += '</div></div>';
+                    }
+                    mhtml += '</div>';
+                }
+
+                /* ── Reasoning ── */
+                if (mp.reasons && mp.reasons.length) {
+                    mhtml += '<h3 style="color:var(--gold-light);margin-top:14px;font-size:0.9rem">Detailed Reasoning</h3>';
+                    mhtml += '<div style="font-size:0.82rem;color:var(--text)">';
+                    mp.reasons.forEach(function(r){
+                        var icon = r.indexOf('WARNING') >= 0 ? '&#9888;' : r.indexOf('STRONG') >= 0 || r.indexOf('victory') >= 0 ? '&#10003;' : r.indexOf('LOSE') >= 0 || r.indexOf('denied') >= 0 ? '&#10007;' : '&#8226;';
+                        var rColor = r.indexOf('WARNING') >= 0 || r.indexOf('LOSE') >= 0 ? 'var(--red)' : r.indexOf('STRONG') >= 0 || r.indexOf('victory') >= 0 || r.indexOf('desire fulfilled') >= 0 ? 'var(--green)' : 'var(--text)';
+                        mhtml += '<div style="margin-bottom:6px;color:'+rColor+'">'+icon+' '+r+'</div>';
+                    });
+                    mhtml += '</div>';
+                }
+
+                resultDiv.innerHTML = mhtml;
+            } catch(err) {
+                resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+            }
+        });
+    }
+
+    /* ═══ Toss Prediction handler ═══════════════════════════════ */
+    var tossBtn = document.getElementById('kp-toss-fetch');
+    if (tossBtn) {
+        tossBtn.addEventListener('click', async function(){
+            var kpNum = parseInt(document.getElementById('kp-toss-num').value);
+            if (!kpNum || kpNum < 1 || kpNum > 249) {
+                document.getElementById('kp-toss-result').innerHTML = '<p style="color:var(--red)">Please enter a valid KP number between 1 and 249</p>';
+                return;
+            }
+            var teamA = document.getElementById('kp-toss-teama').value || document.getElementById('kp-match-teama').value || 'Team A';
+            var teamB = document.getElementById('kp-toss-teamb').value || document.getElementById('kp-match-teamb').value || 'Team B';
+            var resultDiv = document.getElementById('kp-toss-result');
+            resultDiv.innerHTML = '<p style="color:var(--text-muted)">Predicting toss for '+teamA+' vs '+teamB+' (KP #'+kpNum+')...</p>';
+            try {
+                var tBody = {
+                    name: body.name,
+                    date: body.date,
+                    time: body.time,
+                    place: document.getElementById('kp-match-place').value || body.place,
+                    ayanamsa: 'krishnamurti',
+                    kp_number: kpNum,
+                    team_a: teamA,
+                    team_b: teamB,
+                    query_date: document.getElementById('kp-match-date').value,
+                    query_time: parseTimeInput(document.getElementById('kp-match-time').value)
+                };
+                var resp = await fetch(API + '/kp/toss-prediction', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(tBody)
+                });
+                if (!resp.ok) throw new Error('API error ' + resp.status);
+                var tData = await resp.json();
+                var tp = tData.prediction;
+                if (!tp) { resultDiv.innerHTML = '<p style="color:var(--red)">No toss prediction data returned</p>'; return; }
+
+                var thtml = '';
+
+                /* Toss winner banner */
+                var tBg, tBorder, tColor;
+                if (tp.verdict_type === 'team_a') {
+                    tBg = 'rgba(0,200,100,0.15)'; tBorder = '#00c864'; tColor = '#00e874';
+                } else if (tp.verdict_type === 'team_b') {
+                    tBg = 'rgba(255,80,80,0.15)'; tBorder = '#ff5050'; tColor = '#ff6666';
+                } else {
+                    tBg = 'rgba(212,168,67,0.12)'; tBorder = 'var(--gold)'; tColor = 'var(--gold)';
+                }
+
+                thtml += '<div style="background:'+tBg+';border:2px solid '+tBorder+';border-radius:10px;padding:18px;text-align:center;margin-bottom:12px">';
+                thtml += '<div style="font-size:0.82rem;color:var(--text-dim);margin-bottom:2px">TOSS PREDICTION</div>';
+                thtml += '<div style="font-size:0.95rem;color:var(--text);margin-bottom:6px">'+tp.team_a+' <span style="color:var(--text-dim)">vs</span> '+tp.team_b+'</div>';
+                thtml += '<div style="font-size:1.6rem;font-weight:900;color:'+tColor+'">&#127944; '+tp.verdict+'</div>';
+                thtml += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">Confidence: '+tp.confidence+'%</div>';
+                thtml += '</div>';
+
+                /* Score bar */
+                var tTotal = tp.team_a_score + tp.team_b_score;
+                var tPctA = tTotal > 0 ? Math.round(tp.team_a_score / tTotal * 100) : 50;
+                thtml += '<div style="margin-bottom:10px">';
+                thtml += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;font-weight:700;margin-bottom:3px"><span style="color:#00e874">'+tp.team_a+' ('+tp.team_a_score+')</span><span style="color:#ff6666">'+tp.team_b+' ('+tp.team_b_score+')</span></div>';
+                thtml += '<div style="height:10px;border-radius:5px;overflow:hidden;display:flex;background:#222">';
+                thtml += '<div style="width:'+tPctA+'%;background:linear-gradient(90deg,#00c864,#44ee88)"></div>';
+                thtml += '<div style="width:'+(100-tPctA)+'%;background:linear-gradient(90deg,#ee4444,#ff6666)"></div>';
+                thtml += '</div></div>';
+
+                /* KP details */
+                if (tp.horary_kp) {
+                    var hk = tp.horary_kp;
+                    thtml += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:0.78rem">';
+                    thtml += '<div class="metric"><div class="label">KP #</div><div class="value gold">'+tp.kp_number+'</div></div>';
+                    thtml += '<div class="metric"><div class="label">Sign</div><div class="value">'+(hk.sign||'')+'</div></div>';
+                    thtml += '<div class="metric"><div class="label">Star</div><div class="value">'+(hk.nakshatra||'')+'</div></div>';
+                    thtml += '<div class="metric"><div class="label">Sub Lord</div><div class="value" style="color:'+pColor(hk.sub_lord)+'">'+hk.sub_lord+'</div></div>';
+                    thtml += '</div>';
+                }
+
+                /* 6th SL analysis */
+                thtml += '<div style="font-size:0.8rem;margin-bottom:6px"><span style="color:var(--gold)">6th Cusp SL:</span> <span style="font-weight:700;color:'+pColor(tp.cusp_6_sub_lord)+'">'+tp.cusp_6_sub_lord+'</span> signifies H'+(tp.cusp_6_signifies||[]).join(', H')+'</div>';
+                thtml += '<div style="font-size:0.8rem;margin-bottom:10px"><span style="color:var(--gold)">12th Cusp SL:</span> <span style="font-weight:700;color:'+pColor(tp.cusp_12_sub_lord)+'">'+tp.cusp_12_sub_lord+'</span> signifies H'+(tp.cusp_12_signifies||[]).join(', H')+'</div>';
+
+                /* Retro tier */
+                if (tp.retro_tier_6 > 0) {
+                    thtml += '<div style="padding:6px 10px;background:rgba(255,60,60,0.1);border:1px solid var(--red);border-radius:5px;font-size:0.78rem;color:var(--red);margin-bottom:8px">';
+                    thtml += '&#9888; Retro Tier-'+tp.retro_tier_6+' on 6th SL — ';
+                    if (tp.retro_tier_6 === 1) thtml += 'delayed result';
+                    else if (tp.retro_tier_6 === 2) thtml += 'total failure promised';
+                    else thtml += 'cannot give result';
+                    thtml += '</div>';
+                }
+
+                /* Reasoning */
+                if (tp.reasons && tp.reasons.length) {
+                    thtml += '<div style="font-size:0.76rem;color:var(--text-dim);border-top:1px solid #333;padding-top:8px">';
+                    tp.reasons.forEach(function(r){
+                        var icon = r.indexOf('RETRO') >= 0 ? '&#9888;' : r.indexOf('favours') >= 0 ? '&#10003;' : '&#8226;';
+                        thtml += '<div style="margin-bottom:3px">'+icon+' '+r+'</div>';
+                    });
+                    thtml += '</div>';
+                }
+
+                resultDiv.innerHTML = thtml;
             } catch(err) {
                 resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
             }
@@ -2996,7 +4427,7 @@ function drawNorthIndianSVG(chartData, size) {
     var T = [mid,0], R = [s,mid], B = [mid,s], L = [0,mid];
     var C = [mid,mid];
 
-    // House polygons (path strings for SVG)
+    // House polygons — counter-clockwise from H1 at top (North Indian)
     var HP = {
         1:  [T, [s*0.75,mid*0.5], C, [s*0.25,mid*0.5]],           // top diamond = Lagna
         2:  [TL, T, [s*0.25,mid*0.5]],                             // top-left triangle
@@ -3012,20 +4443,20 @@ function drawNorthIndianSVG(chartData, size) {
         12: [TR, [s*0.75,mid*0.5], T]                              // top-right triangle
     };
 
-    // House label centers (approximate centroids)
+    // House label centers — adjusted to sit clearly within each triangle
     var HC = {
         1:  [mid, mid*0.35],
-        2:  [s*0.15, mid*0.3],
-        3:  [s*0.15, mid*0.7],
+        2:  [s*0.12, s*0.12],
+        3:  [s*0.08, mid*0.75],
         4:  [s*0.18, mid],
-        5:  [s*0.15, s*0.7],
-        6:  [s*0.25, s*0.85],
+        5:  [s*0.08, s*0.73],
+        6:  [s*0.25, s*0.88],
         7:  [mid, s*0.68],
-        8:  [s*0.78, s*0.85],
-        9:  [s*0.85, s*0.7],
+        8:  [s*0.75, s*0.88],
+        9:  [s*0.88, s*0.73],
         10: [s*0.82, mid],
-        11: [s*0.85, mid*0.3],
-        12: [s*0.78, s*0.15]
+        11: [s*0.88, mid*0.3],
+        12: [s*0.82, s*0.12]
     };
 
     var svg = '<svg viewBox="0 0 '+s+' '+s+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+s+'px">';
@@ -3218,8 +4649,8 @@ function renderShodasvarga(data) {
 
     // Style toggle
     var toggleHtml = '<div style="display:flex;gap:6px;align-items:center">';
-    toggleHtml += '<button class="sv-style-btn active" data-style="south" style="padding:4px 12px;border:1px solid #555;background:rgba(212,168,67,0.15);color:#d4a843;border-radius:4px;cursor:pointer;font-size:0.8rem">South Indian</button>';
-    toggleHtml += '<button class="sv-style-btn" data-style="north" style="padding:4px 12px;border:1px solid #555;background:transparent;color:#aaa;border-radius:4px;cursor:pointer;font-size:0.8rem">North Indian</button>';
+    toggleHtml += '<button class="sv-style-btn" data-style="south" style="padding:4px 12px;border:1px solid #555;background:transparent;color:#aaa;border-radius:4px;cursor:pointer;font-size:0.8rem">South Indian</button>';
+    toggleHtml += '<button class="sv-style-btn active" data-style="north" style="padding:4px 12px;border:1px solid #555;background:rgba(212,168,67,0.15);color:#d4a843;border-radius:4px;cursor:pointer;font-size:0.8rem">North Indian</button>';
     toggleHtml += '</div>';
 
     var html = '';
@@ -3245,7 +4676,7 @@ function renderShodasvarga(data) {
         if (cd) {
             html += '<div class="sv-mini-chart-card" data-chart="'+c.id.toLowerCase()+'" style="cursor:pointer;border:1px solid #333;border-radius:6px;padding:4px;transition:border-color 0.2s">';
             html += '<div style="font-size:0.7rem;color:#d4a843;text-align:center;font-weight:600;padding:2px 0">'+c.id+' '+c.name+'</div>';
-            html += drawSouthIndianSVG(cd, 160);
+            html += drawNorthIndianSVG(cd, 160);
             html += '</div>';
         }
     });
@@ -3263,12 +4694,12 @@ function renderShodasvarga(data) {
     resultEl.innerHTML = html;
 
     // Set initial chart
-    updateSelectedChart(currentChart, 'south');
+    updateSelectedChart(currentChart, 'north');
 
     // Event: chart dropdown
     document.getElementById('sv-chart-select').addEventListener('change', function(){
         var style = document.querySelector('.sv-style-btn.active');
-        updateSelectedChart(this.value, style ? style.dataset.style : 'south');
+        updateSelectedChart(this.value, style ? style.dataset.style : 'north');
     });
 
     // Event: style toggle
@@ -3293,7 +4724,7 @@ function renderShodasvarga(data) {
             var chartId = this.dataset.chart;
             document.getElementById('sv-chart-select').value = chartId;
             var style = document.querySelector('.sv-style-btn.active');
-            updateSelectedChart(chartId, style ? style.dataset.style : 'south');
+            updateSelectedChart(chartId, style ? style.dataset.style : 'north');
             // Scroll to top of chart area
             document.getElementById('sv-chart-area').scrollIntoView({behavior:'smooth'});
         });
@@ -3341,4 +4772,596 @@ document.getElementById('shodasvarga-form').addEventListener('submit', async fun
     renderShodasvarga(data);
 });
 
+/* ═══════════════════════════════════════════════════════════
+   GOCHAR (TRANSIT) PANCHANG TAB
+   ═══════════════════════════════════════════════════════════ */
+
+// Set default dates for gochar (current month)
+(function(){
+    var today = new Date();
+    var startEl = document.getElementById('gochar-start');
+    var endEl = document.getElementById('gochar-end');
+    if (startEl) startEl.value = today.toISOString().slice(0,10);
+    if (endEl) {
+        var nextMonth = new Date(today);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        endEl.value = nextMonth.toISOString().slice(0,10);
+    }
+})();
+
+var gocharBtn = document.getElementById('gochar-fetch');
+if (gocharBtn) {
+    gocharBtn.addEventListener('click', async function(){
+        var resultDiv = document.getElementById('gochar-result');
+        var startDate = document.getElementById('gochar-start').value;
+        var endDate = document.getElementById('gochar-end').value;
+        var ayanamsa = document.getElementById('gochar-ayanamsa').value;
+
+        if (!startDate || !endDate) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Please select both start and end dates</p>';
+            return;
+        }
+
+        resultDiv.innerHTML = '<p style="color:var(--text-muted)">Calculating planet transits (including Lagna if location available)...</p>';
+
+        // Get lat/lon from master birth data for Lagna
+        var latEl = document.getElementById('lat');
+        var lonEl = document.getElementById('lon');
+        var lat = latEl ? parseFloat(latEl.value) : null;
+        var lon = lonEl ? parseFloat(lonEl.value) : null;
+
+        var payload = {
+            start_date: startDate,
+            end_date: endDate,
+            ayanamsa: ayanamsa,
+            timezone_offset_minutes: 330
+        };
+        if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
+            payload.latitude = lat;
+            payload.longitude = lon;
+        }
+
+        try {
+            var resp = await fetch(API + '/gochar/transits', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) {
+                var errBody = await resp.json().catch(function(){ return {}; });
+                throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+            }
+            var data = await resp.json();
+            renderGochar(data);
+        } catch(err) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+        }
+    });
+}
+
+function renderGochar(data) {
+    var resultDiv = document.getElementById('gochar-result');
+    var html = '';
+    var planetColors = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080',Lagna:'#00FF88'};
+    var pColor = function(n){ return planetColors[n]||'#ccc'; };
+
+    /* ── Summary Banner ── */
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:1px solid var(--gold)">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:var(--gold-light)">Gochar Panchang</div>';
+    html += '<div style="font-size:0.85rem;color:var(--text-dim);margin-top:4px">' + data.start_date + ' to ' + data.end_date + ' | ' + data.ayanamsa + ' ayanamsa</div>';
+    html += '<div style="font-size:1.1rem;font-weight:700;color:var(--text);margin-top:6px">' + data.total_events + ' Transit Events</div>';
+    html += '</div>';
+
+    /* ── Current Planet Positions ── */
+    html += '<div class="card" style="margin-bottom:16px">';
+    html += '<h3 style="color:var(--gold-light);margin-bottom:10px">Planet Positions at ' + data.start_date + '</h3>';
+    html += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.82rem">';
+    html += '<thead><tr><th>Planet</th><th>Sign</th><th>Degree</th><th>Longitude</th><th>Nakshatra</th><th>Lord</th><th>Pada</th><th>Speed</th><th>Status</th></tr></thead><tbody>';
+    data.planet_positions.forEach(function(p){
+        var statusColor = p.retrograde ? 'var(--red)' : 'var(--green)';
+        var statusText = p.retrograde ? 'R' : 'D';
+        html += '<tr>';
+        html += '<td style="color:' + p.color + ';font-weight:700">' + p.planet + '</td>';
+        html += '<td>' + p.sign + '</td>';
+        html += '<td>' + p.degree_in_sign.toFixed(2) + '°</td>';
+        html += '<td>' + p.longitude.toFixed(2) + '°</td>';
+        html += '<td>' + p.nakshatra + '</td>';
+        html += '<td style="color:' + (pColor(p.nakshatra_lord) || '#ccc') + '">' + p.nakshatra_lord + '</td>';
+        html += '<td>' + p.pada + '</td>';
+        html += '<td>' + p.speed.toFixed(4) + '°/d</td>';
+        html += '<td style="color:' + statusColor + ';font-weight:700">' + statusText + '</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    html += '</div>';
+
+    /* ── Per-Planet Summary ── */
+    html += '<details style="margin-bottom:16px" class="card"><summary style="cursor:pointer;color:var(--gold-light);font-weight:700;font-size:0.9rem">Per-Planet Event Summary</summary>';
+    html += '<div style="overflow-x:auto;margin-top:8px"><table class="data-table" style="font-size:0.82rem">';
+    html += '<thead><tr><th>Planet</th><th>Sign Changes</th><th>Nakshatra Changes</th><th>Pada Changes</th><th>Retro Events</th><th>Total</th></tr></thead><tbody>';
+    var planetOrder = ['Lagna','Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+    planetOrder.forEach(function(pn){
+        var s = data.planet_summaries[pn];
+        if (!s) return;
+        html += '<tr>';
+        html += '<td style="color:' + (pColor(pn) || '#ccc') + ';font-weight:700">' + pn + '</td>';
+        html += '<td>' + s.sign_changes + '</td>';
+        html += '<td>' + s.nakshatra_changes + '</td>';
+        html += '<td>' + s.pada_changes + '</td>';
+        html += '<td>' + s.retro_events + '</td>';
+        html += '<td style="font-weight:700">' + s.total_events + '</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table></div></details>';
+
+    /* ── Filter buttons ── */
+    html += '<div class="card" style="margin-bottom:16px">';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
+    html += '<button class="gochar-filter active" data-filter="all" style="padding:4px 10px;border-radius:4px;border:1px solid var(--gold);background:var(--gold);color:#000;font-size:0.78rem;font-weight:700;cursor:pointer">All Events</button>';
+    html += '<button class="gochar-filter" data-filter="sign_change" style="padding:4px 10px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.78rem;cursor:pointer">Sign Changes</button>';
+    html += '<button class="gochar-filter" data-filter="nakshatra_change" style="padding:4px 10px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.78rem;cursor:pointer">Nakshatra</button>';
+    html += '<button class="gochar-filter" data-filter="pada_change" style="padding:4px 10px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.78rem;cursor:pointer">Pada</button>';
+    html += '<button class="gochar-filter" data-filter="retro" style="padding:4px 10px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.78rem;cursor:pointer">Retrograde</button>';
+
+    // Planet filters
+    html += '<span style="color:var(--text-dim);font-size:0.72rem;margin-left:8px;align-self:center">Planet:</span>';
+    planetOrder.forEach(function(pn){
+        html += '<button class="gochar-planet-filter" data-planet="' + pn + '" style="padding:4px 8px;border-radius:4px;border:1px solid #555;background:transparent;color:' + (pColor(pn) || '#ccc') + ';font-size:0.72rem;cursor:pointer">' + pn + '</button>';
+    });
+    html += '</div>';
+    html += '<div id="gochar-visible-count" style="font-size:0.75rem;color:var(--text-dim);margin-top:6px">' + data.events.length + ' events shown</div>';
+
+    /* ── Main Events Table ── */
+    html += '<div style="overflow-x:auto"><table class="data-table" id="gochar-events-table" style="font-size:0.78rem">';
+    html += '<thead><tr><th>Date</th><th>Time</th><th>Planet</th><th>Event</th><th>Details</th></tr></thead><tbody>';
+
+    data.events.forEach(function(e, idx){
+        var evClass = e.event_type;
+        var importClass = e.importance === 'high' ? 'font-weight:700;' : '';
+
+        // Event type icon and color
+        var icon = '';
+        var evColor = e.color || '#ccc';
+        if (e.event_type === 'sign_change') icon = '♈';
+        else if (e.event_type === 'nakshatra_change') icon = '✦';
+        else if (e.event_type === 'pada_change') icon = '·';
+        else if (e.event_type === 'retro_start') icon = '℞';
+        else if (e.event_type === 'retro_end') icon = '▶';
+
+        // Build detail column
+        var detail = '';
+        if (e.event_type === 'sign_change') {
+            detail = e.from_sign + ' → <b>' + e.to_sign + '</b>';
+        } else if (e.event_type === 'nakshatra_change') {
+            detail = e.from_nakshatra + ' → <b>' + e.to_nakshatra + '</b> (' + e.to_nak_lord + ')';
+        } else if (e.event_type === 'pada_change') {
+            detail = e.nakshatra + ' Pada ' + e.from_pada + ' → <b>Pada ' + e.to_pada + '</b>';
+        } else if (e.event_type === 'retro_start' || e.event_type === 'retro_end') {
+            detail = e.degree + '° ' + e.sign;
+        }
+
+        html += '<tr class="gochar-row" data-type="' + evClass + '" data-planet="' + e.planet + '" style="' + importClass + '">';
+        html += '<td>' + e.date + '</td>';
+        html += '<td>' + e.time + '</td>';
+        html += '<td style="color:' + evColor + ';font-weight:700">' + icon + ' ' + e.planet + '</td>';
+        html += '<td>' + e.description + '</td>';
+        html += '<td>' + detail + '</td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    html += '</div>';
+
+    resultDiv.innerHTML = html;
+
+    /* ── Combined filter logic ── */
+    function applyGocharFilters() {
+        // Get active event type
+        var activeTypeBtn = document.querySelector('.gochar-filter.active');
+        var typeFilter = activeTypeBtn ? activeTypeBtn.dataset.filter : 'all';
+
+        // Get active planets
+        var activePlanets = [];
+        document.querySelectorAll('.gochar-planet-filter.active').forEach(function(b){ activePlanets.push(b.dataset.planet); });
+
+        document.querySelectorAll('.gochar-row').forEach(function(row){
+            var showType = true;
+            var showPlanet = true;
+
+            // Type filter
+            if (typeFilter !== 'all') {
+                if (typeFilter === 'retro') {
+                    showType = (row.dataset.type === 'retro_start' || row.dataset.type === 'retro_end');
+                } else {
+                    showType = row.dataset.type === typeFilter;
+                }
+            }
+
+            // Planet filter
+            if (activePlanets.length > 0) {
+                showPlanet = activePlanets.indexOf(row.dataset.planet) >= 0;
+            }
+
+            row.style.display = (showType && showPlanet) ? '' : 'none';
+        });
+
+        // Update count
+        var visible = document.querySelectorAll('.gochar-row:not([style*="display: none"])').length;
+        var countEl = document.getElementById('gochar-visible-count');
+        if (countEl) countEl.textContent = visible + ' events shown';
+    }
+
+    /* ── Filter click handlers ── */
+    document.querySelectorAll('.gochar-filter').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            document.querySelectorAll('.gochar-filter').forEach(function(b){ b.classList.remove('active'); b.style.background = 'transparent'; b.style.color = 'var(--text)'; });
+            this.classList.add('active'); this.style.background = 'var(--gold)'; this.style.color = '#000';
+            applyGocharFilters();
+        });
+    });
+
+    document.querySelectorAll('.gochar-planet-filter').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            var planet = this.dataset.planet;
+            var isActive = this.classList.toggle('active');
+            if (isActive) {
+                this.style.background = pColor(planet) || '#555';
+                this.style.color = '#000';
+            } else {
+                this.style.background = 'transparent';
+                this.style.color = pColor(planet) || '#ccc';
+            }
+            applyGocharFilters();
+        });
+    });
+}
+
 })(); // end IIFE
+
+/* ═══════════════════════════════════════════════════════════════
+   GOLD PRICE PREDICTOR TAB
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Apply DD-MM-YYYY auto-format to gold date inputs */
+document.querySelectorAll('.gold-date').forEach(setupDateInput);
+
+var goldBtn = document.getElementById('gold-fetch');
+if (goldBtn) {
+    goldBtn.addEventListener('click', async function(){
+        var resultDiv = document.getElementById('gold-result');
+        var startRaw = document.getElementById('gold-start').value;
+        var endRaw = document.getElementById('gold-end').value;
+        var ayanamsa = document.getElementById('gold-ayanamsa').value;
+
+        if (!startRaw || !endRaw) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Please enter both start and end dates (DD-MM-YYYY)</p>';
+            return;
+        }
+
+        /* Convert DD-MM-YYYY to YYYY-MM-DD for API */
+        var startDate = ddmmToApi(startRaw);
+        var endDate = ddmmToApi(endRaw);
+
+        resultDiv.innerHTML = '<p style="color:#FFD700">Calculating gold predictions using Vedic rules...</p>';
+
+        try {
+            var resp = await fetch(API + '/gold/predict', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    ayanamsa: ayanamsa,
+                    timezone_offset_minutes: 330
+                })
+            });
+            if (!resp.ok) {
+                var errBody = await resp.json().catch(function(){ return {}; });
+                throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+            }
+            var data = await resp.json();
+            renderGold(data);
+        } catch(err) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+        }
+    });
+}
+
+function renderGold(data) {
+    var resultDiv = document.getElementById('gold-result');
+    var html = '';
+    var pColors = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080'};
+    var pC = function(n){ return pColors[n]||'#ccc'; };
+
+    /* ── Summary Banner ── */
+    var sigColor = data.overall_signal.indexOf('BULLISH') >= 0 ? '#FFD700' : data.overall_signal.indexOf('BEARISH') >= 0 ? '#ff5252' : '#bdbdbd';
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid #FFD700;background:linear-gradient(135deg,rgba(255,215,0,0.08),transparent)">';
+    html += '<div style="font-size:1.5rem;font-weight:800;color:#FFD700">Gold Price Prediction</div>';
+    html += '<div style="font-size:0.85rem;color:var(--text-dim);margin-top:4px">' + data.start_date + ' to ' + data.end_date + ' | ' + data.ayanamsa + ' ayanamsa | ' + data.total_days + ' days</div>';
+    html += '<div style="font-size:2rem;font-weight:900;color:' + sigColor + ';margin-top:10px">' + data.overall_signal + '</div>';
+    html += '<div style="font-size:1rem;color:var(--text);margin-top:4px">Average Score: <b>' + data.average_score + '</b></div>';
+    html += '<div style="display:flex;justify-content:center;gap:20px;margin-top:12px;font-size:0.85rem">';
+    html += '<div><span style="color:#66bb6a;font-weight:700">' + data.bullish_days + '</span> Bullish days</div>';
+    html += '<div><span style="color:#bdbdbd;font-weight:700">' + data.neutral_days + '</span> Neutral days</div>';
+    html += '<div><span style="color:#ff5252;font-weight:700">' + data.bearish_days + '</span> Bearish days</div>';
+    html += '</div></div>';
+
+    /* ── Planet Positions ── */
+    html += '<div class="card" style="margin-bottom:16px">';
+    html += '<h3 style="color:#FFD700;margin-bottom:10px">Planet Positions & Gold Roles at ' + data.start_date + '</h3>';
+    html += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.82rem">';
+    html += '<thead><tr><th>Planet</th><th>Sign</th><th>Nakshatra</th><th>Status</th><th>Bala</th><th>Gold Role</th><th>Nak Flag</th></tr></thead><tbody>';
+    (data.planet_positions || []).forEach(function(p){
+        var statusClr = p.retrograde ? 'var(--red)' : 'var(--green)';
+        var statusTxt = p.retrograde ? 'Retro' : 'Direct';
+        var roleClr = (p.gold_role === 'primary_ruler') ? '#FFD700' : (p.gold_role === 'secondary_ruler') ? '#ffeb3b' : 'var(--text-dim)';
+        var nakFlag = '';
+        if (p.is_gold_nak) nakFlag = '<span style="background:#FFD700;color:#000;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">GOLD</span>';
+        else if (p.is_metal_nak) nakFlag = '<span style="background:#90A4AE;color:#000;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">METAL</span>';
+        html += '<tr>';
+        html += '<td style="color:' + pC(p.planet) + ';font-weight:700">' + p.planet + '</td>';
+        html += '<td>' + p.sign + '</td>';
+        html += '<td>' + p.nakshatra + (p.nakshatra_shloka ? ' <span style="color:var(--text-dim);font-size:0.65rem">(Sh.' + p.nakshatra_shloka + ')</span>' : '') + '</td>';
+        html += '<td style="color:' + statusClr + ';font-weight:700">' + statusTxt + '</td>';
+        html += '<td>' + (p.kshetra_bala || 0).toFixed(2) + '</td>';
+        html += '<td style="color:' + roleClr + ';font-weight:' + (p.gold_role ? '700' : '400') + '">' + (p.gold_role || '—').replace(/_/g,' ') + '</td>';
+        html += '<td>' + nakFlag + '</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    /* Commodities for gold nakshatra planets */
+    var goldNakPlanets = (data.planet_positions || []).filter(function(p){ return p.is_gold_nak; });
+    if (goldNakPlanets.length > 0) {
+        html += '<div style="margin-top:8px;padding:8px;background:rgba(255,215,0,0.08);border-radius:6px;border:1px solid rgba(255,215,0,0.3)">';
+        html += '<div style="font-size:0.8rem;font-weight:700;color:#FFD700;margin-bottom:4px">Planets in Gold Nakshatras:</div>';
+        goldNakPlanets.forEach(function(p){
+            var comms = (p.nakshatra_commodities || []).join(', ');
+            html += '<div style="font-size:0.75rem;color:var(--text)"><span style="color:' + pC(p.planet) + ';font-weight:700">' + p.planet + '</span> in ' + p.nakshatra + (comms ? ' — Commodities: ' + comms : '') + '</div>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+
+    /* ── SBC Vedha Snapshot ── */
+    if (data.vedha_snapshot && data.vedha_snapshot.at_start_date) {
+        var vs = data.vedha_snapshot.at_start_date;
+        if ((vs.vedha_hits && vs.vedha_hits.length > 0) || (vs.ubhayato && vs.ubhayato.length > 0)) {
+            html += '<div class="card" style="margin-bottom:16px;border:1px solid rgba(255,215,0,0.3)">';
+            html += '<h3 style="color:#FFD700;margin-bottom:8px">SBC Vedha on Gold Nakshatras <span style="font-size:0.75rem;color:var(--text-dim)">at ' + data.start_date + '</span></h3>';
+            html += '<div style="display:flex;gap:16px;margin-bottom:8px;font-size:0.82rem">';
+            html += '<div>Papa vedha: <span style="color:#ff5252;font-weight:700">' + (vs.papa_count||0) + '</span></div>';
+            html += '<div>Shubha vedha: <span style="color:#66bb6a;font-weight:700">' + (vs.shubha_count||0) + '</span></div>';
+            html += '<div>Vedha Score: <span style="color:#FFD700;font-weight:700">' + (vs.score >= 0 ? '+' : '') + vs.score + '</span></div>';
+            html += '</div>';
+            if (vs.vedha_hits && vs.vedha_hits.length > 0) {
+                html += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.78rem">';
+                html += '<thead><tr><th>Vedha Planet</th><th>Nature</th><th>Target</th><th>Type</th><th>Score</th><th>Bala</th><th>Shloka</th></tr></thead><tbody>';
+                vs.vedha_hits.forEach(function(vh){
+                    var natClr = vh.vedha_nature === 'papa' ? '#ff5252' : '#66bb6a';
+                    var dirClr = vh.direction.indexOf('bullish') >= 0 ? '#66bb6a' : '#ff5252';
+                    html += '<tr>';
+                    html += '<td style="color:' + pC(vh.vedha_planet) + ';font-weight:700">' + vh.vedha_planet + '</td>';
+                    html += '<td style="color:' + natClr + ';font-weight:700;text-transform:uppercase">' + vh.vedha_nature + '</td>';
+                    html += '<td>' + vh.target + '</td>';
+                    html += '<td style="color:var(--text-dim);font-size:0.7rem">' + (vh.target_type||'').replace(/_/g,' ') + '</td>';
+                    html += '<td style="color:' + dirClr + ';font-weight:700">' + (vh.score >= 0 ? '+' : '') + vh.score + '</td>';
+                    html += '<td>' + (vh.graha_bala||0).toFixed(2) + '</td>';
+                    html += '<td style="color:var(--text-dim);font-size:0.7rem">' + (vh.shloka||'') + '</td>';
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+            }
+            if (vs.ubhayato && vs.ubhayato.length > 0) {
+                vs.ubhayato.forEach(function(ub){
+                    html += '<div style="margin-top:8px;padding:8px;background:rgba(255,0,0,0.1);border-radius:6px;border:1px solid rgba(255,0,0,0.4)">';
+                    html += '<div style="font-weight:800;color:#ff5252;font-size:0.85rem">UBHAYATO VEDHA on ' + ub.target + '</div>';
+                    html += '<div style="font-size:0.78rem;color:var(--text)">Planets: ' + ub.planets.join(', ') + ' | Score: +' + ub.score + ' | Shloka ' + ub.shloka + '</div>';
+                    html += '<div style="font-size:0.72rem;color:var(--text-dim)">' + ub.detail + '</div>';
+                    html += '</div>';
+                });
+            }
+            html += '</div>';
+        }
+    }
+
+    /* ── Daily Signal Calendar ── */
+    html += '<div class="card" style="margin-bottom:16px">';
+    html += '<h3 style="color:#FFD700;margin-bottom:10px">Daily Gold Signals</h3>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">';
+    (data.daily_signals || []).forEach(function(d, idx){
+        var bg = d.signal_color || '#333';
+        var txtC = (d.score >= 1.0 || d.score <= -1.0) ? '#000' : '#fff';
+        var scoreSign = d.score >= 0 ? '+' : '';
+        html += '<div class="gold-day-cell" data-idx="' + idx + '" style="width:42px;height:52px;background:' + bg + ';border-radius:4px;text-align:center;padding:2px;cursor:pointer;font-size:0.65rem;color:' + txtC + ';position:relative;display:flex;flex-direction:column;justify-content:center;border:1px solid rgba(255,255,255,0.1)" title="' + d.date + ' | ' + d.signal + ' | Score: ' + d.score + '">';
+        html += '<div style="font-weight:700;font-size:0.6rem">' + d.date.substring(5) + '</div>';
+        html += '<div style="font-weight:800;font-size:0.75rem">' + scoreSign + d.score + '</div>';
+        html += '<div style="font-size:0.55rem">' + d.weekday + '</div>';
+        html += '</div>';
+    });
+    html += '</div>';
+
+    /* Daily detail panel (shows on click) */
+    html += '<div id="gold-day-detail" style="display:none;padding:12px;background:var(--bg-card-alt);border-radius:8px;border:1px solid #FFD700"></div>';
+    html += '</div>';
+
+    /* ── Transit Events Timeline ── */
+    if (data.events && data.events.length > 0) {
+        html += '<div class="card" style="margin-bottom:16px">';
+        html += '<h3 style="color:#FFD700;margin-bottom:10px">Gold Transit Events (' + data.events.length + ')</h3>';
+
+        /* Event type filter buttons */
+        html += '<div style="margin-bottom:6px;font-size:0.72rem;color:var(--text-dim);font-weight:700">Event Type:</div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">';
+        html += '<button class="gold-ev-filter active" data-filter="all" style="padding:3px 9px;border-radius:4px;border:1px solid #FFD700;background:#FFD700;color:#000;font-size:0.75rem;font-weight:700;cursor:pointer">All</button>';
+        html += '<button class="gold-ev-filter" data-filter="critical" style="padding:3px 9px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer">Critical</button>';
+        html += '<button class="gold-ev-filter" data-filter="high" style="padding:3px 9px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer">High</button>';
+        html += '<button class="gold-ev-filter" data-filter="sign_change" style="padding:3px 9px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer">Sign Changes</button>';
+        html += '<button class="gold-ev-filter" data-filter="retro" style="padding:3px 9px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer">Retro</button>';
+        html += '<button class="gold-ev-filter" data-filter="gold_nakshatra" style="padding:3px 9px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer">Gold Nak</button>';
+        html += '<button class="gold-ev-filter" data-filter="metal_nakshatra" style="padding:3px 9px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer">Metal Nak</button>';
+        html += '<button class="gold-ev-filter" data-filter="vedha_gold_nak" style="padding:3px 9px;border-radius:4px;border:1px solid #666;background:transparent;color:var(--text);font-size:0.75rem;cursor:pointer">Vedha</button>';
+        html += '</div>';
+
+        /* Planet filter buttons */
+        var goldPlanetOrder = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+        html += '<div style="margin-bottom:4px;font-size:0.72rem;color:var(--text-dim);font-weight:700">Planet:</div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';
+        html += '<button class="gold-pl-filter active" data-planet="all" style="padding:3px 9px;border-radius:4px;border:1px solid #FFD700;background:#FFD700;color:#000;font-size:0.75rem;font-weight:700;cursor:pointer">All</button>';
+        goldPlanetOrder.forEach(function(pn){
+            html += '<button class="gold-pl-filter" data-planet="' + pn + '" style="padding:3px 9px;border-radius:4px;border:1px solid ' + pC(pn) + ';background:transparent;color:' + pC(pn) + ';font-size:0.75rem;font-weight:600;cursor:pointer">' + pn + '</button>';
+        });
+        html += '</div>';
+        html += '<div id="gold-ev-visible-count" style="font-size:0.72rem;color:var(--text-dim);margin-bottom:6px">Showing ' + data.events.length + ' of ' + data.events.length + ' events</div>';
+
+        html += '<div style="overflow-x:auto"><table class="data-table" id="gold-events-table" style="font-size:0.78rem">';
+        html += '<thead><tr><th>Date</th><th>Planet</th><th>Event</th><th>Impact</th><th>Gold Effect</th><th>Shloka</th></tr></thead><tbody>';
+        data.events.forEach(function(e){
+            var effClr = (e.gold_effect || 0) > 0 ? '#66bb6a' : (e.gold_effect || 0) < 0 ? '#ff5252' : '#bdbdbd';
+            var effSign = (e.gold_effect || 0) >= 0 ? '+' : '';
+            var impClr = e.importance === 'critical' ? '#FFD700' : e.importance === 'high' ? '#ff9800' : '#bdbdbd';
+            var evType = e.event_type || '';
+            html += '<tr class="gold-ev-row" data-type="' + evType + '" data-importance="' + (e.importance||'medium') + '" data-planet="' + (e.planet||'') + '">';
+            html += '<td>' + e.date + '</td>';
+            html += '<td style="color:' + (e.color||'#ccc') + ';font-weight:700">' + e.planet + '</td>';
+            html += '<td><span style="color:' + impClr + ';font-weight:700;font-size:0.65rem;text-transform:uppercase">' + (e.importance||'') + '</span> ' + evType.replace(/_/g,' ') + '</td>';
+            html += '<td style="font-size:0.75rem">' + (e.impact||'') + '</td>';
+            html += '<td style="color:' + effClr + ';font-weight:700">' + effSign + (e.gold_effect||0) + '</td>';
+            html += '<td style="color:var(--text-dim);font-size:0.7rem">' + (e.shloka||'') + '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div></div>';
+    }
+
+    /* ── Rules Reference ── */
+    if (data.rules_used && data.rules_used.length > 0) {
+        html += '<details class="card" style="margin-bottom:16px"><summary style="cursor:pointer;color:#FFD700;font-weight:700;font-size:0.9rem">Vedic Rules Applied (' + data.rules_used.length + ')</summary>';
+        html += '<div style="margin-top:10px">';
+        data.rules_used.forEach(function(r){
+            html += '<div style="margin-bottom:10px;padding:8px;background:var(--bg-card-alt);border-radius:6px;border-left:3px solid #FFD700">';
+            html += '<div style="font-weight:700;color:var(--text)">' + r.id + '. ' + r.name + ' <span style="color:var(--text-dim);font-size:0.75rem">(Shloka ' + r.shloka + ')</span></div>';
+            html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">' + r.description + '</div>';
+            html += '</div>';
+        });
+        html += '</div></details>';
+    }
+
+    resultDiv.innerHTML = html;
+
+    /* ── Day cell click handler ── */
+    document.querySelectorAll('.gold-day-cell').forEach(function(cell){
+        cell.addEventListener('click', function(){
+            var idx = parseInt(this.dataset.idx);
+            var d = data.daily_signals[idx];
+            if (!d) return;
+            var detailDiv = document.getElementById('gold-day-detail');
+            var dh = '<div style="font-size:1.1rem;font-weight:800;color:#FFD700">' + d.date + ' (' + d.weekday + ') — ' + d.signal + '</div>';
+            dh += '<div style="font-size:0.9rem;margin-top:4px">Score: <b style="color:' + d.signal_color + '">' + d.score + '</b> | Day Lord: <b style="color:' + pC(d.day_lord) + '">' + d.day_lord + '</b> | Moon: <b>' + d.moon_nakshatra + '</b> (' + d.moon_sign + ') | Sun: <b>' + d.sun_sign + '</b> | Jupiter: <b>' + d.jupiter_sign + '</b></div>';
+            if (d.retro_planets && d.retro_planets.length > 0) {
+                dh += '<div style="margin-top:4px;font-size:0.82rem"><span style="color:var(--red)">Retrograde:</span> ' + d.retro_planets.join(', ') + '</div>';
+            }
+            /* Vedha summary for this day */
+            if (d.vedha_summary) {
+                var vsum = d.vedha_summary;
+                dh += '<div style="margin-top:6px;display:flex;gap:12px;font-size:0.8rem;padding:4px 8px;background:rgba(255,215,0,0.05);border-radius:4px">';
+                dh += '<div>SBC Vedha Score: <b style="color:#FFD700">' + (vsum.vedha_score >= 0 ? '+' : '') + vsum.vedha_score + '</b></div>';
+                dh += '<div>Papa: <b style="color:#ff5252">' + vsum.papa_count + '</b></div>';
+                dh += '<div>Shubha: <b style="color:#66bb6a">' + vsum.shubha_count + '</b></div>';
+                if (vsum.ubhayato > 0) dh += '<div style="color:#ff5252;font-weight:700">UBHAYATO: ' + vsum.ubhayato + '</div>';
+                dh += '</div>';
+            }
+            /* Planet nakshatras snapshot */
+            if (d.planet_nakshatras) {
+                dh += '<div style="margin-top:6px;font-size:0.78rem"><b>Planet Nakshatras:</b> ';
+                var pnParts = [];
+                Object.keys(d.planet_nakshatras).forEach(function(pn){
+                    var pnd = d.planet_nakshatras[pn];
+                    var flag = pnd.is_gold_nak ? ' <span style="background:#FFD700;color:#000;padding:0 3px;border-radius:2px;font-size:0.6rem;font-weight:700">GOLD</span>' : (pnd.is_metal_nak ? ' <span style="background:#90A4AE;color:#000;padding:0 3px;border-radius:2px;font-size:0.6rem">METAL</span>' : '');
+                    pnParts.push('<span style="color:' + pC(pn) + '">' + pn + '</span>: ' + pnd.nakshatra + flag);
+                });
+                dh += pnParts.join(' | ');
+                dh += '</div>';
+            }
+            if (d.reasons && d.reasons.length > 0) {
+                dh += '<div style="margin-top:8px;font-size:0.82rem;color:var(--text-dim)"><b>Reasons:</b></div>';
+                d.reasons.forEach(function(r){
+                    dh += '<div style="font-size:0.78rem;padding:2px 0;color:var(--text)">• ' + r + '</div>';
+                });
+            }
+            if (d.active_rules && d.active_rules.length > 0) {
+                dh += '<div style="margin-top:8px;font-size:0.82rem;color:var(--text-dim)"><b>Active Rules:</b></div>';
+                d.active_rules.forEach(function(ar){
+                    var arClr = ar.effect.indexOf('bullish') >= 0 ? '#66bb6a' : ar.effect.indexOf('bearish') >= 0 ? '#ff5252' : '#bdbdbd';
+                    dh += '<div style="font-size:0.75rem;padding:2px 8px;margin:2px 0;background:rgba(255,215,0,0.05);border-radius:4px">';
+                    dh += '<span style="font-weight:700">' + ar.rule + '</span> <span style="color:var(--text-dim);font-size:0.68rem">(Shloka ' + (ar.shloka||'') + ')</span> ';
+                    dh += '<span style="color:' + arClr + ';font-weight:700">' + ar.effect.toUpperCase() + '</span> ';
+                    dh += '<span style="color:var(--text-dim)">' + (ar.score >= 0 ? '+' : '') + ar.score + '</span>';
+                    if (ar.detail) dh += '<div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px">' + ar.detail + '</div>';
+                    dh += '</div>';
+                });
+            }
+            detailDiv.innerHTML = dh;
+            detailDiv.style.display = 'block';
+        });
+    });
+
+    /* ── Combined event + planet filter ── */
+    function applyGoldEventFilters() {
+        var activeType = 'all';
+        var activePlanet = 'all';
+        var typeBtn = document.querySelector('.gold-ev-filter.active');
+        var plBtn = document.querySelector('.gold-pl-filter.active');
+        if (typeBtn) activeType = typeBtn.dataset.filter;
+        if (plBtn) activePlanet = plBtn.dataset.planet;
+
+        var visible = 0;
+        var total = 0;
+        document.querySelectorAll('.gold-ev-row').forEach(function(row){
+            total++;
+            var showType = false;
+            var showPlanet = (activePlanet === 'all') || (row.dataset.planet === activePlanet);
+
+            if (activeType === 'all') {
+                showType = true;
+            } else if (activeType === 'critical' || activeType === 'high') {
+                showType = (row.dataset.importance === activeType);
+            } else if (activeType === 'retro') {
+                showType = (row.dataset.type === 'retro_start' || row.dataset.type === 'retro_end');
+            } else {
+                showType = (row.dataset.type === activeType);
+            }
+
+            if (showType && showPlanet) {
+                row.style.display = '';
+                visible++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        var countDiv = document.getElementById('gold-ev-visible-count');
+        if (countDiv) countDiv.textContent = 'Showing ' + visible + ' of ' + total + ' events';
+    }
+
+    document.querySelectorAll('.gold-ev-filter').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            document.querySelectorAll('.gold-ev-filter').forEach(function(b){ b.classList.remove('active'); b.style.background = 'transparent'; b.style.color = 'var(--text)'; });
+            this.classList.add('active'); this.style.background = '#FFD700'; this.style.color = '#000';
+            applyGoldEventFilters();
+        });
+    });
+
+    document.querySelectorAll('.gold-pl-filter').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            document.querySelectorAll('.gold-pl-filter').forEach(function(b){
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                var origColor = b.dataset.planet === 'all' ? 'var(--text)' : pC(b.dataset.planet);
+                b.style.color = origColor;
+            });
+            this.classList.add('active');
+            this.style.background = this.dataset.planet === 'all' ? '#FFD700' : pC(this.dataset.planet);
+            this.style.color = '#000';
+            applyGoldEventFilters();
+        });
+    });
+}

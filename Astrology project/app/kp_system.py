@@ -82,8 +82,17 @@ from app.constants import (
 def build_kp_sublord_table() -> List[Dict]:
     """
     Build the complete 249-entry KP sub-lord table.
+
     Each nakshatra (13°20') is divided into 9 subs proportional
     to the Vimshottari Dasha years of each planet.
+
+    CRITICAL: When a sub-lord period crosses a sign boundary (e.g.,
+    from Aries to Taurus at 30°), it is SPLIT into two KP entries
+    because the sign lord changes. This is what creates 249 entries
+    instead of 243 (27 nakshatras × 9 subs).
+
+    This matches K.S. Krishnamurti's original KP sub-lord table
+    used in KP Star One, JHora, and all standard KP software.
     """
     table = []
     entry_id = 1
@@ -94,6 +103,9 @@ def build_kp_sublord_table() -> List[Dict]:
         "Mula","P.Ashadha","U.Ashadha","Shravana","Dhanishtha","Shatabhisha",
         "P.Bhadrapada","U.Bhadrapada","Revati"
     ]
+
+    # Sign boundaries at 30°, 60°, 90°, ... 330°
+    sign_boundaries = [i * 30.0 for i in range(1, 12)]  # 30, 60, ..., 330
 
     for nak_idx in range(27):
         nak_start = nak_idx * NAKSHATRA_SPAN_DEG
@@ -107,19 +119,63 @@ def build_kp_sublord_table() -> List[Dict]:
             sub_span = NAKSHATRA_SPAN_DEG * (DASHA_YEARS[sub_lord] / TOTAL_DASHA_YEARS)
             sub_end = sub_start + sub_span
 
-            sign_idx = int(sub_start / 30) % 12
-            table.append({
-                "id":         entry_id,
-                "nakshatra":  nak_idx + 1,
-                "nak_name":   nak_names[nak_idx],
-                "sign":       SIGNS[sign_idx],
-                "sign_lord":  SIGN_LORDS[SIGNS[sign_idx]],
-                "star_lord":  star_lord,
-                "sub_lord":   sub_lord,
-                "start_deg":  round(sub_start, 6),
-                "end_deg":    round(sub_end, 6),
-            })
-            entry_id += 1
+            # Check if this sub crosses any sign boundary
+            # If so, split it into two entries at the boundary
+            # Use epsilon to avoid false splits when sub ends exactly at boundary
+            _EPS = 1e-6
+            split_point = None
+            for boundary in sign_boundaries:
+                if (sub_start + _EPS) < boundary < (sub_end - _EPS):
+                    # Sub genuinely crosses this sign boundary — needs split
+                    split_point = boundary
+                    break
+
+            if split_point is not None:
+                # Part 1: from sub_start to sign boundary
+                sign_idx_1 = int(sub_start / 30) % 12
+                table.append({
+                    "id":         entry_id,
+                    "nakshatra":  nak_idx + 1,
+                    "nak_name":   nak_names[nak_idx],
+                    "sign":       SIGNS[sign_idx_1],
+                    "sign_lord":  SIGN_LORDS[SIGNS[sign_idx_1]],
+                    "star_lord":  star_lord,
+                    "sub_lord":   sub_lord,
+                    "start_deg":  round(sub_start, 6),
+                    "end_deg":    round(split_point, 6),
+                })
+                entry_id += 1
+
+                # Part 2: from sign boundary to sub_end
+                sign_idx_2 = int(split_point / 30) % 12
+                table.append({
+                    "id":         entry_id,
+                    "nakshatra":  nak_idx + 1,
+                    "nak_name":   nak_names[nak_idx],
+                    "sign":       SIGNS[sign_idx_2],
+                    "sign_lord":  SIGN_LORDS[SIGNS[sign_idx_2]],
+                    "star_lord":  star_lord,
+                    "sub_lord":   sub_lord,
+                    "start_deg":  round(split_point, 6),
+                    "end_deg":    round(sub_end, 6),
+                })
+                entry_id += 1
+            else:
+                # No split needed — single entry
+                sign_idx = int(sub_start / 30) % 12
+                table.append({
+                    "id":         entry_id,
+                    "nakshatra":  nak_idx + 1,
+                    "nak_name":   nak_names[nak_idx],
+                    "sign":       SIGNS[sign_idx],
+                    "sign_lord":  SIGN_LORDS[SIGNS[sign_idx]],
+                    "star_lord":  star_lord,
+                    "sub_lord":   sub_lord,
+                    "start_deg":  round(sub_start, 6),
+                    "end_deg":    round(sub_end, 6),
+                })
+                entry_id += 1
+
             sub_start = sub_end
 
     return table
@@ -570,6 +626,1099 @@ HOUSE_GROUPS = {
     "health":       {"houses": [1, 5, 11],     "deny": [6, 8, 12], "label": "Health & Vitality"},
 }
 
+# ── Prashna (Horary) Question Categories ────────────────────
+# Each question type maps to:
+#   primary_house: the main cusp whose sub-lord decides YES/NO
+#   conductive: houses the sub-lord should signify for YES
+#   detrimental: houses that deny the matter
+#   label: display name
+PRASHNA_QUESTIONS = {
+    # ── House groups cross-verified against Futuretek KP Horary FAQs (Sunil Dixit) ──
+    # Format: primary_house = cusp whose sub-lord is checked
+    #         conductive   = houses that promise YES
+    #         detrimental  = houses that deny / obstruct
+
+    # 7th house — PDF Q66 (p64)
+    "marriage":         {"primary_house": 7,  "conductive": [2, 7, 11],     "detrimental": [1, 6, 10],  "label": "Will Marriage Happen?"},
+    # 2nd house — PDF Q4 (p30): Best=2,6,11
+    "wealth":           {"primary_house": 2,  "conductive": [2, 6, 11],     "detrimental": [5, 8, 12],  "label": "Will I Gain Wealth?"},
+    # 10th house — PDF Q94-95 (p79)
+    "job":              {"primary_house": 10, "conductive": [2, 6, 10, 11], "detrimental": [5, 8, 12],  "label": "Will I Get the Job?"},
+    # 10th house — PDF Q94 (p79)
+    "promotion":        {"primary_house": 10, "conductive": [2, 6, 10, 11], "detrimental": [5, 8, 12],  "label": "Will I Get Promotion?"},
+    # 10th house — PDF Q9 (p32): 10th SL sig of 3rd = transfer
+    "transfer":         {"primary_house": 10, "conductive": [3, 10],        "detrimental": [4, 12],     "label": "Will I Be Transferred?"},
+    # 1st house — PDF Q2 (p28)
+    "health":           {"primary_house": 1,  "conductive": [1, 5, 11],     "detrimental": [6, 8, 12],  "label": "Will Health Improve?"},
+    # 3rd house — PDF Q8 (p32)
+    "travel_short":     {"primary_house": 3,  "conductive": [3, 9, 11],     "detrimental": [4, 8, 12],  "label": "Will Short Journey Happen?"},
+    # 12th house — PDF Q105 (p85): 12th SL → 3,9,12 [FIXED: was 9th cusp]
+    "travel_foreign":   {"primary_house": 12, "conductive": [3, 9, 12],     "detrimental": [4],         "label": "Will I Go Abroad?"},
+    # 6th house — PDF Q63-64 (p61-62): [FIXED: added 10 to conductive, 5 to detrimental]
+    "court_case":       {"primary_house": 6,  "conductive": [6, 10, 11],    "detrimental": [5, 12],     "label": "Will I Win the Court Case?"},
+    # 5th house — standard KP speculation
+    "speculation":      {"primary_house": 5,  "conductive": [1, 2, 5, 11],  "detrimental": [8, 12],     "label": "Will Speculation Profit?"},
+    # 4th house — PDF Q22 (p38)
+    "buy_property":     {"primary_house": 4,  "conductive": [4, 11, 12],    "detrimental": [3, 5, 10],  "label": "Will I Buy Property?"},
+    # 10th house — PDF Q23 (p38-39)
+    "sell_property":    {"primary_house": 10, "conductive": [3, 5, 10],     "detrimental": [4, 11],     "label": "Will Property Be Sold?"},
+    # 4th house — PDF Q33 (p45)
+    "education":        {"primary_house": 4,  "conductive": [4, 9, 11],     "detrimental": [8, 12],     "label": "Will I Pass Exams?"},
+    # 5th house — PDF Q39 (p49)
+    "children":         {"primary_house": 5,  "conductive": [2, 5, 11],     "detrimental": [1, 4, 10],  "label": "Will I Have Children?"},
+    # 6th house — PDF Q57 (p59): [FIXED: added 2 to conductive]
+    "loan":             {"primary_house": 6,  "conductive": [2, 6, 11],     "detrimental": [5, 8, 12],  "label": "Will I Get the Loan?"},
+    # 6th house — PDF Q55 (p58): [FIXED: primary was 11, PDF uses 6th cusp]
+    "recovery_money":   {"primary_house": 6,  "conductive": [2, 6, 11],     "detrimental": [5, 8, 12],  "label": "Will I Recover Money?"},
+    # 3rd house — PDF Q12 (p34): [FIXED: primary was 11, PDF uses 3rd cusp; detrimental 8,12]
+    "interview":        {"primary_house": 3,  "conductive": [3, 9, 11],     "detrimental": [8, 12],     "label": "Will I Get Interview Call?"},
+    # 3rd house — PDF Q15 (p36)
+    "contract":         {"primary_house": 3,  "conductive": [3, 11],        "detrimental": [5, 8, 12],  "label": "Will I Get the Contract?"},
+    # 5th house — standard KP lottery/speculation
+    "lottery":          {"primary_house": 5,  "conductive": [2, 5, 6, 11],  "detrimental": [8, 12],     "label": "Will I Win the Lottery?"},
+    # 4th house — standard KP vehicle
+    "vehicle":          {"primary_house": 4,  "conductive": [4, 11],        "detrimental": [3, 12],     "label": "Will I Get a Vehicle?"},
+    # 6th house — PDF Q58-59 (p60)
+    "election":         {"primary_house": 6,  "conductive": [6, 10, 11],    "detrimental": [5, 8, 12],  "label": "Will I Win the Election?"},
+    # 3rd house — PDF Q16 (p36)
+    "appeal":           {"primary_house": 3,  "conductive": [6, 11],        "detrimental": [5, 12],     "label": "Will Appeal Succeed?"},
+    # 11th house — general
+    "general_success":  {"primary_house": 11, "conductive": [1, 2, 11],     "detrimental": [6, 8, 12],  "label": "Will I Succeed (General)?"},
+
+    # ── New question types from Futuretek PDF ──
+    # 12th house — PDF Q105-107 (p85): foreign settlement / green card
+    "foreign_settle":   {"primary_house": 12, "conductive": [3, 9, 12],     "detrimental": [2, 4, 11],  "label": "Will I Settle Abroad?"},
+    # 11th house — PDF Q103 (p83): lost item recovery
+    "lost_item":        {"primary_house": 11, "conductive": [2, 11],        "detrimental": [5, 8, 12],  "label": "Will I Recover Lost Item?"},
+    # 3rd house — PDF Q104 (p84): visa
+    "visa":             {"primary_house": 3,  "conductive": [3, 9, 11, 12], "detrimental": [2, 8],      "label": "Will I Get Visa?"},
+    # 7th house — PDF Q76 (p70): business profit
+    "business_profit":  {"primary_house": 7,  "conductive": [2, 11],        "detrimental": [6, 12],     "label": "Will Business Be Profitable?"},
+    # 7th house — PDF Q77-78 (p70): partnership
+    "partnership":      {"primary_house": 7,  "conductive": [5, 11],        "detrimental": [6, 12],     "label": "Will Partnership Suit Me?"},
+    # 5th house — PDF Q49 (p54): love affair
+    "love_affair":      {"primary_house": 5,  "conductive": [7, 11],        "detrimental": [6, 12],     "label": "Will Love Affair Materialise?"},
+    # 12th house — PDF Q58 (p60): debt freedom
+    "debt_freedom":     {"primary_house": 12, "conductive": [5, 8, 12],     "detrimental": [2, 6, 11],  "label": "Will I Get Out of Debt?"},
+    # 6th house — PDF Q59 (p60): competitive exam
+    "competitive_exam": {"primary_house": 6,  "conductive": [4, 6, 9, 11],  "detrimental": [5, 8, 12],  "label": "Will I Clear Competitive Exam?"},
+}
+
+
+def calculate_prashna_yesno(
+    kp_number: int,
+    question_type: str,
+    planets: List[Dict],
+    houses: List[Dict],
+    ascendant: Dict,
+    transit_planets: Optional[List[Dict]],
+    transit_datetime: Optional[datetime],
+    significator_data: Dict,
+    cuspal_data: List[Dict],
+    planet_sig_table: List[Dict],
+) -> Dict:
+    """
+    Advanced KP Prashna (Horary) Yes/No system per Futuretek methodology:
+
+    1. KP number (1-249) sets the ascendant degree
+    2. Identify the primary house cusp for the question type
+    3. Check cusp sub-lord's signification → does it signify conductive houses? (YES)
+       or detrimental houses? (NO) or both? (MIXED)
+    4. Check if cusp sub-lord is retrograde or in star of retrograde planet → weak/deny
+    5. Compute Ruling Planets at query moment
+    6. Cross-match significators with Ruling Planets → fruitful significators
+    7. Final verdict with detailed reasoning
+
+    Rules from Futuretek KP Horary:
+    - Sub-lord of primary cusp must signify conductive houses → YES
+    - Sub-lord signifying only detrimental houses → NO
+    - Sub-lord in star of retrograde planet → matter delayed/denied
+    - Rahu/Ketu act as agents of their sign lord among RPs
+    - RP in star of retrograde planet should be discarded
+    - Significators common with RP are FRUITFUL significators
+    """
+    q_config = PRASHNA_QUESTIONS.get(question_type)
+    if not q_config:
+        return {"error": f"Unknown question type: {question_type}"}
+
+    primary_house = q_config["primary_house"]
+    conductive = q_config["conductive"]
+    detrimental = q_config["detrimental"]
+    label = q_config["label"]
+
+    # ── Step 1: KP Horary pointer ──
+    horary_kp = get_kp_from_number(kp_number) if (1 <= kp_number <= 249) else {}
+
+    # ── Step 2: Get cusp sub-lord of primary house ──
+    primary_cusp = next((c for c in cuspal_data if c["house"] == primary_house), None)
+    if not primary_cusp:
+        return {"error": f"No cuspal data for house {primary_house}"}
+
+    cusp_sub_lord = primary_cusp.get("sub_lord", "")
+    cusp_star_lord = primary_cusp.get("star_lord", "")
+    cusp_sign_lord = primary_cusp.get("sign_lord", "")
+
+    # ── Step 3: Find which houses the sub-lord signifies ──
+    house_sigs = significator_data.get("houses", {})
+    sub_lord_signifies = _get_planet_signified_houses(cusp_sub_lord, house_sigs)
+    star_lord_signifies = _get_planet_signified_houses(cusp_star_lord, house_sigs)
+
+    # Check conductive vs detrimental overlap
+    conductive_match = [h for h in conductive if h in sub_lord_signifies]
+    detrimental_match = [h for h in detrimental if h in sub_lord_signifies]
+
+    # ── Step 4: Retrograde check — 3-tier per Futuretek PDF Page 25 ──
+    # Exception: Rahu & Ketu are always retrograde — treat as normal
+    # Sun & Moon are never retrograde
+    ALWAYS_RETRO = {"Rahu", "Ketu"}
+    NEVER_RETRO = {"Sun", "Moon"}
+
+    sub_lord_planet_data = next((p for p in planets if p["planet"] == cusp_sub_lord), None)
+    is_sub_lord_retro = False
+    if sub_lord_planet_data and cusp_sub_lord not in ALWAYS_RETRO and cusp_sub_lord not in NEVER_RETRO:
+        is_sub_lord_retro = sub_lord_planet_data.get("speed", 0) < 0
+
+    # Find the sub-lord's depositor (the star lord of the sub-lord's position)
+    # This tells us: is the sub-lord deposited in the star of a retro/direct planet?
+    sl_depositor = ""
+    is_sl_depositor_retro = False
+    if sub_lord_planet_data:
+        sl_kp = get_kp_pointer(sub_lord_planet_data["longitude"])
+        sl_depositor = sl_kp.get("star_lord", "")
+        if sl_depositor and sl_depositor not in ALWAYS_RETRO and sl_depositor not in NEVER_RETRO:
+            depositor_data = next((p for p in planets if p["planet"] == sl_depositor), None)
+            if depositor_data:
+                is_sl_depositor_retro = depositor_data.get("speed", 0) < 0
+
+    # Also check cusp star lord retro (existing check)
+    star_lord_planet_data = next((p for p in planets if p["planet"] == cusp_star_lord), None)
+    is_star_lord_retro = False
+    if star_lord_planet_data and cusp_star_lord not in ALWAYS_RETRO and cusp_star_lord not in NEVER_RETRO:
+        is_star_lord_retro = star_lord_planet_data.get("speed", 0) < 0
+
+    # ── 3-tier retrograde classification (Futuretek PDF p25) ──
+    # Tier 1: Retro in star of DIRECT → delayed, materializes after becoming direct
+    # Tier 2: Retro in star of RETRO (or own star when retro) → "promises only failure"
+    # Tier 3: Direct in star of RETRO → "cannot give result in its period"
+    retro_tier = 0  # 0 = no retro issue
+    if is_sub_lord_retro and not is_sl_depositor_retro:
+        retro_tier = 1  # Retro in star of direct → delayed but will happen
+    elif is_sub_lord_retro and is_sl_depositor_retro:
+        retro_tier = 2  # Retro in star of retro → absolute failure
+    elif not is_sub_lord_retro and is_sl_depositor_retro:
+        retro_tier = 3  # Direct in star of retro → cannot give result
+
+    retro_weakness = retro_tier > 0 or is_star_lord_retro
+    retro_denial = retro_tier >= 2  # Tier 2 and 3 = hard denial
+
+    # ── Step 5: Compute Ruling Planets ──
+    rp_data = None
+    fruitful_significators = []
+    rp_match_count = 0
+    if transit_planets and transit_datetime:
+        rp_data = calculate_current_ruling_planets(
+            transit_planets,
+            ascendant,
+            transit_datetime,
+        )
+        rp_planets = [r["planet"] for r in rp_data.get("rp_rows", [])]
+        rp_set = set(rp_planets)
+
+        # ── Step 6: Discard RP in star of retrograde planet ──
+        # Exception: Rahu/Ketu are always retro — don't discard planets in their stars
+        valid_rps = []
+        for rp_planet in rp_set:
+            rp_planet_data = next((p for p in transit_planets if p["planet"] == rp_planet), None)
+            if rp_planet_data:
+                rp_kp = get_kp_pointer(rp_planet_data["longitude"])
+                rp_star_lord = rp_kp.get("star_lord", "")
+                if rp_star_lord not in ALWAYS_RETRO:
+                    rp_star_planet = next((p for p in transit_planets if p["planet"] == rp_star_lord), None)
+                    if rp_star_planet and rp_star_planet.get("speed", 0) < 0:
+                        continue  # discard — in star of truly retrograde planet
+            valid_rps.append(rp_planet)
+
+        # Rahu/Ketu agent replacement among RPs
+        for node in ["Rahu", "Ketu"]:
+            node_data = next((p for p in transit_planets if p["planet"] == node), None)
+            if node_data:
+                node_kp = get_kp_pointer(node_data["longitude"])
+                agent_of = node_kp.get("sign_lord", "")
+                if agent_of in rp_set and node not in valid_rps:
+                    valid_rps.append(node)
+
+        # ── Step 7: Cross-match significators with RPs ──
+        # Get all significators of the conductive houses
+        all_sigs_for_group = set()
+        for h in conductive:
+            h_data = house_sigs.get(h, {})
+            for s in h_data.get("all_significators", []):
+                all_sigs_for_group.add(s)
+
+        fruitful_significators = sorted(all_sigs_for_group & set(valid_rps))
+        rp_match_count = len(fruitful_significators)
+
+    # ── Step 8: Final Verdict ──
+    reasons = []
+
+    if conductive_match and not detrimental_match:
+        base_verdict = "YES"
+        reasons.append(f"Sub-lord {cusp_sub_lord} of H{primary_house} signifies conductive houses {conductive_match}")
+    elif detrimental_match and not conductive_match:
+        base_verdict = "NO"
+        reasons.append(f"Sub-lord {cusp_sub_lord} of H{primary_house} signifies ONLY detrimental houses {detrimental_match}")
+    elif conductive_match and detrimental_match:
+        base_verdict = "YES (with obstacles)"
+        reasons.append(f"Sub-lord {cusp_sub_lord} signifies both conductive {conductive_match} AND detrimental {detrimental_match}")
+    else:
+        # Sub-lord doesn't signify either group directly — check star lord
+        star_conductive = [h for h in conductive if h in star_lord_signifies]
+        star_detrimental = [h for h in detrimental if h in star_lord_signifies]
+        if star_conductive:
+            base_verdict = "LIKELY YES"
+            reasons.append(f"Sub-lord's star lord {cusp_star_lord} signifies conductive houses {star_conductive}")
+        elif star_detrimental:
+            base_verdict = "LIKELY NO"
+            reasons.append(f"Sub-lord's star lord {cusp_star_lord} signifies detrimental houses {star_detrimental}")
+        else:
+            base_verdict = "UNCERTAIN"
+            reasons.append(f"Sub-lord {cusp_sub_lord} does not clearly signify conductive or detrimental houses")
+
+    # Retrograde modifier — 3-tier per Futuretek PDF Page 25
+    # Rahu/Ketu always retrograde — already excluded above
+    if retro_tier == 1:
+        # Retro in star of direct → delayed but will materialise after becoming direct
+        reasons.append(f"RETRO TIER-1: Sub-lord {cusp_sub_lord} is RETROGRADE but in star of DIRECT {sl_depositor} — matter delayed, will materialise after {cusp_sub_lord} turns direct")
+        if "YES" in base_verdict or base_verdict == "LIKELY YES":
+            base_verdict = "YES (delayed — retro in star of direct)"
+    elif retro_tier == 2:
+        # Retro in star of retro → "promises only failure. Never success."
+        reasons.append(f"RETRO TIER-2 DENIAL: Sub-lord {cusp_sub_lord} is RETROGRADE in star of RETROGRADE {sl_depositor} — promises ONLY FAILURE per Futuretek rules")
+        if "YES" in base_verdict or base_verdict == "LIKELY YES":
+            base_verdict = "NO (retro-retro: total failure)"
+    elif retro_tier == 3:
+        # Direct in star of retro → "cannot give result in its period"
+        reasons.append(f"RETRO TIER-3 BLOCK: Sub-lord {cusp_sub_lord} is DIRECT but in star of RETROGRADE {sl_depositor} — CANNOT give result in its period per Futuretek rules")
+        if "YES" in base_verdict or base_verdict == "LIKELY YES":
+            base_verdict = "NO (direct in star of retro)"
+
+    # Additional: cusp star lord retro = extra weakness
+    if is_star_lord_retro and retro_tier == 0:
+        reasons.append(f"WARNING: Cusp star lord {cusp_star_lord} is RETROGRADE — promise weakened, delays likely")
+        if base_verdict.startswith("YES") and not is_sub_lord_retro:
+            base_verdict = "YES (delayed)"
+
+    # RP confirmation
+    if rp_data:
+        if rp_match_count >= 3:
+            reasons.append(f"STRONG RP confirmation: {rp_match_count} fruitful significators match Ruling Planets: {', '.join(fruitful_significators)}")
+        elif rp_match_count >= 1:
+            reasons.append(f"PARTIAL RP confirmation: {rp_match_count} fruitful significators: {', '.join(fruitful_significators)}")
+        else:
+            reasons.append("WEAK RP confirmation: No significators match current Ruling Planets — timing may not be NOW")
+            if base_verdict.startswith("YES"):
+                base_verdict += " (not now)"
+
+    # Confidence score
+    score = 0
+    if conductive_match:
+        score += len(conductive_match) * 20
+    if detrimental_match:
+        score -= len(detrimental_match) * 20
+    if rp_match_count:
+        score += rp_match_count * 10
+    if retro_tier == 2:
+        score -= 70  # Retro in star of retro = absolute failure
+    elif retro_tier == 3:
+        score -= 60  # Direct in star of retro = cannot give result
+    elif retro_tier == 1:
+        score -= 25  # Retro in star of direct = delayed but possible
+    if is_star_lord_retro and retro_tier == 0:
+        score -= 20  # Cusp star lord retro = weaken
+    # Clamp -100 to 100
+    score = max(-100, min(100, score))
+
+    # Determine verdict color
+    if "YES" in base_verdict and "NO" not in base_verdict:
+        verdict_type = "positive"
+    elif "NO" in base_verdict:
+        verdict_type = "negative"
+    else:
+        verdict_type = "neutral"
+
+    # ── All cusps analysis for the question group ──
+    group_cusp_analysis = []
+    for h in conductive:
+        cusp = next((c for c in cuspal_data if c["house"] == h), None)
+        if cusp:
+            sl = cusp.get("sub_lord", "")
+            sl_houses = _get_planet_signified_houses(sl, house_sigs)
+            cond = [x for x in conductive if x in sl_houses]
+            detr = [x for x in detrimental if x in sl_houses]
+            if cond and not detr:
+                v = "PROMISE"
+            elif detr and not cond:
+                v = "DENIAL"
+            elif cond and detr:
+                v = "MIXED"
+            else:
+                v = "NEUTRAL"
+            group_cusp_analysis.append({
+                "house": h,
+                "sub_lord": sl,
+                "signifies": sl_houses,
+                "verdict": v,
+            })
+
+    return {
+        "question_type":        question_type,
+        "question_label":       label,
+        "kp_number":            kp_number,
+        "horary_kp":            horary_kp,
+        "primary_house":        primary_house,
+        "conductive_houses":    conductive,
+        "detrimental_houses":   detrimental,
+        "cusp_sub_lord":        cusp_sub_lord,
+        "cusp_star_lord":       cusp_star_lord,
+        "cusp_sign_lord":       cusp_sign_lord,
+        "sub_lord_signifies":   sub_lord_signifies,
+        "conductive_match":     conductive_match,
+        "detrimental_match":    detrimental_match,
+        "is_sub_lord_retro":    is_sub_lord_retro,
+        "is_star_lord_retro":   is_star_lord_retro,
+        "retro_tier":           retro_tier,
+        "sl_depositor":         sl_depositor,
+        "is_sl_depositor_retro": is_sl_depositor_retro,
+        "ruling_planets":       rp_data,
+        "fruitful_significators": fruitful_significators,
+        "rp_match_count":       rp_match_count,
+        "group_cusp_analysis":  group_cusp_analysis,
+        "verdict":              base_verdict,
+        "verdict_type":         verdict_type,
+        "confidence_score":     score,
+        "reasons":              reasons,
+    }
+
+
+# ═════════════════════════════════════════════════════════════
+# KP SPORTS / MATCH PREDICTION
+# ═════════════════════════════════════════════════════════════
+#
+# Rules from notes (4-step significator theory):
+#
+# TEAM A (Querent / Favourite — takes Lagna):
+#   WINS if 6th SL → 6, 10, 11, 1, 2, 3 at level 1 or 2
+#     Prime importance: 6, 10, 11
+#     Cross-check from 12th SL (should NOT signify opponent win houses)
+#   LOSES if 6th SL → 12, 5, 4, 7, 8, 9 at level 1 or 2
+#
+# TEAM B (Opponent — 7th house):
+#   WINS if 12th SL → 12, 5, 4, 7, 8, 9 at level 1 or 2
+#     Prime importance: 12, 5, 4
+#     Cross-check from 5th SL
+#   LOSES if 12th SL → 6, 10, 11, 1, 2, 3 at level 1 or 2
+#
+# If mixed houses appear, check opponent combination also.
+#
+# BILATERAL SERIES: Same chart for all matches.
+#   Moon's transiting nakshatra on match day → that nak lord's
+#   signification decides result. If Moon crosses 2 nakshatras
+#   during match, take the one at match END.
+#
+# TOURNAMENT: Give seed no per team. 6th SL → 5, 4, 12 = eliminated.
+# ═════════════════════════════════════════════════════════════
+
+MATCH_CATEGORIES = {
+    "cricket":      "Cricket Match",
+    "football":     "Football Match",
+    "tennis":       "Tennis Match",
+    "kabaddi":      "Kabaddi Match",
+    "hockey":       "Hockey Match",
+    "boxing":       "Boxing / Wrestling",
+    "election":     "Election Contest",
+    "competition":  "General Competition",
+    "court_case":   "Court Case / Legal Battle",
+    "business":     "Business Competition",
+    "exam":         "Competitive Exam",
+}
+
+
+def _get_level12_houses(planet: str, house_sigs: Dict) -> List[int]:
+    """
+    Get houses where a planet is a Level-1 or Level-2 significator
+    (star-of-occupant or occupant — strongest levels in 4-step theory).
+    """
+    houses = []
+    for h_num, h_data in house_sigs.items():
+        if not isinstance(h_data, dict):
+            continue
+        step1 = h_data.get("step1_star_of_occ", [])
+        step2 = h_data.get("step2_occupants", h_data.get("occupants", []))
+        if planet in step1 or planet in step2:
+            houses.append(h_num)
+    return houses
+
+
+def _get_level34_houses(planet: str, house_sigs: Dict) -> List[int]:
+    """
+    Get houses where a planet is a Level-3 or Level-4 significator
+    (star-of-lord or lord — weaker levels).
+    """
+    houses = []
+    for h_num, h_data in house_sigs.items():
+        if not isinstance(h_data, dict):
+            continue
+        step3 = h_data.get("step3_star_of_lord", [])
+        step4 = h_data.get("step4_lord", [])
+        if planet in step3 or planet in step4:
+            houses.append(h_num)
+    return houses
+
+
+def calculate_match_prediction(
+    kp_number: int,
+    planets: List[Dict],
+    houses: List[Dict],
+    ascendant: Dict,
+    transit_planets: Optional[List[Dict]],
+    transit_datetime: Optional[datetime],
+    significator_data: Dict,
+    cuspal_data: List[Dict],
+    team_a: str = "Team A",
+    team_b: str = "Team B",
+    match_type: str = "cricket",
+) -> Dict:
+    """
+    KP Horary Sports / Match Prediction — Who will WIN / LOSE.
+
+    Exact rules from handwritten notes (4-step significator theory):
+
+    TEAM A (Favourite / Querent — takes Lagna):
+      WINS if 6th SL → 6, 10, 11, 1, 2, 3 at Level 1 or 2
+        Prime importance: 6, 10, 11
+        Cross-check from 12th SL
+      LOSES if 6th SL → 12, 5, 4, 7, 8, 9 at Level 1 or 2
+
+    TEAM B (Opponent — 7th house):
+      WINS if 12th SL → 12, 5, 4, 7, 8, 9 at Level 1 or 2
+        Prime importance: 12, 5, 4
+        Cross-check from 5th SL
+      LOSES if 12th SL → 6, 10, 11, 1, 2, 3 at Level 1 or 2
+
+    Level 1 = Planets in STAR of OCCUPANT (strongest)
+    Level 2 = OCCUPANT planet itself
+    Level 3 = Planets in STAR of LORD
+    Level 4 = LORD itself (weakest)
+
+    If mixed houses appear, check opponent combination also.
+
+    Bilateral Series: Same chart, Moon nakshatra lord on match day decides.
+    Tournament: 6th SL → 5, 4, 12 = eliminated.
+    """
+    house_sigs = significator_data.get("houses", {})
+
+    # ── KP Horary pointer ──
+    horary_kp = get_kp_from_number(kp_number) if (1 <= kp_number <= 249) else {}
+
+    # ═══ CUSP SUB-LORDS ═══
+    def _get_cusp(h):
+        c = next((x for x in cuspal_data if x["house"] == h), None)
+        return c or {}
+
+    cusp_6 = _get_cusp(6)
+    cusp_12 = _get_cusp(12)
+    cusp_5 = _get_cusp(5)
+    cusp_1 = _get_cusp(1)
+    cusp_7 = _get_cusp(7)
+    cusp_11 = _get_cusp(11)
+
+    sl_6 = cusp_6.get("sub_lord", "")
+    sl_12 = cusp_12.get("sub_lord", "")
+    sl_5 = cusp_5.get("sub_lord", "")
+    sl_1 = cusp_1.get("sub_lord", "")
+    sl_7 = cusp_7.get("sub_lord", "")
+    sl_11 = cusp_11.get("sub_lord", "")
+
+    # All houses signified (all 4 levels)
+    sl_6_all = _get_planet_signified_houses(sl_6, house_sigs)
+    sl_12_all = _get_planet_signified_houses(sl_12, house_sigs)
+    sl_5_all = _get_planet_signified_houses(sl_5, house_sigs)
+
+    # Level 1-2 only (strongest)
+    sl_6_L12 = _get_level12_houses(sl_6, house_sigs)
+    sl_6_L34 = _get_level34_houses(sl_6, house_sigs)
+    sl_12_L12 = _get_level12_houses(sl_12, house_sigs)
+    sl_12_L34 = _get_level34_houses(sl_12, house_sigs)
+    sl_5_L12 = _get_level12_houses(sl_5, house_sigs)
+
+    # ═══ TEAM A ANALYSIS (6th SL) ═══
+    team_a_win_houses = [6, 10, 11, 1, 2, 3]
+    team_a_win_prime = [6, 10, 11]
+    team_a_lose_houses = [12, 5, 4, 7, 8, 9]
+
+    team_a_score = 0
+    team_b_score = 0
+    reasons = []
+
+    # Check 6th SL at Level 1-2
+    sl6_win_L12 = [h for h in team_a_win_houses if h in sl_6_L12]
+    sl6_win_prime_L12 = [h for h in team_a_win_prime if h in sl_6_L12]
+    sl6_lose_L12 = [h for h in team_a_lose_houses if h in sl_6_L12]
+
+    # Also check Level 3-4 (weaker)
+    sl6_win_L34 = [h for h in team_a_win_houses if h in sl_6_L34]
+    sl6_lose_L34 = [h for h in team_a_lose_houses if h in sl_6_L34]
+
+    if sl6_win_prime_L12:
+        team_a_score += 40
+        reasons.append(f"6th SL ({sl_6}) is PRIMARY significator (L1/L2) of PRIME win houses {sl6_win_prime_L12} → STRONG for {team_a}")
+    elif sl6_win_L12:
+        team_a_score += 30
+        reasons.append(f"6th SL ({sl_6}) is PRIMARY significator (L1/L2) of win houses {sl6_win_L12} → {team_a} favored")
+
+    if sl6_lose_L12:
+        team_b_score += 35
+        reasons.append(f"6th SL ({sl_6}) is PRIMARY significator (L1/L2) of loss houses {sl6_lose_L12} → {team_a} likely to LOSE")
+
+    # Level 3-4 (weaker confirmation)
+    if sl6_win_L34 and not sl6_win_L12:
+        team_a_score += 10
+        reasons.append(f"6th SL ({sl_6}) is L3/L4 significator of win houses {sl6_win_L34} (weak support for {team_a})")
+    if sl6_lose_L34 and not sl6_lose_L12:
+        team_b_score += 8
+        reasons.append(f"6th SL ({sl_6}) is L3/L4 significator of loss houses {sl6_lose_L34} (weak negative for {team_a})")
+
+    # ═══ CROSS-CHECK from 12th SL ═══
+    # 12th cusp = 6th from 7th = opponent's victory house
+    team_b_win_houses = [12, 5, 4, 7, 8, 9]
+    team_b_win_prime = [12, 5, 4]
+    team_b_lose_houses = [6, 10, 11, 1, 2, 3]
+
+    sl12_win_L12 = [h for h in team_b_win_houses if h in sl_12_L12]
+    sl12_win_prime_L12 = [h for h in team_b_win_prime if h in sl_12_L12]
+    sl12_lose_L12 = [h for h in team_b_lose_houses if h in sl_12_L12]
+    sl12_win_L34 = [h for h in team_b_win_houses if h in sl_12_L34]
+    sl12_lose_L34 = [h for h in team_b_lose_houses if h in sl_12_L34]
+
+    if sl12_win_prime_L12:
+        team_b_score += 40
+        reasons.append(f"12th SL ({sl_12}) is PRIMARY significator (L1/L2) of PRIME opponent-win houses {sl12_win_prime_L12} → STRONG for {team_b}")
+    elif sl12_win_L12:
+        team_b_score += 30
+        reasons.append(f"12th SL ({sl_12}) is PRIMARY significator (L1/L2) of opponent-win houses {sl12_win_L12} → {team_b} favored")
+
+    if sl12_lose_L12:
+        team_a_score += 30
+        reasons.append(f"12th SL ({sl_12}) is PRIMARY significator (L1/L2) of opponent-loss houses {sl12_lose_L12} → {team_b} weakened, confirms {team_a}")
+
+    if sl12_win_L34 and not sl12_win_L12:
+        team_b_score += 8
+        reasons.append(f"12th SL ({sl_12}) is L3/L4 significator of {sl12_win_L34} (weak for {team_b})")
+    if sl12_lose_L34 and not sl12_lose_L12:
+        team_a_score += 5
+        reasons.append(f"12th SL ({sl_12}) is L3/L4 significator of {sl12_lose_L34} (weak confirmation for {team_a})")
+
+    # ═══ 5th SL CROSS-CHECK (11th from 7th = opponent's gains) ═══
+    sl5_b_gain = [h for h in team_b_win_houses if h in sl_5_L12]
+    if sl5_b_gain:
+        team_b_score += 15
+        reasons.append(f"5th SL ({sl_5}) confirms {team_b} gains: L1/L2 in {sl5_b_gain}")
+
+    sl5_b_deny = [h for h in team_b_lose_houses if h in sl_5_L12]
+    if sl5_b_deny:
+        team_a_score += 10
+        reasons.append(f"5th SL ({sl_5}) denies {team_b} gains: L1/L2 in {sl5_b_deny}")
+
+    # ═══ RETROGRADE CHECK — 3-tier per Futuretek PDF Page 25 ═══
+    # Rahu & Ketu are always retrograde — exclude from retro penalty
+    # Sun & Moon are never retrograde
+    _ALWAYS_RETRO = {"Rahu", "Ketu"}
+    _NEVER_RETRO = {"Sun", "Moon"}
+
+    def _is_retro(planet_name, planet_list):
+        if planet_name in _ALWAYS_RETRO or planet_name in _NEVER_RETRO:
+            return False
+        pd = next((p for p in planet_list if p["planet"] == planet_name), None)
+        return pd and pd.get("speed", 0) < 0
+
+    def _get_retro_tier(sl_name, planet_list):
+        """Compute 3-tier retro status for a sub-lord."""
+        sl_pd = next((p for p in planet_list if p["planet"] == sl_name), None)
+        if not sl_pd:
+            return 0, ""
+        sl_is_retro = _is_retro(sl_name, planet_list)
+        # Find depositor (star lord of sub-lord's position)
+        sl_kp = get_kp_pointer(sl_pd["longitude"])
+        depositor = sl_kp.get("star_lord", "")
+        dep_is_retro = _is_retro(depositor, planet_list) if depositor else False
+        if sl_is_retro and not dep_is_retro:
+            return 1, depositor  # delayed
+        elif sl_is_retro and dep_is_retro:
+            return 2, depositor  # total failure
+        elif not sl_is_retro and dep_is_retro:
+            return 3, depositor  # cannot give result
+        return 0, depositor
+
+    sl_6_retro_tier, sl_6_dep = _get_retro_tier(sl_6, planets)
+    sl_12_retro_tier, sl_12_dep = _get_retro_tier(sl_12, planets)
+
+    sl_6_retro = sl_6_retro_tier >= 2  # For backward compat in return dict
+
+    if sl_6_retro_tier == 1:
+        team_a_score -= 12
+        reasons.append(f"RETRO TIER-1: 6th SL ({sl_6}) is RETRO in star of DIRECT {sl_6_dep} — {team_a} result delayed")
+    elif sl_6_retro_tier == 2:
+        team_a_score -= 30
+        reasons.append(f"RETRO TIER-2 DENIAL: 6th SL ({sl_6}) is RETRO in star of RETRO {sl_6_dep} — {team_a} victory DENIED (total failure)")
+    elif sl_6_retro_tier == 3:
+        team_a_score -= 25
+        reasons.append(f"RETRO TIER-3 BLOCK: 6th SL ({sl_6}) is DIRECT in star of RETRO {sl_6_dep} — CANNOT give result for {team_a}")
+
+    if sl_12_retro_tier == 1:
+        team_b_score -= 10
+        reasons.append(f"RETRO TIER-1: 12th SL ({sl_12}) is RETRO in star of DIRECT {sl_12_dep} — {team_b} result delayed")
+    elif sl_12_retro_tier == 2:
+        team_b_score -= 25
+        reasons.append(f"RETRO TIER-2 DENIAL: 12th SL ({sl_12}) is RETRO in star of RETRO {sl_12_dep} — {team_b} victory DENIED")
+    elif sl_12_retro_tier == 3:
+        team_b_score -= 20
+        reasons.append(f"RETRO TIER-3 BLOCK: 12th SL ({sl_12}) is DIRECT in star of RETRO {sl_12_dep} — CANNOT give result for {team_b}")
+
+    # ═══ MOON NAKSHATRA (for bilateral series timing) ═══
+    moon_nak_info = None
+    if transit_planets:
+        moon = next((p for p in transit_planets if p["planet"] == "Moon"), None)
+        if moon:
+            moon_kp = get_kp_pointer(moon["longitude"])
+            nak_lord = moon_kp.get("star_lord", "")
+            nak_lord_L12 = _get_level12_houses(nak_lord, house_sigs)
+            nak_lord_all = _get_planet_signified_houses(nak_lord, house_sigs)
+            moon_nak_info = {
+                "nakshatra": moon_kp.get("nakshatra", ""),
+                "nak_lord": nak_lord,
+                "nak_lord_signifies_all": nak_lord_all,
+                "nak_lord_signifies_L12": nak_lord_L12,
+                "moon_sign": moon_kp.get("sign", ""),
+                "moon_longitude": round(moon["longitude"], 4),
+            }
+            # Moon nak lord signification adds to score
+            nak_a_houses = [h for h in team_a_win_houses if h in nak_lord_all]
+            nak_b_houses = [h for h in team_b_win_houses if h in nak_lord_all]
+            if nak_a_houses:
+                team_a_score += len(nak_a_houses) * 3
+                reasons.append(f"Moon in {moon_kp['nakshatra']} — Nak lord {nak_lord} signifies {team_a} win houses {nak_a_houses}")
+            if nak_b_houses:
+                team_b_score += len(nak_b_houses) * 3
+                reasons.append(f"Moon in {moon_kp['nakshatra']} — Nak lord {nak_lord} signifies {team_b} win houses {nak_b_houses}")
+
+    # ═══ RULING PLANETS ═══
+    rp_data = None
+    fruitful_a = []
+    fruitful_b = []
+    if transit_planets and transit_datetime:
+        rp_data = calculate_current_ruling_planets(
+            transit_planets, ascendant, transit_datetime
+        )
+        rp_planets = set(r["planet"] for r in rp_data.get("rp_rows", []))
+
+        # Discard RP in star of retrograde (Rahu/Ketu always retro — exclude)
+        valid_rps = []
+        for rp_p in rp_planets:
+            rp_pd = next((p for p in transit_planets if p["planet"] == rp_p), None)
+            if rp_pd:
+                rp_kp = get_kp_pointer(rp_pd["longitude"])
+                rp_sl = rp_kp.get("star_lord", "")
+                if rp_sl not in _ALWAYS_RETRO:
+                    rp_sl_pd = next((p for p in transit_planets if p["planet"] == rp_sl), None)
+                    if rp_sl_pd and rp_sl_pd.get("speed", 0) < 0:
+                        continue
+            valid_rps.append(rp_p)
+
+        # Rahu/Ketu agent
+        for node in ["Rahu", "Ketu"]:
+            nd = next((p for p in transit_planets if p["planet"] == node), None)
+            if nd:
+                nkp = get_kp_pointer(nd["longitude"])
+                agent = nkp.get("sign_lord", "")
+                if agent in rp_planets and node not in valid_rps:
+                    valid_rps.append(node)
+
+        # Team A fruitful = significators of 1,2,3,6,10,11 ∩ RP
+        sigs_a = set()
+        for h in [1, 2, 3, 6, 10, 11]:
+            hd = house_sigs.get(h, {})
+            for s in hd.get("all_significators", []):
+                sigs_a.add(s)
+        fruitful_a = sorted(sigs_a & set(valid_rps))
+
+        # Team B fruitful = significators of 4,5,7,8,9,12 ∩ RP
+        sigs_b = set()
+        for h in [4, 5, 7, 8, 9, 12]:
+            hd = house_sigs.get(h, {})
+            for s in hd.get("all_significators", []):
+                sigs_b.add(s)
+        fruitful_b = sorted(sigs_b & set(valid_rps))
+
+        if len(fruitful_a) > len(fruitful_b):
+            team_a_score += len(fruitful_a) * 4
+            reasons.append(f"RP match favors {team_a}: {len(fruitful_a)} fruitful sigs ({', '.join(fruitful_a)}) vs {len(fruitful_b)} for {team_b}")
+        elif len(fruitful_b) > len(fruitful_a):
+            team_b_score += len(fruitful_b) * 4
+            reasons.append(f"RP match favors {team_b}: {len(fruitful_b)} fruitful sigs ({', '.join(fruitful_b)}) vs {len(fruitful_a)} for {team_a}")
+        else:
+            reasons.append(f"RP match is equal: {len(fruitful_a)} each — very close contest")
+
+    # ═══ TOURNAMENT ELIMINATION CHECK ═══
+    elimination_houses = [5, 4, 12]
+    sl6_elim = [h for h in elimination_houses if h in sl_6_L12]
+    is_eliminated = len(sl6_elim) > 0
+    if is_eliminated:
+        reasons.append(f"TOURNAMENT: 6th SL ({sl_6}) is L1/L2 significator of {sl6_elim} → {team_a} would be ELIMINATED in a tournament")
+
+    # ═══ FINAL VERDICT ═══
+    if team_a_score > team_b_score + 15:
+        winner = team_a
+        verdict = f"{team_a} WINS"
+        verdict_type = "team_a"
+    elif team_b_score > team_a_score + 15:
+        winner = team_b
+        verdict = f"{team_b} WINS"
+        verdict_type = "team_b"
+    elif team_a_score > team_b_score:
+        winner = team_a
+        verdict = f"{team_a} slight edge — close match"
+        verdict_type = "team_a_close"
+    elif team_b_score > team_a_score:
+        winner = team_b
+        verdict = f"{team_b} slight edge — close match"
+        verdict_type = "team_b_close"
+    else:
+        winner = "Too Close to Call"
+        verdict = "DRAW / Very Close Match"
+        verdict_type = "draw"
+
+    # Confidence
+    total = max(team_a_score + team_b_score, 1)
+    confidence = abs(team_a_score - team_b_score) / total * 100
+    confidence = min(95, max(5, confidence))
+
+    # Per-cusp detail table — show levels
+    cusp_details = []
+    for h in [1, 5, 6, 7, 11, 12]:
+        c = _get_cusp(h)
+        if c:
+            sl = c.get("sub_lord", "")
+            sl_L12 = _get_level12_houses(sl, house_sigs)
+            sl_L34 = _get_level34_houses(sl, house_sigs)
+            sl_all = _get_planet_signified_houses(sl, house_sigs)
+            role_map = {
+                1: f"{team_a} (Self/Lagna)",
+                5: f"{team_b} Gains (11th from 7th)",
+                6: f"{team_a} Victory (PRIMARY)",
+                7: f"{team_b} (Opponent)",
+                11: f"{team_a} Gains/Desire",
+                12: f"{team_b} Victory (6th from 7th)",
+            }
+            cusp_details.append({
+                "house": h,
+                "role": role_map.get(h, ""),
+                "sub_lord": sl,
+                "star_lord": c.get("star_lord", ""),
+                "sign": c.get("sign", ""),
+                "signifies_all": sl_all,
+                "signifies_L12": sl_L12,
+                "signifies_L34": sl_L34,
+            })
+
+    # Build 4-step detail for 6th and 12th SL
+    def _build_4step_detail(planet, h_sigs):
+        detail = {}
+        for h_num, h_data in h_sigs.items():
+            s1 = h_data.get("step1_star_of_occ", [])
+            s2 = h_data.get("step2_occupants", h_data.get("occupants", []))
+            s3 = h_data.get("step3_star_of_lord", [])
+            s4 = h_data.get("step4_lord", [])
+            levels = []
+            if planet in s1:
+                levels.append("L1 (Star-of-Occupant)")
+            if planet in s2:
+                levels.append("L2 (Occupant)")
+            if planet in s3:
+                levels.append("L3 (Star-of-Lord)")
+            if planet in s4:
+                levels.append("L4 (Lord)")
+            if levels:
+                detail[h_num] = levels
+        return detail
+
+    sl6_4step = _build_4step_detail(sl_6, house_sigs)
+    sl12_4step = _build_4step_detail(sl_12, house_sigs)
+
+    return {
+        "match_type":           MATCH_CATEGORIES.get(match_type, match_type),
+        "team_a":               team_a,
+        "team_b":               team_b,
+        "kp_number":            kp_number,
+        "horary_kp":            horary_kp,
+        "winner":               winner,
+        "verdict":              verdict,
+        "verdict_type":         verdict_type,
+        "team_a_score":         team_a_score,
+        "team_b_score":         team_b_score,
+        "confidence":           round(confidence, 1),
+        "cusp_6_sub_lord":      sl_6,
+        "cusp_6_signifies":     sl_6_all,
+        "cusp_6_L12":           sl_6_L12,
+        "cusp_6_L34":           sl_6_L34,
+        "cusp_12_sub_lord":     sl_12,
+        "cusp_12_signifies":    sl_12_all,
+        "cusp_12_L12":          sl_12_L12,
+        "cusp_12_L34":          sl_12_L34,
+        "cusp_11_sub_lord":     sl_11,
+        "cusp_11_signifies":    _get_planet_signified_houses(sl_11, house_sigs),
+        "is_6sl_retro":         bool(sl_6_retro),
+        "retro_tier_6":         sl_6_retro_tier,
+        "retro_tier_12":        sl_12_retro_tier,
+        "is_12sl_retro":        sl_12_retro_tier >= 2,
+        "is_eliminated":        is_eliminated,
+        "elimination_houses":   sl6_elim,
+        "cusp_details":         cusp_details,
+        "sl6_4step":            sl6_4step,
+        "sl12_4step":           sl12_4step,
+        "moon_nakshatra":       moon_nak_info,
+        "ruling_planets":       rp_data,
+        "fruitful_team_a":      fruitful_a,
+        "fruitful_team_b":      fruitful_b,
+        "reasons":              reasons,
+    }
+
+
+def calculate_toss_prediction(
+    kp_number: int,
+    planets: List[Dict],
+    houses: List[Dict],
+    ascendant: Dict,
+    transit_planets: Optional[List[Dict]],
+    transit_datetime: Optional[datetime],
+    significator_data: Dict,
+    cuspal_data: List[Dict],
+    team_a: str = "Team A",
+    team_b: str = "Team B",
+) -> Dict:
+    """
+    KP Horary Toss Prediction — Who will WIN the TOSS.
+
+    The toss is a separate mini-competition before the match.
+    User thinks of a SEPARATE KP number (1-249) while asking
+    "Who will win the toss?"
+
+    KP Logic:
+    - 6th cusp sub-lord signifying 6, 10, 11 → Team A wins toss
+    - 6th cusp sub-lord signifying 5, 12 → Team B wins toss
+    - 1st cusp sub-lord strength = Team A's overall luck at query moment
+    - 3-tier retrograde rules apply (PDF Page 25)
+    - Ruling Planets confirm timing
+
+    Time to use: The moment you think of the KP number and ask
+    "Who will win the toss?" — NOT the actual toss time.
+    """
+    house_sigs = significator_data.get("houses", {})
+
+    horary_kp = get_kp_from_number(kp_number) if (1 <= kp_number <= 249) else {}
+
+    # Cusps
+    def _get_cusp(h):
+        return next((x for x in cuspal_data if x["house"] == h), {})
+
+    cusp_6 = _get_cusp(6)
+    cusp_12 = _get_cusp(12)
+    cusp_1 = _get_cusp(1)
+
+    sl_6 = cusp_6.get("sub_lord", "")
+    sl_12 = cusp_12.get("sub_lord", "")
+    sl_1 = cusp_1.get("sub_lord", "")
+
+    # House significations of 6th sub-lord
+    sl_6_all = _get_planet_signified_houses(sl_6, house_sigs)
+    sl_6_L12 = _get_level12_houses(sl_6, house_sigs)
+
+    # Team A wins toss: 6th SL → 6, 10, 11 (own victory houses)
+    team_a_toss_houses = [6, 10, 11]
+    # Team B wins toss: 6th SL → 5, 12 (opponent's victory = 12th from 7th = 6th? No—
+    # 12th = loss to querent, 5th = 11th from 7th = opponent's gain)
+    team_b_toss_houses = [5, 12]
+
+    team_a_score = 0
+    team_b_score = 0
+    reasons = []
+
+    # Check 6th SL signification
+    sl6_a_match = [h for h in team_a_toss_houses if h in sl_6_L12]
+    sl6_a_all = [h for h in team_a_toss_houses if h in sl_6_all]
+    sl6_b_match = [h for h in team_b_toss_houses if h in sl_6_L12]
+    sl6_b_all = [h for h in team_b_toss_houses if h in sl_6_all]
+
+    if sl6_a_match:
+        team_a_score += len(sl6_a_match) * 15
+        reasons.append(f"6th SL ({sl_6}) signifies {team_a} toss-win houses {sl6_a_match} at L1/L2 (strong)")
+    if sl6_a_all and not sl6_a_match:
+        a_extra = [h for h in sl6_a_all if h not in sl6_a_match]
+        if a_extra:
+            team_a_score += len(a_extra) * 5
+            reasons.append(f"6th SL ({sl_6}) signifies {team_a} toss-win houses {a_extra} at L3/L4 (supportive)")
+
+    if sl6_b_match:
+        team_b_score += len(sl6_b_match) * 15
+        reasons.append(f"6th SL ({sl_6}) signifies {team_b} toss-win houses {sl6_b_match} at L1/L2 (strong)")
+    if sl6_b_all and not sl6_b_match:
+        b_extra = [h for h in sl6_b_all if h not in sl6_b_match]
+        if b_extra:
+            team_b_score += len(b_extra) * 5
+            reasons.append(f"6th SL ({sl_6}) signifies {team_b} toss-win houses {b_extra} at L3/L4 (supportive)")
+
+    # Cross-check with 12th SL
+    sl_12_all = _get_planet_signified_houses(sl_12, house_sigs)
+    sl_12_L12 = _get_level12_houses(sl_12, house_sigs)
+    sl12_b_match = [h for h in team_b_toss_houses if h in sl_12_L12]
+    sl12_a_deny = [h for h in team_a_toss_houses if h in sl_12_L12]
+
+    if sl12_b_match:
+        team_b_score += len(sl12_b_match) * 10
+        reasons.append(f"12th SL ({sl_12}) confirms {team_b}: signifies {sl12_b_match} at L1/L2")
+    if sl12_a_deny:
+        team_a_score -= len(sl12_a_deny) * 5
+        reasons.append(f"12th SL ({sl_12}) weakens {team_a}: signifies {team_a} houses {sl12_a_deny} from opponent cusp")
+
+    # 1st cusp sub-lord — querent's luck indicator
+    sl_1_all = _get_planet_signified_houses(sl_1, house_sigs)
+    sl1_luck = [h for h in [1, 3, 11] if h in sl_1_all]
+    if sl1_luck:
+        team_a_score += len(sl1_luck) * 3
+        reasons.append(f"1st SL ({sl_1}) signifies luck houses {sl1_luck} — favours {team_a}")
+
+    # ═══ RETROGRADE CHECK — 3-tier ═══
+    _ALWAYS_RETRO = {"Rahu", "Ketu"}
+    _NEVER_RETRO = {"Sun", "Moon"}
+
+    def _is_retro_t(planet_name, planet_list):
+        if planet_name in _ALWAYS_RETRO or planet_name in _NEVER_RETRO:
+            return False
+        pd = next((p for p in planet_list if p["planet"] == planet_name), None)
+        return pd and pd.get("speed", 0) < 0
+
+    def _get_retro_tier_t(sl_name, planet_list):
+        sl_pd = next((p for p in planet_list if p["planet"] == sl_name), None)
+        if not sl_pd:
+            return 0, ""
+        sl_is_retro = _is_retro_t(sl_name, planet_list)
+        sl_kp = get_kp_pointer(sl_pd["longitude"])
+        depositor = sl_kp.get("star_lord", "")
+        dep_is_retro = _is_retro_t(depositor, planet_list) if depositor else False
+        if sl_is_retro and not dep_is_retro:
+            return 1, depositor
+        elif sl_is_retro and dep_is_retro:
+            return 2, depositor
+        elif not sl_is_retro and dep_is_retro:
+            return 3, depositor
+        return 0, depositor
+
+    retro_tier_6, dep_6 = _get_retro_tier_t(sl_6, planets)
+    if retro_tier_6 == 1:
+        team_a_score -= 8
+        reasons.append(f"RETRO TIER-1: 6th SL ({sl_6}) RETRO in star of DIRECT {dep_6} — {team_a} toss delayed/uncertain")
+    elif retro_tier_6 == 2:
+        team_a_score -= 25
+        reasons.append(f"RETRO TIER-2: 6th SL ({sl_6}) RETRO in star of RETRO {dep_6} — {team_a} toss DENIED")
+    elif retro_tier_6 == 3:
+        team_a_score -= 20
+        reasons.append(f"RETRO TIER-3: 6th SL ({sl_6}) DIRECT in star of RETRO {dep_6} — cannot give toss result for {team_a}")
+
+    # ═══ RULING PLANETS ═══
+    rp_data = None
+    fruitful_a = []
+    fruitful_b = []
+    if transit_planets and transit_datetime:
+        rp_data = calculate_current_ruling_planets(
+            transit_planets, ascendant, transit_datetime,
+        )
+        rp_planets = [r["planet"] for r in rp_data.get("rp_rows", [])]
+        rp_set = set(rp_planets)
+
+        # Discard RP in star of retro (except Rahu/Ketu stars)
+        valid_rps = []
+        for rp_p in rp_set:
+            rp_pd = next((p for p in transit_planets if p["planet"] == rp_p), None)
+            if rp_pd:
+                rp_kp = get_kp_pointer(rp_pd["longitude"])
+                rp_sl = rp_kp.get("star_lord", "")
+                if rp_sl not in _ALWAYS_RETRO:
+                    rp_star_pd = next((p for p in transit_planets if p["planet"] == rp_sl), None)
+                    if rp_star_pd and rp_star_pd.get("speed", 0) < 0:
+                        continue
+            valid_rps.append(rp_p)
+
+        # Fruitful significators for toss
+        all_sigs_a = set()
+        for h in team_a_toss_houses:
+            h_data = house_sigs.get(h, {})
+            for s in h_data.get("all_significators", []):
+                all_sigs_a.add(s)
+        fruitful_a = sorted(all_sigs_a & set(valid_rps))
+
+        all_sigs_b = set()
+        for h in team_b_toss_houses:
+            h_data = house_sigs.get(h, {})
+            for s in h_data.get("all_significators", []):
+                all_sigs_b.add(s)
+        fruitful_b = sorted(all_sigs_b & set(valid_rps))
+
+        if len(fruitful_a) > len(fruitful_b):
+            team_a_score += (len(fruitful_a) - len(fruitful_b)) * 5
+            reasons.append(f"RP favours {team_a} toss: {len(fruitful_a)} fruitful sigs vs {len(fruitful_b)} for {team_b}")
+        elif len(fruitful_b) > len(fruitful_a):
+            team_b_score += (len(fruitful_b) - len(fruitful_a)) * 5
+            reasons.append(f"RP favours {team_b} toss: {len(fruitful_b)} fruitful sigs vs {len(fruitful_a)} for {team_a}")
+
+    # ═══ VERDICT ═══
+    diff = team_a_score - team_b_score
+    if diff > 10:
+        winner = team_a
+        verdict = f"{team_a} WINS THE TOSS"
+        verdict_type = "team_a"
+    elif diff < -10:
+        winner = team_b
+        verdict = f"{team_b} WINS THE TOSS"
+        verdict_type = "team_b"
+    else:
+        winner = "Uncertain"
+        verdict = "TOSS RESULT UNCLEAR — marginal difference"
+        verdict_type = "draw"
+
+    confidence = min(95, abs(diff) * 2.5 + 20) if abs(diff) > 5 else max(10, abs(diff) * 5)
+
+    return {
+        "prediction_type":      "toss",
+        "team_a":               team_a,
+        "team_b":               team_b,
+        "kp_number":            kp_number,
+        "horary_kp":            horary_kp,
+        "winner":               winner,
+        "verdict":              verdict,
+        "verdict_type":         verdict_type,
+        "team_a_score":         team_a_score,
+        "team_b_score":         team_b_score,
+        "confidence":           round(confidence, 1),
+        "cusp_6_sub_lord":      sl_6,
+        "cusp_6_signifies":     sl_6_all,
+        "cusp_12_sub_lord":     sl_12,
+        "cusp_12_signifies":    sl_12_all,
+        "retro_tier_6":         retro_tier_6,
+        "ruling_planets":       rp_data,
+        "fruitful_team_a":      fruitful_a,
+        "fruitful_team_b":      fruitful_b,
+        "reasons":              reasons,
+    }
+
 
 def analyze_promise_denial(
     cuspal_data: List[Dict],
@@ -678,8 +1827,10 @@ def _get_planet_signified_houses(planet: str, house_sigs: Dict) -> List[int]:
     """Get all houses a planet signifies."""
     houses = []
     for h_num, h_data in house_sigs.items():
-        if planet in h_data.get("all_significators", []):
-            houses.append(h_num)
+        if isinstance(h_data, dict):
+            if planet in h_data.get("all_significators", []):
+                houses.append(h_num)
+        # Skip non-dict entries (e.g. metadata strings)
     return houses
 
 
@@ -1751,4 +2902,728 @@ def calculate_kp_analysis(
         "fortuna_point":          fortuna,
         "yogi_avayogi":           yogi,
         "planet_status":          planet_status,
+    }
+
+
+# ═════════════════════════════════════════════════════════════
+# 18. EVENT PROMISE CHECKER — Does the chart promise the event?
+# ═════════════════════════════════════════════════════════════
+
+def check_event_promise(
+    question_type: str,
+    planets: List[Dict],
+    houses: List[Dict],
+    ascendant: Dict,
+    cuspal_data: List[Dict],
+    significator_data: Dict,
+) -> Dict:
+    """
+    KP Event Promise Checker — checks if a natal/prashna chart PROMISES
+    that a particular event will happen, using the 3-way sub-lord theory.
+
+    KP Promise Theory:
+    ─────────────────
+    Step 1: Find the sub-lord of the PRIMARY house cusp for the question.
+            e.g. Marriage → 7th cusp sub-lord
+    Step 2: Check if the cusp sub-lord SIGNIFIES conductive houses.
+            If yes → promise exists at this level.
+    Step 3: Check the sub-lord's STAR LORD — which houses does the star lord
+            signify? The star lord shows the SOURCE/flow of results.
+    Step 4: Check the sub-lord's own SUB-LORD — which houses does it signify?
+            The sub-sub level shows the FINAL outcome/delivery.
+    Step 5: 3-way verdict:
+            - Sub-lord → conductive = promise at surface level
+            - Star lord → conductive = source supports the event
+            - Sub-lord's sub → conductive = delivery confirmed
+            All 3 pointing conductive = STRONG PROMISE
+            Sub-lord conductive but star/sub deny = WEAK/CONDITIONAL
+            Sub-lord detrimental = NO PROMISE
+
+    Also checks retrograde status (3-tier) for denial/delay.
+
+    This is SEPARATE from DBA timing — this tells you IF the event can
+    happen at all. DBA timing tells you WHEN.
+    """
+    q_config = PRASHNA_QUESTIONS.get(question_type)
+    if not q_config:
+        return {"error": f"Unknown question type: {question_type}"}
+
+    primary_house = q_config["primary_house"]
+    conductive = q_config["conductive"]
+    detrimental = q_config["detrimental"]
+    label = q_config["label"]
+
+    house_sigs = significator_data.get("houses", {})
+
+    # ── Step 1: Get cusp sub-lord of the primary house ──
+    primary_cusp = next((c for c in cuspal_data if c["house"] == primary_house), None)
+    if not primary_cusp:
+        return {"error": f"No cuspal data for house {primary_house}"}
+
+    cusp_sub_lord = primary_cusp.get("sub_lord", "")
+    cusp_star_lord = primary_cusp.get("star_lord", "")
+    cusp_sign_lord = primary_cusp.get("sign_lord", "")
+    cusp_longitude = primary_cusp.get("longitude", 0)
+
+    # ── Step 2: Sub-lord signification (Level 1 — Promise) ──
+    sl_signifies = _get_planet_signified_houses(cusp_sub_lord, house_sigs)
+    sl_conductive = [h for h in conductive if h in sl_signifies]
+    sl_detrimental = [h for h in detrimental if h in sl_signifies]
+
+    # ── Step 3: Sub-lord's Star Lord signification (Level 2 — Source) ──
+    # The star lord of the sub-lord's NATAL position (not the cusp's star lord)
+    sl_planet_data = next((p for p in planets if p["planet"] == cusp_sub_lord), None)
+    sl_natal_star = ""
+    sl_natal_sub = ""
+    sl_natal_kp = {}
+    if sl_planet_data:
+        sl_natal_kp = get_kp_pointer(sl_planet_data["longitude"])
+        sl_natal_star = sl_natal_kp.get("star_lord", "")
+        sl_natal_sub = sl_natal_kp.get("sub_lord", "")
+
+    star_signifies = _get_planet_signified_houses(sl_natal_star, house_sigs) if sl_natal_star else []
+    star_conductive = [h for h in conductive if h in star_signifies]
+    star_detrimental = [h for h in detrimental if h in star_signifies]
+
+    # ── Step 4: Sub-lord's Sub-Lord signification (Level 3 — Delivery) ──
+    sub_sub_signifies = _get_planet_signified_houses(sl_natal_sub, house_sigs) if sl_natal_sub else []
+    sub_sub_conductive = [h for h in conductive if h in sub_sub_signifies]
+    sub_sub_detrimental = [h for h in detrimental if h in sub_sub_signifies]
+
+    # ── Step 5: Retrograde check (3-tier) ──
+    ALWAYS_R = {"Rahu", "Ketu"}
+    NEVER_R = {"Sun", "Moon"}
+
+    is_sl_retro = False
+    if sl_planet_data and cusp_sub_lord not in ALWAYS_R and cusp_sub_lord not in NEVER_R:
+        is_sl_retro = sl_planet_data.get("speed", 0) < 0
+
+    # Depositor (star lord of sub-lord's natal position) retro check
+    is_depositor_retro = False
+    if sl_natal_star and sl_natal_star not in ALWAYS_R and sl_natal_star not in NEVER_R:
+        dep_data = next((p for p in planets if p["planet"] == sl_natal_star), None)
+        if dep_data:
+            is_depositor_retro = dep_data.get("speed", 0) < 0
+
+    # 3-tier classification
+    retro_tier = 0
+    retro_detail = "No retrograde issue"
+    if is_sl_retro and not is_depositor_retro:
+        retro_tier = 1
+        retro_detail = f"{cusp_sub_lord} is retrograde in star of direct {sl_natal_star} — delayed but will materialise"
+    elif is_sl_retro and is_depositor_retro:
+        retro_tier = 2
+        retro_detail = f"{cusp_sub_lord} is retrograde in star of retrograde {sl_natal_star} — promises only failure"
+    elif not is_sl_retro and is_depositor_retro:
+        retro_tier = 3
+        retro_detail = f"{cusp_sub_lord} is direct but in star of retrograde {sl_natal_star} — cannot deliver result in its period"
+
+    # ── Step 6: 3-Way Verdict ──
+    reasons = []
+    promise_score = 0
+
+    # Level 1: Sub-lord check (most important)
+    if sl_conductive:
+        promise_score += 40
+        reasons.append(f"LEVEL 1 (Sub-lord): {cusp_sub_lord} signifies conductive houses {sl_conductive} — PROMISE exists")
+    elif sl_detrimental:
+        promise_score -= 40
+        reasons.append(f"LEVEL 1 (Sub-lord): {cusp_sub_lord} signifies detrimental houses {sl_detrimental} — DENIAL")
+    else:
+        reasons.append(f"LEVEL 1 (Sub-lord): {cusp_sub_lord} signifies houses {sl_signifies} — neutral (no conductive or detrimental)")
+
+    if sl_conductive and sl_detrimental:
+        promise_score -= 10
+        reasons.append(f"  Sub-lord also signifies detrimental {sl_detrimental} — mixed signal, weakens promise")
+
+    # Does sub-lord signify the primary house itself?
+    if primary_house in sl_signifies:
+        promise_score += 15
+        reasons.append(f"  Sub-lord {cusp_sub_lord} directly signifies its own house {primary_house} — self-promising")
+
+    # Level 2: Star lord check (source of results)
+    if sl_natal_star:
+        if star_conductive:
+            promise_score += 25
+            reasons.append(f"LEVEL 2 (Star lord): {cusp_sub_lord}'s star lord {sl_natal_star} signifies conductive {star_conductive} — source supports event")
+        elif star_detrimental:
+            promise_score -= 25
+            reasons.append(f"LEVEL 2 (Star lord): {cusp_sub_lord}'s star lord {sl_natal_star} signifies detrimental {star_detrimental} — source opposes event")
+        else:
+            reasons.append(f"LEVEL 2 (Star lord): {cusp_sub_lord}'s star lord {sl_natal_star} signifies {star_signifies} — neutral source")
+
+        if star_conductive and star_detrimental:
+            promise_score -= 5
+            reasons.append(f"  Star lord also hits detrimental {star_detrimental} — weakens source")
+
+    # Level 3: Sub-sub lord check (final delivery)
+    if sl_natal_sub:
+        if sub_sub_conductive:
+            promise_score += 20
+            reasons.append(f"LEVEL 3 (Sub-sub): {cusp_sub_lord}'s sub-lord {sl_natal_sub} signifies conductive {sub_sub_conductive} — delivery confirmed")
+        elif sub_sub_detrimental:
+            promise_score -= 20
+            reasons.append(f"LEVEL 3 (Sub-sub): {cusp_sub_lord}'s sub-lord {sl_natal_sub} signifies detrimental {sub_sub_detrimental} — delivery blocked")
+        else:
+            reasons.append(f"LEVEL 3 (Sub-sub): {cusp_sub_lord}'s sub-lord {sl_natal_sub} signifies {sub_sub_signifies} — neutral delivery")
+
+        if sub_sub_conductive and sub_sub_detrimental:
+            promise_score -= 5
+            reasons.append(f"  Sub-sub also hits detrimental {sub_sub_detrimental}")
+
+    # Retrograde impact
+    if retro_tier == 2:
+        promise_score -= 40
+        reasons.append(f"RETRO DENIAL: {retro_detail}")
+    elif retro_tier == 3:
+        promise_score -= 30
+        reasons.append(f"RETRO BLOCK: {retro_detail}")
+    elif retro_tier == 1:
+        promise_score -= 10
+        reasons.append(f"RETRO DELAY: {retro_detail}")
+
+    # Count how many levels are conductive
+    levels_conductive = 0
+    if sl_conductive:
+        levels_conductive += 1
+    if star_conductive:
+        levels_conductive += 1
+    if sub_sub_conductive:
+        levels_conductive += 1
+
+    levels_detrimental = 0
+    if sl_detrimental:
+        levels_detrimental += 1
+    if star_detrimental:
+        levels_detrimental += 1
+    if sub_sub_detrimental:
+        levels_detrimental += 1
+
+    # Final verdict
+    if retro_tier >= 2:
+        verdict = "NO — RETROGRADE DENIAL"
+        verdict_color = "red"
+    elif not sl_conductive and sl_detrimental:
+        verdict = "NO — Sub-lord denies the event"
+        verdict_color = "red"
+    elif not sl_conductive and not sl_detrimental:
+        verdict = "UNCERTAIN — Sub-lord is neutral"
+        verdict_color = "orange"
+    elif sl_conductive and levels_conductive == 3 and levels_detrimental == 0:
+        verdict = "YES — STRONG PROMISE (all 3 levels conductive)"
+        verdict_color = "green"
+    elif sl_conductive and levels_conductive >= 2 and retro_tier == 0:
+        verdict = "YES — PROMISE EXISTS (2+ levels conductive)"
+        verdict_color = "green"
+    elif sl_conductive and levels_conductive >= 2 and retro_tier == 1:
+        verdict = "YES but DELAYED — Promise with retrograde delay"
+        verdict_color = "gold"
+    elif sl_conductive and levels_detrimental >= 2:
+        verdict = "WEAK — Sub-lord promises but star/sub deny"
+        verdict_color = "orange"
+    elif sl_conductive:
+        verdict = "CONDITIONAL — Sub-lord promises, needs DBA support"
+        verdict_color = "gold"
+    else:
+        verdict = "UNCERTAIN"
+        verdict_color = "orange"
+
+    # ── Also check all conductive-house cusps for promise ──
+    # Check each conductive house cusp sub-lord to see which support
+    all_cusp_analysis = []
+    for h_num in conductive:
+        cusp = next((c for c in cuspal_data if c["house"] == h_num), None)
+        if not cusp:
+            continue
+        h_sl = cusp.get("sub_lord", "")
+        h_sl_houses = _get_planet_signified_houses(h_sl, house_sigs)
+        h_cond = [h for h in conductive if h in h_sl_houses]
+        h_detr = [h for h in detrimental if h in h_sl_houses]
+
+        # Star lord of this cusp sub-lord's natal position
+        h_sl_pd = next((p for p in planets if p["planet"] == h_sl), None)
+        h_star = ""
+        h_sub = ""
+        if h_sl_pd:
+            h_kp = get_kp_pointer(h_sl_pd["longitude"])
+            h_star = h_kp.get("star_lord", "")
+            h_sub = h_kp.get("sub_lord", "")
+
+        h_star_houses = _get_planet_signified_houses(h_star, house_sigs) if h_star else []
+        h_star_cond = [h for h in conductive if h in h_star_houses]
+        h_star_detr = [h for h in detrimental if h in h_star_houses]
+
+        h_sub_houses = _get_planet_signified_houses(h_sub, house_sigs) if h_sub else []
+        h_sub_cond = [h for h in conductive if h in h_sub_houses]
+        h_sub_detr = [h for h in detrimental if h in h_sub_houses]
+
+        supports = bool(h_cond and not h_detr)
+        denies = bool(h_detr and not h_cond)
+        mixed = bool(h_cond and h_detr)
+
+        all_cusp_analysis.append({
+            "house":          h_num,
+            "cusp_sub_lord":  h_sl,
+            "signifies":      sorted(h_sl_houses),
+            "conductive_hit": sorted(h_cond),
+            "detrimental_hit": sorted(h_detr),
+            "star_lord":      h_star,
+            "star_signifies": sorted(h_star_houses),
+            "star_conductive": sorted(h_star_cond),
+            "star_detrimental": sorted(h_star_detr),
+            "sub_lord":       h_sub,
+            "sub_signifies":  sorted(h_sub_houses),
+            "sub_conductive":  sorted(h_sub_cond),
+            "sub_detrimental": sorted(h_sub_detr),
+            "status":         "SUPPORTS" if supports else "DENIES" if denies else "MIXED" if mixed else "NEUTRAL",
+        })
+
+    # Count supporting cusps
+    supporting_cusps = sum(1 for c in all_cusp_analysis if c["status"] == "SUPPORTS")
+    denying_cusps = sum(1 for c in all_cusp_analysis if c["status"] == "DENIES")
+
+    return {
+        "question_type":      question_type,
+        "label":              label,
+        "primary_house":      primary_house,
+        "conductive":         sorted(conductive),
+        "detrimental":        sorted(detrimental),
+        "cusp_longitude":     round(cusp_longitude, 4),
+        "cusp_sign_lord":     cusp_sign_lord,
+        "cusp_star_lord":     cusp_star_lord,
+        "cusp_sub_lord":      cusp_sub_lord,
+        # Level 1: Sub-lord analysis
+        "sub_lord_signifies":     sorted(sl_signifies),
+        "sub_lord_conductive":    sorted(sl_conductive),
+        "sub_lord_detrimental":   sorted(sl_detrimental),
+        # Level 2: Star lord of sub-lord's position
+        "sl_natal_star_lord":     sl_natal_star,
+        "star_lord_signifies":    sorted(star_signifies),
+        "star_lord_conductive":   sorted(star_conductive),
+        "star_lord_detrimental":  sorted(star_detrimental),
+        # Level 3: Sub-lord of sub-lord's position
+        "sl_natal_sub_lord":      sl_natal_sub,
+        "sub_sub_signifies":      sorted(sub_sub_signifies),
+        "sub_sub_conductive":     sorted(sub_sub_conductive),
+        "sub_sub_detrimental":    sorted(sub_sub_detrimental),
+        # Retrograde
+        "is_sl_retro":        is_sl_retro,
+        "retro_tier":         retro_tier,
+        "retro_detail":       retro_detail,
+        # Verdict
+        "promise_score":      promise_score,
+        "levels_conductive":  levels_conductive,
+        "levels_detrimental": levels_detrimental,
+        "verdict":            verdict,
+        "verdict_color":      verdict_color,
+        "reasons":            reasons,
+        # All conductive cusp analysis
+        "cusp_analysis":      all_cusp_analysis,
+        "supporting_cusps":   supporting_cusps,
+        "denying_cusps":      denying_cusps,
+    }
+
+
+# ═════════════════════════════════════════════════════════════
+# 19. DBA TIMING FINDER — Best future windows for any event
+# ═════════════════════════════════════════════════════════════
+
+def find_dba_timing_windows(
+    question_type: str,
+    planets: List[Dict],
+    houses: List[Dict],
+    ascendant: Dict,
+    moon_longitude: float,
+    birth_date: datetime,
+    search_start: datetime,
+    search_end: datetime,
+    transit_planets: Optional[List[Dict]] = None,
+    transit_datetime: Optional[datetime] = None,
+    validate_date: Optional[datetime] = None,
+) -> Dict:
+    """
+    Find the best future DBA (Dasha-Bhukti-Antara) timing windows
+    for a given question type using KP significator theory.
+
+    KP Timing Rule:
+    - An event fructifies when the Dasha lord, Bhukti lord, AND Antara lord
+      are ALL significators of the conductive houses for that event.
+    - Best windows = all 3 DBA lords signify conductive houses
+    - Good windows  = 2 of 3 DBA lords signify conductive houses
+    - Periods where DBA lords signify detrimental houses are penalised
+
+    Args:
+        question_type: Key from PRASHNA_QUESTIONS (marriage, vehicle, etc.)
+        planets: Natal planet data
+        houses: Natal house cusps (Placidus)
+        ascendant: Natal ascendant
+        moon_longitude: Natal Moon longitude (for Vimshottari calculation)
+        birth_date: Date of birth
+        search_start: Start of search window
+        search_end: End of search window
+        transit_planets: Current transit planets (for RP, optional)
+        transit_datetime: Current time (for RP, optional)
+
+    Returns:
+        Dict with ranked timing windows, each showing DBA lords,
+        signified houses, score, and reasoning.
+    """
+    from app.dasha import calculate_vimshottari_dasha
+
+    q_config = PRASHNA_QUESTIONS.get(question_type)
+    if not q_config:
+        return {"error": f"Unknown question type: {question_type}"}
+
+    conductive = set(q_config["conductive"])
+    detrimental = set(q_config["detrimental"])
+    label = q_config["label"]
+    primary_house = q_config["primary_house"]
+
+    # ── Step 1: Get KP significators for all 12 houses ──
+    sig_data = calculate_significators(planets, houses, ascendant)
+    house_sigs = sig_data["houses"]
+
+    # Build planet → signified houses lookup
+    planet_houses_map: Dict[str, List[int]] = {}
+    for p in planets:
+        pname = p["planet"]
+        signified = _get_planet_signified_houses(pname, house_sigs)
+        planet_houses_map[pname] = signified
+
+    # ── Step 2: Get planet retrograde status ──
+    ALWAYS_R = {"Rahu", "Ketu"}
+    NEVER_R  = {"Sun", "Moon"}
+    planet_retro: Dict[str, bool] = {}
+    for p in planets:
+        pname = p["planet"]
+        if pname in ALWAYS_R or pname in NEVER_R:
+            planet_retro[pname] = False
+        else:
+            planet_retro[pname] = p.get("speed", 0) < 0
+
+    # ── Step 3: Calculate full Vimshottari Dasha tree ──
+    years_needed = max(10, int((search_end - birth_date).days / 365.25) + 2)
+    dasha_data = calculate_vimshottari_dasha(moon_longitude, birth_date, years_needed)
+
+    # ── Step 4: Scan all Pratyantar periods in the search window ──
+    search_start_str = search_start.strftime("%Y-%m-%d")
+    search_end_str = search_end.strftime("%Y-%m-%d")
+
+    windows = []
+
+    for maha in dasha_data.get("dashas", []):
+        maha_lord = maha["mahadasha_lord"]
+        # Quick skip if maha is entirely outside search window
+        if maha["end_date"] < search_start_str or maha["start_date"] > search_end_str:
+            continue
+
+        maha_houses = set(planet_houses_map.get(maha_lord, []))
+        maha_cond = maha_houses & conductive
+        maha_detr = maha_houses & detrimental
+
+        for antar in maha.get("antardashas", []):
+            antar_lord = antar["antardasha_lord"]
+            if antar["end_date"] < search_start_str or antar["start_date"] > search_end_str:
+                continue
+
+            antar_houses = set(planet_houses_map.get(antar_lord, []))
+            antar_cond = antar_houses & conductive
+            antar_detr = antar_houses & detrimental
+
+            for prat in antar.get("pratyantardashas", []):
+                prat_lord = prat["pratyantar_lord"]
+                prat_start = prat["start_date"]
+                prat_end = prat["end_date"]
+
+                # Must overlap with search window
+                if prat_end < search_start_str or prat_start > search_end_str:
+                    continue
+
+                prat_houses = set(planet_houses_map.get(prat_lord, []))
+                prat_cond = prat_houses & conductive
+                prat_detr = prat_houses & detrimental
+
+                # ── Score this DBA combination ──
+                score = 0
+                reasons = []
+                lords_with_cond = 0
+
+                # Check each DBA lord for conductive house signification
+                for lord_name, lord_cond, lord_detr, lord_role in [
+                    (maha_lord, maha_cond, maha_detr, "Dasha"),
+                    (antar_lord, antar_cond, antar_detr, "Bhukti"),
+                    (prat_lord, prat_cond, prat_detr, "Antara"),
+                ]:
+                    if lord_cond:
+                        lords_with_cond += 1
+                        score += 30
+                        reasons.append(f"{lord_role} lord {lord_name} signifies conductive houses {sorted(lord_cond)}")
+                    if lord_detr:
+                        score -= 20
+                        reasons.append(f"{lord_role} lord {lord_name} signifies detrimental houses {sorted(lord_detr)}")
+
+                # Bonus: if primary house is signified by any DBA lord
+                all_dba_houses = maha_houses | antar_houses | prat_houses
+                if primary_house in all_dba_houses:
+                    score += 15
+                    reasons.append(f"Primary house {primary_house} directly signified")
+
+                # Bonus: all 3 lords signify conductive = strongest window
+                if lords_with_cond == 3:
+                    score += 25
+                    reasons.append("ALL 3 DBA lords signify conductive houses — STRONGEST window")
+                elif lords_with_cond == 2:
+                    score += 10
+                    reasons.append("2 of 3 DBA lords signify conductive houses — good window")
+
+                # Retrograde penalty (inline 3-tier logic)
+                for lord_name, lord_role in [
+                    (maha_lord, "Dasha"), (antar_lord, "Bhukti"), (prat_lord, "Antara"),
+                ]:
+                    lord_is_retro = planet_retro.get(lord_name, False)
+                    # Find depositor (star lord of this planet)
+                    lord_pd = next((p for p in planets if p["planet"] == lord_name), None)
+                    depositor = ""
+                    dep_is_retro = False
+                    if lord_pd:
+                        lord_kp = get_kp_pointer(lord_pd["longitude"])
+                        depositor = lord_kp.get("star_lord", "")
+                        if depositor and depositor not in ALWAYS_R and depositor not in NEVER_R:
+                            dep_pd = next((p for p in planets if p["planet"] == depositor), None)
+                            if dep_pd:
+                                dep_is_retro = dep_pd.get("speed", 0) < 0
+                    # 3-tier classification
+                    if lord_is_retro and dep_is_retro:
+                        score -= 40
+                        reasons.append(f"{lord_role} lord {lord_name} retro in star of retro {depositor} — blocks event")
+                    elif not lord_is_retro and dep_is_retro:
+                        score -= 30
+                        reasons.append(f"{lord_role} lord {lord_name} direct but star lord {depositor} retro — weak delivery")
+                    elif lord_is_retro and not dep_is_retro:
+                        score -= 10
+                        reasons.append(f"{lord_role} lord {lord_name} retro in star of direct — delayed but possible")
+
+                # Only include windows with some promise (at least 1 lord in conductive)
+                if lords_with_cond >= 1:
+                    # Clamp effective start/end to search window
+                    eff_start = max(prat_start, search_start_str)
+                    eff_end = min(prat_end, search_end_str)
+
+                    # Determine quality tier
+                    if lords_with_cond == 3 and score >= 80:
+                        quality = "EXCELLENT"
+                    elif lords_with_cond == 3:
+                        quality = "VERY GOOD"
+                    elif lords_with_cond == 2 and score >= 50:
+                        quality = "GOOD"
+                    elif lords_with_cond == 2:
+                        quality = "FAIR"
+                    else:
+                        quality = "WEAK"
+
+                    windows.append({
+                        "start_date":     eff_start,
+                        "end_date":       eff_end,
+                        "dasha_lord":     maha_lord,
+                        "bhukti_lord":    antar_lord,
+                        "antara_lord":    prat_lord,
+                        "score":          score,
+                        "quality":        quality,
+                        "lords_conductive": lords_with_cond,
+                        "dasha_houses":   sorted(maha_houses),
+                        "bhukti_houses":  sorted(antar_houses),
+                        "antara_houses":  sorted(prat_houses),
+                        "conductive_hit": sorted(all_dba_houses & conductive),
+                        "detrimental_hit": sorted(all_dba_houses & detrimental),
+                        "reasons":        reasons,
+                        "dasha_retro":    planet_retro.get(maha_lord, False),
+                        "bhukti_retro":   planet_retro.get(antar_lord, False),
+                        "antara_retro":   planet_retro.get(prat_lord, False),
+                    })
+
+    # ── Step 5: Sort by score descending, then by start_date ──
+    windows.sort(key=lambda w: (-w["score"], w["start_date"]))
+
+    # ── Step 6: Current Ruling Planets (optional cross-check) ──
+    ruling_planets = None
+    if transit_planets and transit_datetime:
+        try:
+            ruling_planets = calculate_ruling_planets(
+                transit_planets, transit_datetime, ascendant
+            )
+        except Exception:
+            pass  # RP is a bonus, don't fail the whole request
+
+    # ── Step 7: Mark windows that match current RPs ──
+    if ruling_planets:
+        rp_set = set()
+        rp_data = ruling_planets.get("ruling_planets", {})
+        rp_all = rp_data.get("all", []) if isinstance(rp_data, dict) else rp_data
+        for rp in rp_all:
+            if isinstance(rp, dict):
+                rp_set.add(rp.get("planet", ""))
+            elif isinstance(rp, str):
+                rp_set.add(rp)
+        for w in windows:
+            dba_set = {w["dasha_lord"], w["bhukti_lord"], w["antara_lord"]}
+            rp_match = dba_set & rp_set
+            w["rp_match"] = sorted(rp_match)
+            w["rp_confirmed"] = len(rp_match) >= 2
+            if w["rp_confirmed"]:
+                w["score"] += 15
+                w["reasons"].append(f"Ruling Planets confirm: {sorted(rp_match)}")
+
+    # Re-sort after RP bonus
+    windows.sort(key=lambda w: (-w["score"], w["start_date"]))
+
+    # ── Step 8: Current running DBA for reference ──
+    current_dba = None
+    try:
+        from app.dasha import get_current_dasha
+        current_dba = get_current_dasha(dasha_data, search_start)
+    except Exception:
+        pass
+
+    # ── Step 9: Validate a known event date ──
+    validation = None
+    if validate_date:
+        try:
+            from app.dasha import get_current_dasha
+            vd_str = validate_date.strftime("%Y-%m-%d")
+            vd_dba = get_current_dasha(dasha_data, validate_date)
+
+            if vd_dba and not vd_dba.get("error"):
+                v_maha = vd_dba.get("mahadasha", "")
+                v_antar = vd_dba.get("antardasha", "")
+                v_prat = vd_dba.get("pratyantar", "")
+
+                v_maha_houses = set(planet_houses_map.get(v_maha, []))
+                v_antar_houses = set(planet_houses_map.get(v_antar, []))
+                v_prat_houses = set(planet_houses_map.get(v_prat, []))
+
+                # Score this DBA for the question type
+                v_score = 0
+                v_reasons = []
+                v_lords_cond = 0
+
+                for lname, lhouses, lrole in [
+                    (v_maha, v_maha_houses, "Dasha"),
+                    (v_antar, v_antar_houses, "Bhukti"),
+                    (v_prat, v_prat_houses, "Antara"),
+                ]:
+                    lcond = lhouses & conductive
+                    ldetr = lhouses & detrimental
+                    if lcond:
+                        v_lords_cond += 1
+                        v_score += 30
+                        v_reasons.append(f"{lrole} lord {lname} signifies conductive houses {sorted(lcond)}")
+                    else:
+                        v_reasons.append(f"{lrole} lord {lname} does NOT signify any conductive house")
+                    if ldetr:
+                        v_score -= 20
+                        v_reasons.append(f"  -> Also signifies detrimental houses {sorted(ldetr)}")
+
+                all_vd_houses = v_maha_houses | v_antar_houses | v_prat_houses
+                if primary_house in all_vd_houses:
+                    v_score += 15
+                    v_reasons.append(f"Primary house {primary_house} is signified")
+
+                if v_lords_cond == 3:
+                    v_score += 25
+                    v_reasons.append("ALL 3 DBA lords signify conductive houses")
+                elif v_lords_cond == 2:
+                    v_score += 10
+
+                # Retro check
+                for lname, lrole in [(v_maha, "Dasha"), (v_antar, "Bhukti"), (v_prat, "Antara")]:
+                    lr = planet_retro.get(lname, False)
+                    lpd = next((p for p in planets if p["planet"] == lname), None)
+                    dep = ""
+                    dr = False
+                    if lpd:
+                        lkp = get_kp_pointer(lpd["longitude"])
+                        dep = lkp.get("star_lord", "")
+                        if dep and dep not in ALWAYS_R and dep not in NEVER_R:
+                            dpd = next((p for p in planets if p["planet"] == dep), None)
+                            if dpd:
+                                dr = dpd.get("speed", 0) < 0
+                    if lr and dr:
+                        v_score -= 40
+                        v_reasons.append(f"{lrole} lord {lname} retro + star lord {dep} retro — blocks event")
+                    elif not lr and dr:
+                        v_score -= 30
+                        v_reasons.append(f"{lrole} lord {lname} direct but star lord {dep} retro — weak")
+                    elif lr and not dr:
+                        v_score -= 10
+                        v_reasons.append(f"{lrole} lord {lname} retro (delayed but possible)")
+
+                # Quality tier
+                if v_lords_cond == 3 and v_score >= 80:
+                    v_quality = "EXCELLENT"
+                elif v_lords_cond == 3:
+                    v_quality = "VERY GOOD"
+                elif v_lords_cond == 2 and v_score >= 50:
+                    v_quality = "GOOD"
+                elif v_lords_cond == 2:
+                    v_quality = "FAIR"
+                elif v_lords_cond == 1:
+                    v_quality = "WEAK"
+                else:
+                    v_quality = "NO MATCH"
+
+                # Find rank among all windows
+                rank = None
+                for idx, w in enumerate(windows):
+                    if (w["start_date"] <= vd_str <= w["end_date"]
+                        and w["dasha_lord"] == v_maha
+                        and w["bhukti_lord"] == v_antar
+                        and w["antara_lord"] == v_prat):
+                        rank = idx + 1
+                        break
+
+                validation = {
+                    "validate_date":     vd_str,
+                    "dasha_lord":        v_maha,
+                    "bhukti_lord":       v_antar,
+                    "antara_lord":       v_prat,
+                    "dasha_period":      f"{vd_dba.get('mahadasha_start','')} to {vd_dba.get('mahadasha_end','')}",
+                    "antardasha_period": f"{vd_dba.get('antardasha_start','')} to {vd_dba.get('antardasha_end','')}",
+                    "pratyantar_period": f"{vd_dba.get('pratyantar_start','')} to {vd_dba.get('pratyantar_end','')}",
+                    "dasha_houses":      sorted(v_maha_houses),
+                    "bhukti_houses":     sorted(v_antar_houses),
+                    "antara_houses":     sorted(v_prat_houses),
+                    "conductive_hit":    sorted(all_vd_houses & conductive),
+                    "detrimental_hit":   sorted(all_vd_houses & detrimental),
+                    "score":             v_score,
+                    "quality":           v_quality,
+                    "lords_conductive":  v_lords_cond,
+                    "rank_in_search":    rank,
+                    "total_windows":     len(windows),
+                    "reasons":           v_reasons,
+                }
+            else:
+                validation = {
+                    "validate_date": vd_str,
+                    "error":         "Date not found in Dasha range",
+                }
+        except Exception as e:
+            validation = {"validate_date": validate_date.strftime("%Y-%m-%d"), "error": str(e)}
+
+    return {
+        "question_type":   question_type,
+        "label":           label,
+        "conductive":      sorted(conductive),
+        "detrimental":     sorted(detrimental),
+        "primary_house":   primary_house,
+        "search_start":    search_start_str,
+        "search_end":      search_end_str,
+        "total_windows":   len(windows),
+        "top_windows":     windows[:20],  # Top 20 best windows
+        "current_dba":     current_dba,
+        "ruling_planets":  ruling_planets,
+        "validation":      validation,
+        "planet_significations": {
+            pname: sorted(houses_list)
+            for pname, houses_list in planet_houses_map.items()
+        },
     }
