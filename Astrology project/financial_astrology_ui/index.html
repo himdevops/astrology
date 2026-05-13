@@ -7,8 +7,51 @@
     <link rel="stylesheet" href="style.css?v=20260502">
 </head>
 <body>
-    <header>
-        <div class="header-content">
+    <header style="position:relative;overflow:hidden">
+        <!-- Shree Yantra Background Watermark -->
+        <div id="shree-yantra-bg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.06;pointer-events:none;z-index:0">
+            <svg viewBox="0 0 400 400" width="500" height="500" xmlns="http://www.w3.org/2000/svg">
+                <!-- Bhupura (outer square gates) -->
+                <rect x="20" y="20" width="360" height="360" fill="none" stroke="#d4a843" stroke-width="2"/>
+                <rect x="30" y="30" width="340" height="340" fill="none" stroke="#d4a843" stroke-width="1.5"/>
+                <rect x="40" y="40" width="320" height="320" fill="none" stroke="#d4a843" stroke-width="1"/>
+                <!-- Outer lotus (16 petals) -->
+                <circle cx="200" cy="200" r="150" fill="none" stroke="#d4a843" stroke-width="1"/>
+                <circle cx="200" cy="200" r="140" fill="none" stroke="#d4a843" stroke-width="0.5"/>
+                <!-- Inner lotus (8 petals) -->
+                <circle cx="200" cy="200" r="110" fill="none" stroke="#d4a843" stroke-width="0.8"/>
+                <!-- 9 interlocking triangles (4 upward + 5 downward) -->
+                <!-- Upward triangles (Shiva) -->
+                <polygon points="200,62 310,290 90,290" fill="none" stroke="#d4a843" stroke-width="1.2"/>
+                <polygon points="200,82 295,270 105,270" fill="none" stroke="#d4a843" stroke-width="1"/>
+                <polygon points="200,105 280,255 120,255" fill="none" stroke="#d4a843" stroke-width="0.9"/>
+                <polygon points="200,125 268,242 132,242" fill="none" stroke="#d4a843" stroke-width="0.8"/>
+                <!-- Downward triangles (Shakti) -->
+                <polygon points="200,338 90,110 310,110" fill="none" stroke="#d4a843" stroke-width="1.2"/>
+                <polygon points="200,318 105,130 295,130" fill="none" stroke="#d4a843" stroke-width="1"/>
+                <polygon points="200,298 118,148 282,148" fill="none" stroke="#d4a843" stroke-width="0.9"/>
+                <polygon points="200,278 130,162 270,162" fill="none" stroke="#d4a843" stroke-width="0.8"/>
+                <polygon points="200,260 142,175 258,175" fill="none" stroke="#d4a843" stroke-width="0.7"/>
+                <!-- Bindu (center point) -->
+                <circle cx="200" cy="200" r="4" fill="#d4a843"/>
+            </svg>
+        </div>
+
+        <!-- Visible Shree Yantra Hero -->
+        <div style="text-align:center;padding:10px 0 6px;position:relative;z-index:1">
+            <svg viewBox="0 0 120 120" width="80" height="80" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 0 8px rgba(212,168,67,0.4))">
+                <!-- Mini Shree Yantra icon -->
+                <rect x="5" y="5" width="110" height="110" fill="none" stroke="#d4a843" stroke-width="1.5" rx="2"/>
+                <circle cx="60" cy="60" r="45" fill="none" stroke="#d4a84388" stroke-width="0.8"/>
+                <polygon points="60,18 95,88 25,88" fill="none" stroke="#d4a843" stroke-width="1.2"/>
+                <polygon points="60,102 25,32 95,32" fill="none" stroke="#d4a843" stroke-width="1.2"/>
+                <polygon points="60,28 88,78 32,78" fill="none" stroke="#d4a843" stroke-width="0.8"/>
+                <polygon points="60,92 32,42 88,42" fill="none" stroke="#d4a843" stroke-width="0.8"/>
+                <circle cx="60" cy="60" r="3" fill="#d4a843"/>
+            </svg>
+        </div>
+
+        <div class="header-content" style="position:relative;z-index:1">
             <h1>Financial Astrology Engine <span class="version">v3.0</span></h1>
             <p class="subtitle">Advanced Vedic Astrology × NSE/BSE Market Prediction</p>
         </div>
@@ -27,7 +70,11 @@
             <button class="nav-btn" data-tab="sbc-signal">SBC Signal</button>
             <button class="nav-btn" data-tab="shodasvarga">Shodasvarga</button>
             <button class="nav-btn" data-tab="gochar">Gochar</button>
+            <button class="nav-btn" data-tab="laal-kitab" style="color:#e53935;font-weight:700">Laal Kitab</button>
             <button class="nav-btn" data-tab="gold" style="color:#FFD700;font-weight:700">Gold</button>
+            <button class="nav-btn" data-tab="deities" style="color:#9C27B0;font-weight:700">Deities</button>
+            <button class="nav-btn" data-tab="numerology" style="color:#E65100;font-weight:700">Numerology</button>
+            <button class="nav-btn" data-tab="tarot" style="color:#7B1FA2;font-weight:700">Tarot</button>
         </nav>
     </header>
 
@@ -559,6 +606,42 @@
                 </div>
             </div>
             <div id="gochar-result" class="result-area"></div>
+
+            <!-- ASTRO EVENTS SECTION -->
+            <div class="card" style="margin-top:18px;border-left:4px solid #FF6F00">
+                <h2 style="color:#FF6F00">Astrological Events</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Combustion, Retrograde, Transit, Positions, Mutual Aspects, Lunar Aspects, Parallel, Ecliptic Crossings, Graha Yuddha</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+                    <div class="form-group" style="margin:0"><label>Start Date</label><input type="date" id="astro-evt-start" required></div>
+                    <div class="form-group" style="margin:0"><label>End Date</label><input type="date" id="astro-evt-end" required></div>
+                    <div class="form-group" style="margin:0">
+                        <label>Ayanamsa</label>
+                        <select id="astro-evt-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <button id="astro-evt-fetch" class="btn-primary" style="background:#FF6F00">Analyze Events</button>
+                </div>
+            </div>
+            <div id="astro-evt-result" class="result-area"></div>
+        </section>
+
+        <!-- LAAL KITAB TAB -->
+        <section id="tab-laal-kitab" class="tab-content">
+            <div class="card">
+                <h2 style="color:#e53935">Laal Kitab — Red Book Predictions</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Kaalpurush Kundli analysis with planet-in-house predictions, planetary debts (Rins), remedies, and sleeping/blind/awake states</p>
+                <form id="lk-form" class="form-grid">
+                    <div class="form-group"><label>Name</label><input type="text" id="lk-name" value="Himanshu" required class="birth-name"></div>
+                    <div class="form-group"><label>Birth Date (DD-MM-YYYY)</label><input type="text" id="lk-date" required value="23-09-1992" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group"><label>Birth Time</label><input type="text" id="lk-time" value="23:10" required placeholder="HH:MM or HH:MM AM/PM" maxlength="10" class="birth-time"></div>
+                    <div class="form-group"><label>Birth Place</label><input type="text" id="lk-place" value="Ujjain, Madhya Pradesh, India" required list="city-suggestions" class="birth-place"></div>
+                    <div class="form-group">
+                        <label>Ayanamsa</label>
+                        <select id="lk-ayanamsa"><option value="lahiri" selected>Lahiri</option><option value="krishnamurti">KP</option><option value="raman">Raman</option></select>
+                    </div>
+                    <button type="submit" class="btn-primary" style="background:#e53935">Analyze Laal Kitab</button>
+                </form>
+            </div>
+            <div id="lk-result" class="result-area"></div>
         </section>
 
         <section id="tab-gold" class="tab-content">
@@ -578,6 +661,70 @@
             <div id="gold-result" class="result-area"></div>
         </section>
 
+        <!-- ═══ Deities Tab ═══ -->
+        <section id="tab-deities" class="tab-content">
+            <div class="card">
+                <h2 style="color:#9C27B0">Divisional Deity Analysis — D3/D7/D9/D10/D12/D60</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Deity mappings from Brihat Parashara Hora Shastra with Dasha-Deity timeline for career, fortune &amp; karma</p>
+                <button id="deity-fetch" class="btn-primary" style="background:#9C27B0;color:#fff;font-weight:700">Analyze Deities</button>
+            </div>
+            <!-- Sub-tabs for deity sections -->
+            <div id="deity-sub-tabs" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:16px;padding:10px;background:var(--card-bg);border-radius:8px;border:1px solid var(--border)">
+                <button class="sub-tab active" data-deity-tab="deity-overview" style="padding:6px 14px;border:1px solid #9C27B0;background:#9C27B0;color:#fff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">Overview</button>
+                <button class="sub-tab" data-deity-tab="deity-d3" style="padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">D3 Drekkana</button>
+                <button class="sub-tab" data-deity-tab="deity-d7" style="padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">D7 Saptamsha</button>
+                <button class="sub-tab" data-deity-tab="deity-d9" style="padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">D9 Navamsha</button>
+                <button class="sub-tab" data-deity-tab="deity-d10" style="padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">D10 Dashamsha</button>
+                <button class="sub-tab" data-deity-tab="deity-d12" style="padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">D12 Dwadashamsha</button>
+                <button class="sub-tab" data-deity-tab="deity-d60" style="padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">D60 Shashtiamsha</button>
+                <button class="sub-tab" data-deity-tab="deity-dasha" style="padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">Dasha-Deity Timeline</button>
+            </div>
+            <div id="deity-result" class="result-area"></div>
+        </section>
+
+        <!-- NUMEROLOGY TAB -->
+        <section id="tab-numerology" class="tab-content">
+            <div class="card" style="border-left:4px solid #E65100">
+                <h2 style="color:#E65100">Advanced Numerology — Vedic &amp; Western</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Life Path, Destiny, Soul Urge, Loshu Grid, Name Correction, Mobile/Car/Password analysis, Personality &amp; Behavior</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+                    <div class="form-group" style="margin:0"><label>Full Name</label><input type="text" id="num-name" placeholder="Full Name" class="birth-name"></div>
+                    <div class="form-group" style="margin:0"><label>DOB (DD-MM-YYYY)</label><input type="text" id="num-dob" placeholder="DD-MM-YYYY" maxlength="10" class="birth-date"></div>
+                    <div class="form-group" style="margin:0"><label>Mobile Number</label><input type="text" id="num-mobile" placeholder="9876543210" maxlength="15"></div>
+                    <div class="form-group" style="margin:0"><label>Car/Vehicle No</label><input type="text" id="num-car" placeholder="MP09AB1234" maxlength="15"></div>
+                    <div class="form-group" style="margin:0"><label>Password (optional)</label><input type="text" id="num-password" placeholder="YourPass123"></div>
+                    <button id="num-fetch" class="btn-primary" style="background:#E65100;color:#fff;font-weight:700">Analyze Numerology</button>
+                </div>
+            </div>
+            <div id="num-result" class="result-area"></div>
+        </section>
+
+        <!-- TAROT TAB -->
+        <section id="tab-tarot" class="tab-content">
+            <div class="card" style="border-left:4px solid #7B1FA2">
+                <h2 style="color:#7B1FA2">Tarot Card Reading</h2>
+                <p style="color:var(--text-dim);margin-bottom:12px">Draw 1-5 cards from the full 78-card deck (22 Major + 56 Minor Arcana) with auto combination analysis</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+                    <div class="form-group" style="margin:0">
+                        <label>Number of Cards</label>
+                        <select id="tarot-count" style="min-width:100px">
+                            <option value="1">1 Card</option>
+                            <option value="2">2 Cards</option>
+                            <option value="3" selected>3 Cards</option>
+                            <option value="4">4 Cards</option>
+                            <option value="5">5 Cards</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;flex:1;min-width:200px">
+                        <label>Your Question (optional)</label>
+                        <input type="text" id="tarot-question" placeholder="What should I focus on today?">
+                    </div>
+                    <button id="tarot-draw" class="btn-primary" style="background:#7B1FA2;color:#fff;font-weight:700;font-size:1rem;padding:10px 24px">Draw Cards</button>
+                </div>
+            </div>
+            <div id="tarot-result" class="result-area"></div>
+        </section>
+
     </main>
 
     <footer>
@@ -585,6 +732,6 @@
         <p class="disclaimer">Disclaimer: Astrological predictions are for educational/research purposes only. Not financial advice.</p>
     </footer>
 
-    <script src="app.js?v=20260503g"></script>
+    <script src="app.js?v=20260510vedha3"></script>
 </body>
 </html>

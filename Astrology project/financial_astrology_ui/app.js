@@ -657,6 +657,37 @@ document.getElementById('chart-form').addEventListener('submit', async (e) => {
     const asc = data.ascendant || {};
     const planets = data.planets || [];
     const nakshatras = data.planet_nakshatras || [];
+    const d1 = data.d1_chart || null;
+    const d9 = data.d9_chart || null;
+
+    /* ── Build Ascendant row for planet table ── */
+    var ascNakRow = '';
+    if (asc.longitude != null) {
+        ascNakRow = `<tr style="background:rgba(212,168,67,0.08)">
+            <td style="font-weight:700;color:#00FF88">Ascendant</td>
+            <td>${asc.sign || ''}</td>
+            <td>${asc.longitude?.toFixed(2) || ''}°</td>
+            <td style="color:var(--gold)">—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+        </tr>`;
+    }
+
+    /* ── D1 / D9 charts ── */
+    var chartsHtml = '';
+    if (d1 || d9) {
+        chartsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">';
+        if (d1) {
+            chartsHtml += '<div class="card"><h3 style="color:var(--gold-light);margin-bottom:8px">D-1 Rasi Chart</h3>';
+            chartsHtml += '<div id="chart-d1-svg" style="display:flex;justify-content:center"></div></div>';
+        }
+        if (d9) {
+            chartsHtml += '<div class="card"><h3 style="color:var(--gold-light);margin-bottom:8px">D-9 Navamsa Chart</h3>';
+            chartsHtml += '<div id="chart-d9-svg" style="display:flex;justify-content:center"></div></div>';
+        }
+        chartsHtml += '</div>';
+    }
 
     resultEl.innerHTML = `
         <div class="card">
@@ -667,6 +698,7 @@ document.getElementById('chart-form').addEventListener('submit', async (e) => {
             <table class="data-table" style="margin-top:16px">
                 <thead><tr><th>Planet</th><th>Sign</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>Sub-Lord</th><th>Retro</th></tr></thead>
                 <tbody>
+                    ${ascNakRow}
                     ${nakshatras.map(p => `
                         <tr>
                             <td style="font-weight:600">${p.planet}</td>
@@ -681,7 +713,31 @@ document.getElementById('chart-form').addEventListener('submit', async (e) => {
                 </tbody>
             </table>
         </div>
+        ${chartsHtml}
     `;
+
+    /* ── Render D1 / D9 SVGs ── */
+    if (d1) {
+        var d1El = document.getElementById('chart-d1-svg');
+        if (d1El) d1El.innerHTML = drawNorthIndianSVG(d1, 420);
+    }
+    if (d9) {
+        /* Normalize D9 data: backend uses navamsha_ascendant & d9_sign */
+        var d9norm = {
+            chart: d9.chart || 'D9 - Navamsha',
+            ascendant: d9.ascendant || d9.navamsha_ascendant || '',
+            planets: (d9.planets || []).map(function(p){
+                return {
+                    planet: p.planet,
+                    sign: p.sign || p.d9_sign || '',
+                    strength: p.strength || p.d9_strength || '',
+                    retro: p.retro || false,
+                };
+            }),
+        };
+        var d9El = document.getElementById('chart-d9-svg');
+        if (d9El) d9El.innerHTML = drawNorthIndianSVG(d9norm, 420);
+    }
 });
 
 // ─── SHADBALA ───────────────────────────────────────────────
@@ -1061,6 +1117,52 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
         return found;
     }
 
+    /* ── Pada helpers for inner nakshatra boxes and line start points ── */
+    function normalizeNakName(n){
+        return (n || '').replace(/[\s.]+/g,'').toLowerCase();
+    }
+    function getPadaSounds(nak){
+        return PADA_SOUNDS[nak] || PADA_SOUNDS[NAK_FULL_NAMES[nak]] || ['1','2','3','4'];
+    }
+    function getActivePadasForNak(nak){
+        var clean = normalizeNakName(nak);
+        var active = { transit:{}, natal:{} };
+        (data.transit_planets || []).forEach(function(tp){
+            if(normalizeNakName(tp.nakshatra) === clean && tp.pada){ active.transit[Number(tp.pada)] = tp.planet || true; }
+        });
+        (data.natal_planets || data.planets || []).forEach(function(np){
+            if(normalizeNakName(np.nakshatra) === clean && np.pada){ active.natal[Number(np.pada)] = np.planet || true; }
+        });
+        return active;
+    }
+    function buildInnerPadaHtml(nak, row, col){
+        var sounds = getPadaSounds(nak);
+        var active = getActivePadasForNak(nak);
+        /* Side columns (col 0 or 8) → vertical 2x2 layout; top/bottom rows → horizontal 4x1 */
+        var isSideCol = (col === 0 || col === 8);
+        var layoutCls = isSideCol ? 'sbc-inner-padas sbc-padas-vert' : 'sbc-inner-padas';
+        var html = '<div class="'+layoutCls+'" title="Nakshatra padas">';
+        for(var i=1;i<=4;i++){
+            var cls = 'sbc-inner-pada';
+            var label = sounds[i-1] || i;
+            var tip = nak + ' Pada ' + i + ' (' + label + ')';
+            if(active.transit[i]) { cls += ' active-transit'; tip += ' — transit ' + active.transit[i]; }
+            else if(active.natal[i]) { cls += ' active-natal'; tip += ' — natal ' + active.natal[i]; }
+            html += '<span class="'+cls+'" data-nak="'+nak+'" data-pada="'+i+'" title="'+tip+'"><span>'+label+'</span><span class="pno">P'+i+'</span></span>';
+        }
+        html += '</div>';
+        return html;
+    }
+    function getTransitPadaForPlanet(planetName){
+        var tp = (data.transit_planets || []).find(function(t){ return t.planet === planetName; });
+        return tp && tp.pada ? Number(tp.pada) : null;
+    }
+    function pointInCellByPada(pos, pada, cellW, cellH){
+        /* Use cell center so lines pass cleanly through grid corners */
+        var r = pos[0], c = pos[1];
+        return [c * cellW + cellW * 0.5, r * cellH + cellH * 0.5];
+    }
+
     /* ── Build info strip HTML for a list of nakshatras ──────── */
     /* Kansal-style with GRID ALIGNMENT:
        - Spacer cells/rows for corner positions (grid cols 0,8 / rows 0,8)
@@ -1251,6 +1353,12 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
             .sbc-cell.vedha-hit{box-shadow:inset 0 0 0 2px #ff0000}
             .sbc-cell.navatara-on .navatara-stripe{display:block}
             .sbc-cell .navatara-stripe{position:absolute;bottom:0;left:0;right:0;height:5px;display:none;z-index:2;border-radius:0 0 1px 1px}
+            .sbc-cell .sbc-inner-padas{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;width:92%;margin-top:2px;z-index:3;position:relative}
+            .sbc-cell .sbc-inner-padas.sbc-padas-vert{grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,auto);width:85%}
+            .sbc-cell .sbc-inner-pada{font-size:0.38rem;line-height:1.05;text-align:center;border:1px solid rgba(80,45,120,0.25);border-radius:2px;background:rgba(255,255,255,0.28);color:#4b2a78;font-weight:700;padding:1px 0;min-width:0}
+            .sbc-cell .sbc-inner-pada .pno{display:block;font-size:0.34rem;opacity:0.75;color:#6b4e00}
+            .sbc-cell .sbc-inner-pada.active-transit{background:rgba(255,204,0,0.55);border-color:#ffcc00;color:#8b1a1a;box-shadow:0 0 4px rgba(255,204,0,0.65)}
+            .sbc-cell .sbc-inner-pada.active-natal{background:rgba(60,140,255,0.28);border-color:#4d8dff;color:#003c8f}
 
             /* ── SVG Vedha Overlay ─────────────────────────────── */
             .sbc-vedha-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4}
@@ -1280,6 +1388,7 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 <label class="sbc-opt-label"><input type="checkbox" data-layer="navatara"> Show Navatara colors</label>
                 <label class="sbc-opt-label"><input type="checkbox" data-layer="aksharas" checked> Show Devanagari</label>
                 <label class="sbc-opt-label"><input type="checkbox" data-layer="tarabala" checked> Show Tarabala</label>
+                <label class="sbc-opt-label"><input type="checkbox" data-layer="padas" checked> Show Pada inside Nakshatra boxes</label>
             </div>
 
             <div style="overflow-x:auto">
@@ -1429,10 +1538,11 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                                         p.vedha_mode === 'front' ? 'Front (nearest)' :
                                         p.vedha_mode === 'left' ? 'Left (fast)' :
                                         p.vedha_mode === 'right' ? 'Right (retro)' : p.vedha_mode || '—';
+                        var cpvBadge = p.corner_pada_vedha ? ' <span title="Corner Pada Vedha (Shloka 52)" style="color:#ba68c8;font-size:0.65rem;font-weight:700">◈</span>' : '';
                         return '<tr>' +
                             '<td style="font-weight:700;color:' + natureColor + '">' + p.planet +
-                                (p.retrograde ? ' <span style="color:var(--red);font-size:0.7rem">R</span>' : '') + '</td>' +
-                            '<td>' + (p.nakshatra || '—') + '</td>' +
+                                (p.retrograde ? ' <span style="color:var(--red);font-size:0.7rem">R</span>' : '') + cpvBadge + '</td>' +
+                            '<td>' + (p.nakshatra || '—') + ' <span style="font-size:0.7rem;color:var(--text-dim)">P' + (p.pada||'?') + '</span></td>' +
                             '<td>' + (p.sign || '—') + '</td>' +
                             '<td style="color:' + natureColor + ';font-weight:600;text-transform:uppercase">' + (p.nature || '—') + '</td>' +
                             '<td style="font-size:0.78rem">' + reasonLabel + '</td>' +
@@ -1553,6 +1663,279 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 </tbody>
             </table>
         </div>
+
+        <!-- ═══ Vedha Count Analysis (Shlokas 107-109, 122-124) ═══ -->
+        ${(function(){
+            var vca = sbc.vedha_count_analysis || {};
+            if (!vca.papa_vedha_count && !vca.shubha_vedha_count) return '';
+            var papaEff = vca.papa_effect || {};
+            var shubhaEff = vca.shubha_effect || {};
+            var netColor = vca.net_assessment === 'EXTREME_DANGER' ? '#ff0000' :
+                           vca.net_assessment === 'HIGH_DANGER' ? '#ff4444' :
+                           vca.net_assessment === 'UNFAVORABLE' ? '#ff8c00' :
+                           vca.net_assessment === 'HIGHLY_FAVORABLE' ? '#00e676' :
+                           vca.net_assessment === 'FAVORABLE' ? '#66bb6a' : '#d4a843';
+            return '<div class="card" style="border-color:' + netColor + '">' +
+                '<h2>Vedha Count Analysis — Shlokas 107-109, 122-124</h2>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+                    '<div style="padding:10px;background:rgba(255,60,60,0.06);border:1px solid rgba(255,60,60,0.2);border-radius:6px">' +
+                        '<div style="font-weight:700;color:var(--red);font-size:1.1rem">' + (vca.papa_vedha_count||0) + ' Papa Vedha</div>' +
+                        (papaEff.effect ? '<div style="font-size:0.85rem;color:#ff8c00;font-weight:600">' + papaEff.effect + '</div>' : '') +
+                        (papaEff.meaning ? '<div style="font-size:0.78rem;color:var(--text-muted)">' + papaEff.meaning + '</div>' : '') +
+                        (papaEff.market ? '<div style="font-size:0.75rem;color:var(--red);margin-top:4px">' + papaEff.market + '</div>' : '') +
+                        '<div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px">Planets: ' + (vca.papa_planets||[]).join(', ') + '</div>' +
+                    '</div>' +
+                    '<div style="padding:10px;background:rgba(40,200,60,0.06);border:1px solid rgba(40,200,60,0.2);border-radius:6px">' +
+                        '<div style="font-weight:700;color:var(--green);font-size:1.1rem">' + (vca.shubha_vedha_count||0) + ' Shubha Vedha</div>' +
+                        (shubhaEff.effect ? '<div style="font-size:0.85rem;color:#66bb6a;font-weight:600">' + shubhaEff.effect + '</div>' : '') +
+                        (shubhaEff.meaning ? '<div style="font-size:0.78rem;color:var(--text-muted)">' + shubhaEff.meaning + '</div>' : '') +
+                        (shubhaEff.market ? '<div style="font-size:0.75rem;color:var(--green);margin-top:4px">' + shubhaEff.market + '</div>' : '') +
+                        '<div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px">Planets: ' + (vca.shubha_planets||[]).join(', ') + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div style="padding:8px 12px;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);border-radius:6px;text-align:center">' +
+                    '<span style="font-weight:700;font-size:1rem;color:' + netColor + '">' + (vca.net_assessment||'').replace(/_/g,' ') + '</span>' +
+                    '<div style="font-size:0.8rem;color:var(--text-muted)">' + (vca.net_description||'') + '</div>' +
+                '</div>' +
+            '</div>';
+        })()}
+
+        <!-- ═══ Moon Daily Vedha ═══ -->
+        ${(function(){
+            var mdv = sbc.moon_daily_vedha || {};
+            if (!mdv.moon_nakshatra) return '';
+            var outlookColor = mdv.daily_outlook && mdv.daily_outlook.indexOf('Positive') >= 0 ? 'var(--green)' :
+                               mdv.daily_outlook && mdv.daily_outlook.indexOf('Negative') >= 0 ? 'var(--red)' : '#d4a843';
+            var html = '<div class="card" style="border-color:' + outlookColor + '">' +
+                '<h2>Moon Daily Vedha — ' + mdv.moon_nakshatra + ' (' + (mdv.moon_rashi||'') + ')</h2>' +
+                '<div style="padding:8px 12px;background:rgba(212,168,67,0.08);border-radius:6px;margin-bottom:12px;text-align:center">' +
+                    '<span style="font-weight:700;color:' + outlookColor + '">' + (mdv.daily_outlook||'') + '</span>' +
+                    '<div style="font-size:0.78rem;color:var(--text-muted)">Shubha: ' + (mdv.shubha_vedha_on_moon||0) + ' | Papa: ' + (mdv.papa_vedha_on_moon||0) + '</div>' +
+                '</div>';
+
+            // Planets vedhing Moon
+            var pvm = mdv.planets_vedhing_moon || [];
+            if (pvm.length) {
+                html += '<h3 style="font-size:0.85rem;margin-bottom:6px">Planets Casting Vedha on Moon</h3>' +
+                '<table class="data-table"><thead><tr><th>Planet</th><th>From Nak</th><th>Type</th><th>Nature</th><th>Speed</th><th>Effect</th></tr></thead><tbody>';
+                pvm.forEach(function(p){
+                    var nc = p.is_benefic ? 'var(--green)' : 'var(--red)';
+                    html += '<tr>' +
+                        '<td style="font-weight:600;color:' + nc + '">' + p.planet + '</td>' +
+                        '<td>' + p.from_nakshatra + '</td>' +
+                        '<td style="font-size:0.78rem">' + p.vedha_type + '</td>' +
+                        '<td style="color:' + nc + ';font-weight:600;text-transform:uppercase;font-size:0.78rem">' + p.nature + '</td>' +
+                        '<td style="font-size:0.78rem">' + p.speed + (p.retrograde ? ' (R)' : '') + '</td>' +
+                        '<td style="font-size:0.75rem">' + (p.effect||'') + '</td>' +
+                    '</tr>';
+                });
+                html += '</tbody></table>';
+            }
+
+            // Moon's vedha targets
+            var targets = mdv.vedha_targets || [];
+            if (targets.length) {
+                html += '<h3 style="font-size:0.85rem;margin:12px 0 6px">Moon Vedha Targets (' + targets.length + ' entities)</h3>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+                targets.forEach(function(t){
+                    var dirColor = t.direction === 'vama' ? '#66bb6a' : t.direction === 'dakshina' ? '#ef5350' : '#d4a843';
+                    html += '<span style="padding:2px 8px;background:rgba(212,168,67,0.08);border:1px solid ' + dirColor + ';border-radius:4px;font-size:0.75rem">' +
+                        t.entity + ' <span style="color:' + dirColor + ';font-size:0.68rem">(' + t.direction + ')</span></span>';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+            return html;
+        })()}
+
+        <!-- ═══ Tatkalika Grahas — Shlokas 153-160 ═══ -->
+        ${(function(){
+            var tat = sbc.tatkalika_grahas || {};
+            if (!tat.paksha && !tat.dina && !tat.kshana) return '';
+            var html = '<div class="card">' +
+                '<h2>Tatkalika Grahas — Temporal Planets (Shlokas 153-160)</h2>' +
+                '<p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">' +
+                'Paksha (fortnightly) from Sun, Dina (daily) from Moon, Kshana (momentary) from Sun. These temporal planets add vedha in their time periods.</p>';
+
+            ['paksha', 'dina', 'kshana'].forEach(function(period){
+                var planets = tat[period] || [];
+                if (!planets.length) return;
+                var label = period === 'paksha' ? 'Paksha (Fortnightly)' : period === 'dina' ? 'Dina (Daily)' : 'Kshana (Momentary)';
+                var color = period === 'paksha' ? '#bb86fc' : period === 'dina' ? '#03dac6' : '#d4a843';
+                html += '<h3 style="font-size:0.82rem;color:' + color + ';margin:10px 0 4px">' + label + '</h3>' +
+                '<table class="data-table"><thead><tr><th>Planet</th><th>Nakshatra</th><th>Offset</th><th>From</th></tr></thead><tbody>';
+                planets.forEach(function(p){
+                    html += '<tr><td style="font-weight:600">' + p.planet + '</td>' +
+                        '<td style="color:' + color + '">' + p.nakshatra + '</td>' +
+                        '<td>' + p.offset + '</td>' +
+                        '<td style="font-size:0.75rem;color:var(--text-dim)">' + p.from_nak + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            });
+            html += '</div>';
+            return html;
+        })()}
+
+        <!-- ═══ Planet Vedha Chooser ═══ -->
+        <div class="card">
+            <h2>Planet Vedha Detail — Choose Planet</h2>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">
+                Select any transit planet to see all entities it vedhas, categorized by type and direction. For future Nifty implementation.
+            </p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+                ${transitPlanets.map(function(tp){
+                    var nc = BENEFICS.has(tp.planet) ? 'var(--green)' : 'var(--red)';
+                    return '<button class="sbc-planet-vedha-btn" data-planet="' + tp.planet + '" style="padding:4px 12px;border:1px solid ' + nc + ';background:rgba(26,26,46,0.8);color:' + nc + ';border-radius:4px;cursor:pointer;font-weight:600;font-size:0.82rem">' +
+                        tp.planet + ' <span style="font-size:0.7rem;opacity:0.7">(' + (tp.nakshatra||'').split(' ')[0] + ')</span></button>';
+                }).join('')}
+            </div>
+            <div id="sbc-planet-vedha-result" style="min-height:40px"></div>
+        </div>
+
+        <!-- ═══ Vedha List — All 9 Planets + Lagna ═══ -->
+        ${(function(){
+            var vl = data.vedha_list;
+            if (!vl || !vl.flat_list || !vl.flat_list.length) return '';
+            var summary = vl.summary || {};
+            var balColor = summary.balance === 'Strongly Negative' ? '#ff0000' :
+                           summary.balance === 'Negative' ? '#ff4444' :
+                           summary.balance === 'Neutral' ? '#d4a843' :
+                           summary.balance === 'Positive' ? '#66bb6a' : '#00e676';
+
+            var html = '<div class="card" style="border-left:3px solid ' + balColor + '">' +
+                '<h2>Vedha List — Transit Planet Vedha to Nakshatras &amp; Planets</h2>' +
+                '<p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">' +
+                'Per Shlokas 19-47: Each transit planet vedhas specific nakshatras in Vama (Left), Dakshina (Right), Sammukha (Front) directions. ' +
+                'Sun/Moon/Rahu/Ketu = 3-Way (all dirs). Others depend on speed.</p>';
+
+            // Summary badges
+            html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">' +
+                '<div style="padding:8px 14px;background:rgba(255,60,60,0.06);border:1px solid rgba(255,60,60,0.2);border-radius:6px;text-align:center">' +
+                    '<div style="font-weight:700;color:var(--red);font-size:1.1rem">' + (summary.papa_vedhas||0) + '</div>' +
+                    '<div style="font-size:0.75rem;color:var(--text-muted)">Papa Vedhas</div></div>' +
+                '<div style="padding:8px 14px;background:rgba(40,200,60,0.06);border:1px solid rgba(40,200,60,0.2);border-radius:6px;text-align:center">' +
+                    '<div style="font-weight:700;color:var(--green);font-size:1.1rem">' + (summary.shubha_vedhas||0) + '</div>' +
+                    '<div style="font-size:0.75rem;color:var(--text-muted)">Shubha Vedhas</div></div>' +
+                '<div style="padding:8px 14px;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);border-radius:6px;text-align:center">' +
+                    '<div style="font-weight:700;color:' + balColor + ';font-size:1.1rem">' + (summary.balance||'—') + '</div>' +
+                    '<div style="font-size:0.75rem;color:var(--text-muted)">Net: ' + (summary.net_score >= 0 ? '+' : '') + (summary.net_score||0) + '</div></div>' +
+            '</div>';
+
+            // Planet-wise collapsible vedha table
+            var planets = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+            var MALEFIC_SET = new Set(['Sun','Mars','Saturn','Rahu','Ketu']);
+
+            planets.forEach(function(planet){
+                var report = (vl.planet_reports || {})[planet];
+                if (!report) return;
+                var trad = report.traditional_vedha || {};
+                var vedhaClass = report.vedha_classification || {};
+                var isMalefic = MALEFIC_SET.has(planet);
+                var nc = isMalefic ? 'var(--red)' : 'var(--green)';
+                var natureLabel = isMalefic ? 'Papa' : 'Shubha';
+                var tradPair = report.traditional_vedha_pair || {};
+
+                html += '<details style="margin-bottom:6px;border:1px solid rgba(255,255,255,0.08);border-radius:6px;overflow:hidden">' +
+                    '<summary style="padding:8px 12px;cursor:pointer;background:rgba(26,26,46,0.6);display:flex;align-items:center;gap:8px">' +
+                        '<span style="font-weight:700;color:' + nc + ';font-size:0.95rem">' + planet + '</span>' +
+                        '<span style="font-size:0.78rem;color:var(--text-muted)">' + (report.transit_nakshatra||'') + ' (' + (report.transit_rashi||'') + ')</span>' +
+                        '<span style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--text-dim)">' + (vedhaClass.type||'') + '</span>' +
+                        '<span style="font-size:0.72rem;color:' + nc + '">' + natureLabel + '</span>' +
+                        '<span style="margin-left:auto;font-size:0.75rem;color:var(--gold)">' + (trad.all_active_targets||[]).length + ' targets</span>' +
+                    '</summary>' +
+                    '<div style="padding:8px 12px;background:rgba(0,0,0,0.2)">';
+
+                // Vedha info
+                html += '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">' +
+                    'Vedha: <b>' + (vedhaClass.type||'') + '</b> | Strength: <b>' + (vedhaClass.strength||'') + '</b> | ' +
+                    'Trad Pair: <b>' + (tradPair.partner_nakshatra||'None') + '</b></div>';
+
+                // Direction-wise targets
+                var dirs = [
+                    {key: 'vama_targets', label: 'Vama (Left / baaI)', color: '#66bb6a'},
+                    {key: 'dakshina_targets', label: 'Dakshina (Right / daahini)', color: '#ef5350'},
+                    {key: 'sammukha_targets', label: 'Sammukha (Front / saamne)', color: '#d4a843'},
+                ];
+                dirs.forEach(function(d){
+                    var targets = trad[d.key] || [];
+                    if (!targets.length) return;
+                    html += '<div style="margin-bottom:4px"><span style="font-size:0.75rem;font-weight:600;color:' + d.color + '">' + d.label + ':</span> ' +
+                        '<span style="font-size:0.78rem">' + targets.join(', ') + '</span></div>';
+                });
+
+                // Affected natal planets
+                var detail = trad.detail || [];
+                var affected = detail.filter(function(e){ return e.affected_natal_planets && e.affected_natal_planets.length > 0; });
+                if (affected.length) {
+                    html += '<div style="margin-top:6px;padding:6px 8px;background:rgba(255,140,0,0.08);border:1px solid rgba(255,140,0,0.2);border-radius:4px">' +
+                        '<span style="font-weight:700;color:#ff8c00;font-size:0.78rem">Natal Planets Affected:</span>';
+                    affected.forEach(function(a){
+                        a.affected_natal_planets.forEach(function(np){
+                            html += '<div style="font-size:0.75rem;margin-top:2px;color:var(--text-dim)">' + np.effect + '</div>';
+                        });
+                    });
+                    html += '</div>';
+                }
+
+                // Full target table
+                if (detail.length) {
+                    html += '<table class="data-table" style="margin-top:8px;font-size:0.78rem"><thead><tr>' +
+                        '<th>Target Nak</th><th>Direction</th><th>Rashi</th><th>Nak Lord</th><th>Rashi Lord</th><th>Strength</th></tr></thead><tbody>';
+                    detail.forEach(function(e){
+                        var dirColor = e.direction_key === 'vama' ? '#66bb6a' : e.direction_key === 'dakshina' ? '#ef5350' : '#d4a843';
+                        html += '<tr>' +
+                            '<td style="font-weight:600">' + e.nakshatra + '</td>' +
+                            '<td style="color:' + dirColor + '">' + (e.direction_key||'') + '</td>' +
+                            '<td>' + (e.rashi||'') + '</td>' +
+                            '<td>' + (e.nak_lord||'') + '</td>' +
+                            '<td>' + (e.rashi_lord||'') + '</td>' +
+                            '<td>' + (e.strength||'') + ' (' + (e.strength_multiplier||1) + 'x)</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+                html += '</div></details>';
+            });
+
+            // Lagna vedha
+            var lagna = vl.lagna_report;
+            if (lagna) {
+                var lt = lagna.traditional_vedha || {};
+                html += '<details style="margin-bottom:6px;border:1px solid rgba(41,128,185,0.3);border-radius:6px;overflow:hidden">' +
+                    '<summary style="padding:8px 12px;cursor:pointer;background:rgba(26,26,46,0.6);display:flex;align-items:center;gap:8px">' +
+                        '<span style="font-weight:700;color:#2980b9;font-size:0.95rem">Lagna (Ascendant)</span>' +
+                        '<span style="font-size:0.78rem;color:var(--text-muted)">' + (lagna.lagna_nakshatra||'') + ' (' + (lagna.lagna_rashi||'') + ')</span>' +
+                        '<span style="margin-left:auto;font-size:0.75rem;color:var(--gold)">' + (lt.all_targets||[]).length + ' targets</span>' +
+                    '</summary>' +
+                    '<div style="padding:8px 12px;background:rgba(0,0,0,0.2)">';
+
+                // Direction targets
+                if ((lt.vama_targets||[]).length)
+                    html += '<div style="margin-bottom:4px"><span style="font-size:0.75rem;font-weight:600;color:#66bb6a">Vama:</span> ' + lt.vama_targets.join(', ') + '</div>';
+                if ((lt.dakshina_targets||[]).length)
+                    html += '<div style="margin-bottom:4px"><span style="font-size:0.75rem;font-weight:600;color:#ef5350">Dakshina:</span> ' + lt.dakshina_targets.join(', ') + '</div>';
+                if ((lt.sammukha_targets||[]).length)
+                    html += '<div style="margin-bottom:4px"><span style="font-size:0.75rem;font-weight:600;color:#d4a843">Sammukha:</span> ' + lt.sammukha_targets.join(', ') + '</div>';
+
+                // Planets making vedha to lagna
+                var pvl = lagna.planets_making_vedha_to_lagna || [];
+                if (pvl.length) {
+                    html += '<h3 style="font-size:0.82rem;margin:8px 0 4px">Planets Making Vedha to Lagna</h3>' +
+                        '<table class="data-table" style="font-size:0.78rem"><thead><tr><th>Planet</th><th>From Nak</th><th>Direction</th><th>Nature</th><th>Effect</th></tr></thead><tbody>';
+                    pvl.forEach(function(p){
+                        var nc2 = p.nature === 'Papa' ? 'var(--red)' : 'var(--green)';
+                        html += '<tr><td style="font-weight:600;color:' + nc2 + '">' + p.planet + '</td>' +
+                            '<td>' + p.from_nakshatra + '</td><td>' + p.direction + '</td>' +
+                            '<td style="color:' + nc2 + '">' + p.nature + '</td>' +
+                            '<td style="font-size:0.75rem">' + (p.effect||'') + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+                html += '</div></details>';
+            }
+
+            html += '</div>';
+            return html;
+        })()}
     `;
 
     /* ══════════════════════════════════════════════════════════
@@ -1660,6 +2043,11 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
                 html += '<div class="sbc-tara-num" style="font-size:0.48rem;color:'+tc+';opacity:0.7">'+(navInfo.tara || '')+(navInfo.tara_number ? ' ('+navInfo.tara_number+')' : '')+'</div>';
             }
 
+            /* Four padas inside each nakshatra box, so vedha can be read pada → pada */
+            if (type === 'nakshatra') {
+                html += buildInnerPadaHtml(name, r, c);
+            }
+
             /* Planet badges - separate natal and transit */
             if (planets.length) {
                 html += '<div class="planet-badges">';
@@ -1743,10 +2131,11 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
 
             flatLines.forEach(function(vl){
                 if (!vl.from || !vl.to) return;
-                var x1 = vl.from[1] * cellW + cellW/2;
-                var y1 = vl.from[0] * cellH + cellH/2;
-                var x2 = vl.to[1] * cellW + cellW/2;
-                var y2 = vl.to[0] * cellH + cellH/2;
+                var sourcePada = getTransitPadaForPlanet(vl.planet);
+                var p1 = pointInCellByPada(vl.from, sourcePada, cellW, cellH);
+                var p2 = pointInCellByPada(vl.to, vl.to_pada || sourcePada, cellW, cellH);
+                var x1 = p1[0], y1 = p1[1];
+                var x2 = p2[0], y2 = p2[1];
 
                 var color = vl.isPapa ? '#ff2222' : '#22cc44';
                 var line = document.createElementNS('http://www.w3.org/2000/svg','line');
@@ -1806,6 +2195,11 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
             if (layer === 'aksharas') {
                 document.querySelectorAll('.sbc-akshara-layer').forEach(function(a){
                     a.style.display = on ? '' : 'none';
+                });
+            }
+            if (layer === 'padas') {
+                document.querySelectorAll('.sbc-inner-padas').forEach(function(p){
+                    p.style.display = on ? 'grid' : 'none';
                 });
             }
             if (layer === 'tarabala') {
@@ -1882,10 +2276,11 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
 
             planetLines.forEach(function(vl){
                 if (!vl.from || !vl.to) return;
-                var x1 = vl.from[1] * cellW + cellW/2;
-                var y1 = vl.from[0] * cellH + cellH/2;
-                var x2 = vl.to[1] * cellW + cellW/2;
-                var y2 = vl.to[0] * cellH + cellH/2;
+                var sourcePada = getTransitPadaForPlanet(planetName);
+                var p1 = pointInCellByPada(vl.from, sourcePada, cellW, cellH);
+                var p2 = pointInCellByPada(vl.to, vl.to_pada || sourcePada, cellW, cellH);
+                var x1 = p1[0], y1 = p1[1];
+                var x2 = p2[0], y2 = p2[1];
 
                 var color = vl.isPapa ? '#ff2222' : '#22cc44';
                 var sw = '2.5';
@@ -1983,6 +2378,117 @@ document.getElementById('sarvatobhadra-form').addEventListener('submit', async (
     legendHtml += '</div>';
     var gridWrap = document.getElementById('sbc-grid-wrap');
     if (gridWrap) gridWrap.insertAdjacentHTML('afterend', legendHtml);
+
+    /* ══════════════════════════════════════════════════════════
+       Planet Vedha Chooser — click a planet button to see its vedha detail
+       ══════════════════════════════════════════════════════════ */
+    document.querySelectorAll('.sbc-planet-vedha-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            var pName = this.dataset.planet;
+            var resultDiv = document.getElementById('sbc-planet-vedha-result');
+            if (!resultDiv) return;
+
+            // Find the planet analysis from sbc data
+            var pa = (sbc.planet_analyses || []).find(function(p){ return p.planet === pName; });
+            if (!pa) { resultDiv.innerHTML = '<p style="color:var(--red)">No data for ' + pName + '</p>'; return; }
+
+            // Highlight selected button
+            document.querySelectorAll('.sbc-planet-vedha-btn').forEach(function(b){ b.style.opacity = '0.5'; });
+            this.style.opacity = '1';
+
+            var nc = pa.nature === 'benefic' ? 'var(--green)' : 'var(--red)';
+            var gb = pa.graha_bala || {};
+            var vedhaHitsP = pa.vedha_hits || [];
+            var lattaHitsP = pa.latta_hits || [];
+
+            var html = '<div style="border:1px solid ' + nc + ';border-radius:8px;padding:12px;background:rgba(26,26,46,0.5)">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+            html += '<div><span style="font-weight:700;font-size:1.1rem;color:' + nc + '">' + pName + '</span>';
+            html += ' <span style="font-size:0.8rem;color:var(--text-muted)">in ' + pa.nakshatra + ' Pada ' + (pa.pada||'?') + ' (' + pa.sign + ')</span></div>';
+            html += '<div style="text-align:right">';
+            html += '<div style="font-size:0.78rem;color:' + nc + ';font-weight:600">' + (pa.vedha_speed_type||'') + '</div>';
+            html += '<div style="font-size:0.72rem;color:var(--text-dim)">' + (pa.vedha_mode||'') + ' | Speed: ' + (pa.speed||0) + (pa.retrograde ? ' (R)' : '') + '</div>';
+            html += '</div></div>';
+
+            // Graha Bala
+            html += '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px">';
+            html += 'Graha Bala: <span style="color:var(--gold);font-weight:600">' + (gb.graha_bala||'—') + '</span>';
+            html += ' (' + (gb.sign_relation||'') + ' ' + (gb.sign_strength ? (gb.sign_strength*100).toFixed(0)+'%' : '') + ' × ' + (gb.motion||'') + ' ' + (gb.motion_multiplier||1) + '×)';
+            html += '</div>';
+
+            // Vedha hits
+            if (vedhaHitsP.length) {
+                html += '<h4 style="font-size:0.82rem;color:' + nc + ';margin:8px 0 4px">Vedha Hits (' + vedhaHitsP.length + ')</h4>';
+                html += '<table class="data-table" style="font-size:0.75rem"><thead><tr><th>Target</th><th>Dir</th><th>Bindu</th><th>Tara</th><th>Severity</th><th>Temporal</th><th>Strength</th></tr></thead><tbody>';
+                vedhaHitsP.forEach(function(vh){
+                    var sc = vh.severity === 'CRITICAL' ? '#ff0000' : vh.severity === 'HIGH' ? '#ff4444' : '#ff8c00';
+                    var ts = vh.temporal_state || {};
+                    html += '<tr>' +
+                        '<td style="font-weight:600">' + vh.to_entity + '</td>' +
+                        '<td>' + (vh.vedha_direction||'') + '</td>' +
+                        '<td style="color:var(--gold)">' + (vh.bindu_type||'—') + '</td>' +
+                        '<td>' + (vh.tara||'—') + '</td>' +
+                        '<td style="color:' + sc + ';font-weight:600">' + vh.severity + '</td>' +
+                        '<td style="font-size:0.7rem">' + (ts.state || '—') + '</td>' +
+                        '<td>' + (vh.strength_multiplier||1) + 'x</td>' +
+                    '</tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p style="font-size:0.78rem;color:var(--text-dim)">No vedha hits on sensitive points</p>';
+            }
+
+            // Latta
+            if (lattaHitsP.length) {
+                html += '<h4 style="font-size:0.82rem;color:#ff8c00;margin:8px 0 4px">Latta Hits</h4>';
+                lattaHitsP.forEach(function(lh){
+                    html += '<div style="padding:4px 8px;margin-bottom:4px;background:rgba(255,140,0,0.06);border-left:3px solid #ff8c00;border-radius:3px;font-size:0.78rem">' +
+                        '<span style="font-weight:600">' + lh.kicked_nak + '</span>' +
+                        (lh.bindu_type ? ' <span style="color:var(--gold)">(' + lh.bindu_type + ')</span>' : '') +
+                        ' — <span style="color:var(--red)">' + lh.severity + '</span>' +
+                        ' — ' + (lh.effect||'') + '</div>';
+                });
+            }
+
+            // Book vedha targets
+            var bTargets = pa.nak_vedha_targets;
+            if (bTargets) {
+                html += '<h4 style="font-size:0.82rem;color:var(--gold);margin:10px 0 4px">Book Vedha Targets (Shlokas 19-47)</h4>';
+                ['vama', 'dakshina', 'sammukha'].forEach(function(dir){
+                    var targets = bTargets[dir] || [];
+                    if (!targets.length) return;
+                    var dirLabel = dir === 'vama' ? 'Vama (Left/बाई)' : dir === 'dakshina' ? 'Dakshina (Right/दाहिनी)' : 'Sammukha (Front/सामने)';
+                    var dirColor = dir === 'vama' ? '#66bb6a' : dir === 'dakshina' ? '#ef5350' : '#d4a843';
+                    html += '<div style="margin-bottom:4px"><span style="font-size:0.75rem;font-weight:600;color:' + dirColor + '">' + dirLabel + ':</span> ';
+                    html += '<span style="font-size:0.75rem;color:var(--text-muted)">' + targets.join(', ') + '</span></div>';
+                });
+                html += '<div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px">' +
+                    'Active direction per speed: <strong>' + (pa.vedha_mode||'') + '</strong>' +
+                    (pa.vedha_mode === 'right' ? ' → only dakshina targets active (retrograde)' :
+                     pa.vedha_mode === 'left' ? ' → only vama targets active (fast)' :
+                     pa.vedha_mode === 'front' ? ' → only sammukha target active (medium speed)' :
+                     ' → all directions active') + '</div>';
+            }
+
+            // Corner Pada Vedha (Shloka 52)
+            var cpv = pa.corner_pada_vedha;
+            if (cpv) {
+                var cpvColor = cpv.nature === 'shubha_vedha' ? '#66bb6a' : '#ef5350';
+                html += '<h4 style="font-size:0.82rem;color:#ba68c8;margin:10px 0 4px">Corner Pada Vedha (Shloka 52)</h4>';
+                html += '<div style="padding:6px 10px;background:rgba(186,104,200,0.08);border-left:3px solid #ba68c8;border-radius:4px;font-size:0.78rem">';
+                html += '<div><span style="font-weight:600;color:#ba68c8">' + cpv.corner + ' Corner</span>';
+                html += ' — Planet at <strong>' + cpv.from_nak + ' Pada ' + cpv.from_pada + '</strong> (junction pada)</div>';
+                html += '<div style="margin-top:3px">Vedhas svara <strong style="color:#ba68c8">' + cpv.svara + ' (' + cpv.svara_en + ')</strong>';
+                html += ' at grid [' + cpv.svara_pos.join(',') + '] + <strong>Purna Tithi</strong> at center [' + cpv.center_pos.join(',') + ']</div>';
+                html += '<div style="margin-top:3px;color:' + cpvColor + ';font-weight:600">' + cpv.effect + '</div>';
+                html += '<div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">Strength: ' + (cpv.strength_multiplier||1) + 'x</div>';
+                html += '</div>';
+            }
+
+            html += '</div>';
+            resultDiv.innerHTML = html;
+        });
+    });
 });
 
 // ─── STRENGTH CALENDAR ───────────────────────────────────────
@@ -2103,7 +2609,7 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
     const yogiData = kp.yogi_avayogi || {};
     const planetStatus = kp.planet_status || [];
     const aspectDefs = kp.aspect_definitions || [];
-    const planetColors = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080'};
+    const planetColors = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080',Ascendant:'#00FF88'};
     const verdictColor = function(v){ if(!v)return'var(--text-muted)'; return v==='PROMISE'?'var(--green)':v==='DENIAL'?'var(--red)':v.indexOf('PROMISE')>=0?'#66bb6a':'var(--text-muted)'; };
     const pColor = function(n){ return planetColors[n]||'#ccc'; };
 
@@ -2763,7 +3269,7 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
     html += '<button id="kp-match-fetch" class="btn-primary" style="font-size:0.82rem;padding:7px 16px;font-weight:700">PREDICT WINNER</button>';
     html += '</div>';
     html += '<div id="kp-match-result"><p style="color:var(--text-muted);font-style:italic">Enter KP number, team names, and click "PREDICT WINNER"</p></div>';
-    html += '</div></div>';
+    html += '</div>';
 
     /* ═══ TOSS PREDICTION (inside Match tab) ═══════════════════ */
     html += '<div class="card" style="margin-top:16px;border:1px solid #333">';
@@ -2777,6 +3283,7 @@ document.getElementById('kp-form').addEventListener('submit', async (e) => {
     html += '</div>';
     html += '<div id="kp-toss-result"><p style="color:var(--text-muted);font-style:italic">Enter a separate KP number for toss prediction</p></div>';
     html += '</div>';
+    html += '</div>'; /* end kp-match tab pane */
 
     resultEl.innerHTML = html;
 
@@ -4374,13 +4881,15 @@ function drawSouthIndianSVG(chartData, size) {
 }
 
 
-/* ── North Indian Diamond Chart (SVG) ──────────────────────── */
+/* ── North Indian Diamond Chart (SVG) — Clean H1-H12 layout ── */
 /* Lagna always at top center. Houses arranged as diamond.
-   The layout is a rotated square with:
-   House 1 = top, House 4 = left, House 7 = bottom, House 10 = right */
+   House 1 = top, House 4 = left, House 7 = bottom, House 10 = right
+   Labels: H1-H12, no roman numerals or zodiac symbols. */
 
 function drawNorthIndianSVG(chartData, size) {
-    var s = size || 320;
+    var s = size || 420;
+    var pad = Math.round(s * 0.04);  // inner padding
+    var inner = s - pad * 2;
     var mid = s / 2;
     var planets = chartData.planets || [];
     var ascSign = chartData.ascendant || '';
@@ -4398,108 +4907,129 @@ function drawNorthIndianSVG(chartData, size) {
         housePlanets[house].push(p);
     });
 
-    /* North Indian diamond house polygons.
-       The outer square has corners at (0,0), (s,0), (s,s), (0,s).
-       The inner diamond connects midpoints: (mid,0), (s,mid), (mid,s), (0,mid).
-       Each house is a triangular region. */
+    // Scaled font sizes based on chart size
+    var fs = Math.max(8, Math.round(s / 35));    // planet font
+    var fsLbl = Math.max(7, Math.round(s / 42));  // house label font
+    var fsCenter = Math.max(11, Math.round(s / 25)); // center label font
+    var lineH = Math.max(10, Math.round(s / 28)); // line height for planets
 
-    var housePolygons = [
-        /* H1  */ [[mid,0],[s*0.75,mid*0.5],[mid,mid],[s*0.25,mid*0.5]],
-        /* H2  */ [[0,0],[s*0.25,mid*0.5],[mid,mid],[0,mid]],             // actually a triangle but we use quad
-        /* H3  */ [[0,0],[mid,0],[s*0.25,mid*0.5]],
-        /* H4  */ [[0,0],[0,mid],[s*0.25,mid*0.5]],                        // actually merged
-        /* rearrange — let me use the standard coordinates */
-    ];
-
-    // Standard North Indian coordinates (12 triangular houses around center diamond)
-    // Outer corners: TL=(0,0), TR=(s,0), BR=(s,s), BL=(0,s)
-    // Inner diamond: T=(mid,0), R=(s,mid), B=(mid,s), L=(0,mid)
-    // Wait — the inner diamond midpoints are on the edges:
-    // top-mid = (mid, 0), right-mid = (s, mid), bot-mid = (mid, s), left-mid = (0, mid)
-    // but actually the diamond connects edge midpoints of the outer box:
-    // (mid, y_off) etc. Let me use the classic layout.
-
-    // The classic North Indian chart is an outer square with lines from each midpoint of each side
-    // to the midpoints of adjacent sides, creating a rotated inner square (diamond).
-    // This creates 12 houses: 4 large triangles at the edges + 8 smaller triangles in corners.
-
-    var TL = [0,0], TR = [s,0], BR = [s,s], BL = [0,s];
-    var T = [mid,0], R = [s,mid], B = [mid,s], L = [0,mid];
+    // Key points
+    var TL = [pad,pad], TR = [s-pad,pad], BR = [s-pad,s-pad], BL = [pad,s-pad];
+    var T = [mid,pad], R = [s-pad,mid], B = [mid,s-pad], L = [pad,mid];
     var C = [mid,mid];
 
-    // House polygons — counter-clockwise from H1 at top (North Indian)
+    // House polygons (12 houses)
+    var q1 = [(TL[0]+T[0])/2, (TL[1]+T[1])/2];  // midpoint top-left edge
+    var q2 = [(T[0]+TR[0])/2, (T[1]+TR[1])/2];   // midpoint top-right edge
+    var q3 = [(TR[0]+R[0])/2, (TR[1]+R[1])/2];
+    var q4 = [(R[0]+BR[0])/2, (R[1]+BR[1])/2];
+    var q5 = [(BR[0]+B[0])/2, (BR[1]+B[1])/2];
+    var q6 = [(B[0]+BL[0])/2, (B[1]+BL[1])/2];
+    var q7 = [(BL[0]+L[0])/2, (BL[1]+L[1])/2];
+    var q8 = [(L[0]+TL[0])/2, (L[1]+TL[1])/2];
+
     var HP = {
-        1:  [T, [s*0.75,mid*0.5], C, [s*0.25,mid*0.5]],           // top diamond = Lagna
-        2:  [TL, T, [s*0.25,mid*0.5]],                             // top-left triangle
-        3:  [TL, [s*0.25,mid*0.5], L],                             // left-top triangle
-        4:  [L, [s*0.25,s*0.75], C, [s*0.25,mid*0.5]],            // left diamond
-        5:  [BL, L, [s*0.25,s*0.75]],                              // left-bottom triangle
-        6:  [BL, [s*0.25,s*0.75], B],                              // bottom-left triangle
-        7:  [B, [s*0.75,s*0.75], C, [s*0.25,s*0.75]],             // bottom diamond
-        8:  [BR, B, [s*0.75,s*0.75]],                              // bottom-right triangle
-        9:  [BR, [s*0.75,s*0.75], R],                              // right-bottom triangle
-        10: [R, [s*0.75,mid*0.5], C, [s*0.75,s*0.75]],            // right diamond
-        11: [TR, R, [s*0.75,mid*0.5]],                             // right-top triangle
-        12: [TR, [s*0.75,mid*0.5], T]                              // top-right triangle
+        1:  [T, q2, C, q1],
+        2:  [TL, T, q1],
+        3:  [TL, q1, L],
+        4:  [L, q8, C, q1],
+        5:  [BL, L, q7],
+        6:  [BL, q7, B],
+        7:  [B, q6, C, q7],
+        8:  [BR, B, q5],
+        9:  [BR, q5, R],
+        10: [R, q4, C, q5],
+        11: [TR, R, q3],
+        12: [TR, q3, T]
     };
 
-    // House label centers — adjusted to sit clearly within each triangle
+    // Diamond midpoints for kendra houses
+    var DM_TL = [mid-(inner/4), mid-(inner/4)];  // inner diamond top-left
+    var DM_TR = [mid+(inner/4), mid-(inner/4)];  // inner diamond top-right
+    var DM_BL = [mid-(inner/4), mid+(inner/4)];  // inner diamond bottom-left
+    var DM_BR = [mid+(inner/4), mid+(inner/4)];  // inner diamond bottom-right
+
+    // House polygons — ANTI-CLOCKWISE from H1 (North Indian standard)
+    // H1=top, H2=top-left, H3=left-upper, H4=left diamond,
+    // H5=left-lower, H6=bottom-left, H7=bottom, H8=bottom-right,
+    // H9=right-lower, H10=right diamond, H11=right-upper, H12=top-right
+    HP[1]  = [T, DM_TR, C, DM_TL];            // top diamond (Lagna)
+    HP[12] = [TR, DM_TR, T];                   // top-right triangle
+    HP[11] = [TR, R, DM_TR];                   // right-upper triangle
+    HP[10] = [R, DM_TR, C, DM_BR];            // right diamond
+    HP[9]  = [BR, DM_BR, R];                   // right-lower triangle
+    HP[8]  = [BR, B, DM_BR];                   // bottom-right triangle
+    HP[7]  = [B, DM_BR, C, DM_BL];            // bottom diamond
+    HP[6]  = [BL, DM_BL, B];                   // bottom-left triangle
+    HP[5]  = [BL, L, DM_BL];                   // left-lower triangle
+    HP[4]  = [L, DM_TL, C, DM_BL];            // left diamond
+    HP[3]  = [TL, DM_TL, L];                   // left-upper triangle
+    HP[2]  = [TL, T, DM_TL];                   // top-left triangle
+
+    // House label & planet centers — computed from triangle/quad centroids
     var HC = {
-        1:  [mid, mid*0.35],
-        2:  [s*0.12, s*0.12],
-        3:  [s*0.08, mid*0.75],
-        4:  [s*0.18, mid],
-        5:  [s*0.08, s*0.73],
-        6:  [s*0.25, s*0.88],
-        7:  [mid, s*0.68],
-        8:  [s*0.75, s*0.88],
-        9:  [s*0.88, s*0.73],
-        10: [s*0.82, mid],
-        11: [s*0.88, mid*0.3],
-        12: [s*0.82, s*0.12]
+        1:  [mid, mid*0.52],           // top diamond center
+        2:  [s*0.27, s*0.12],          // top-left triangle
+        3:  [s*0.12, s*0.27],          // left-upper triangle
+        4:  [s*0.27, mid],             // left diamond center
+        5:  [s*0.12, s*0.73],          // left-lower triangle
+        6:  [s*0.27, s*0.87],          // bottom-left triangle
+        7:  [mid, s*0.62],             // bottom diamond center
+        8:  [s*0.73, s*0.87],          // bottom-right triangle
+        9:  [s*0.88, s*0.73],          // right-lower triangle
+        10: [s*0.73, mid],             // right diamond center
+        11: [s*0.88, s*0.27],          // right-upper triangle
+        12: [s*0.73, s*0.12]           // top-right triangle
     };
 
     var svg = '<svg viewBox="0 0 '+s+' '+s+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:'+s+'px">';
-    svg += '<rect width="'+s+'" height="'+s+'" fill="#0d1117" rx="4"/>';
+
+    // Dark background
+    svg += '<rect width="'+s+'" height="'+s+'" fill="#0d1117" rx="6"/>';
 
     // Outer box
-    svg += '<rect x="1" y="1" width="'+(s-2)+'" height="'+(s-2)+'" fill="none" stroke="#555" stroke-width="1.2"/>';
+    svg += '<rect x="'+pad+'" y="'+pad+'" width="'+inner+'" height="'+inner+'" fill="none" stroke="#d4a84366" stroke-width="1.5" rx="2"/>';
 
     // Inner diamond
-    svg += '<polygon points="'+T.join(',')+' '+R.join(',')+' '+B.join(',')+' '+L.join(',')+'" fill="none" stroke="#555" stroke-width="1.2"/>';
+    svg += '<polygon points="'+T.join(',')+' '+R.join(',')+' '+B.join(',')+' '+L.join(',')+'" fill="none" stroke="#d4a84366" stroke-width="1.5"/>';
 
-    // Cross lines from corners to opposite corners through center
-    svg += '<line x1="0" y1="0" x2="'+s+'" y2="'+s+'" stroke="#555" stroke-width="0.6"/>';
-    svg += '<line x1="'+s+'" y1="0" x2="0" y2="'+s+'" stroke="#555" stroke-width="0.6"/>';
+    // Diagonal lines (corner to corner through center)
+    svg += '<line x1="'+TL[0]+'" y1="'+TL[1]+'" x2="'+BR[0]+'" y2="'+BR[1]+'" stroke="#d4a84333" stroke-width="0.8"/>';
+    svg += '<line x1="'+TR[0]+'" y1="'+TR[1]+'" x2="'+BL[0]+'" y2="'+BL[1]+'" stroke="#d4a84333" stroke-width="0.8"/>';
 
     // Draw each house
     for (var h = 1; h <= 12; h++) {
         var pts = HP[h];
         var polyStr = pts.map(function(p){ return p[0]+','+p[1]; }).join(' ');
         var isLagna = (h === 1);
-        svg += '<polygon points="'+polyStr+'" fill="'+(isLagna?'rgba(212,168,67,0.1)':'transparent')+'" stroke="none"/>';
 
-        // Rashi number in this house
-        var rashiIdx = (ascIdx + h - 1) % 12;
-        var rashiName = RASHI_ORDER[rashiIdx];
+        // Subtle fill for lagna
+        if (isLagna) {
+            svg += '<polygon points="'+polyStr+'" fill="rgba(212,168,67,0.08)" stroke="none"/>';
+        }
+
         var hc = HC[h];
 
-        svg += '<text x="'+hc[0]+'" y="'+(hc[1]-2)+'" fill="'+(isLagna?'#d4a843':'#666')+'" font-size="9" text-anchor="middle">'+(rashiIdx+1)+' '+RASHI_SYMBOL[rashiName]+'</text>';
+        // House label: zodiac sign number (Aries=1, Taurus=2 ... Pisces=12)
+        var rashiIdx = (ascIdx + h - 1) % 12;  // 0-based index in RASHI_ORDER
+        var signNum = rashiIdx + 1;             // 1-based zodiac number
+        svg += '<text x="'+hc[0]+'" y="'+(hc[1]-Math.round(lineH*0.3))+'" fill="'+(isLagna?'#d4a843':'#555')+'" font-size="'+fsLbl+'" font-weight="'+(isLagna?'700':'500')+'" text-anchor="middle" font-family="monospace">'+signNum+'</text>';
 
         // Planets
         var pp = housePlanets[h] || [];
         pp.forEach(function(p, idx){
             var pName = PLANET_SHORT[p.planet] || p.planet.substring(0,2);
             var pColor = PLANET_COLOR[p.planet] || '#ccc';
-            var retro = p.retro ? 'R' : '';
+            var retro = (p.retro || (p.speed != null && p.speed < 0)) ? 'ᴿ' : '';
             var dignityMark = '';
             var str = p.strength || '';
             if (str.indexOf('Exalted') >= 0) dignityMark = '↑';
             else if (str.indexOf('Own') >= 0) dignityMark = '★';
             else if (str.indexOf('Debilitated') >= 0) dignityMark = '↓';
-            var offX = (idx % 2 === 0) ? -12 : 12;
-            var offY = 10 + Math.floor(idx / 2) * 12;
-            svg += '<text x="'+(hc[0]+offX)+'" y="'+(hc[1]+offY)+'" fill="'+pColor+'" font-size="9" font-weight="600" text-anchor="middle">'+pName+retro+dignityMark+'</text>';
+            var cols = pp.length > 4 ? 3 : 2;
+            var offX = (idx % cols - (cols-1)/2) * Math.round(fs * 2.2);
+            var offY = Math.round(lineH * 0.5) + Math.floor(idx / cols) * lineH;
+            svg += '<text x="'+(hc[0]+offX)+'" y="'+(hc[1]+offY)+'" fill="'+pColor+'" font-size="'+fs+'" font-weight="700" text-anchor="middle">'+pName+retro+dignityMark+'</text>';
         });
     }
 
@@ -4507,8 +5037,11 @@ function drawNorthIndianSVG(chartData, size) {
     var chartName = chartData.chart || '';
     var divMatch = chartName.match(/D\d+/);
     var divLabel = divMatch ? divMatch[0] : '';
-    svg += '<text x="'+mid+'" y="'+(mid-4)+'" fill="#d4a843" font-size="13" font-weight="700" text-anchor="middle">'+divLabel+'</text>';
-    svg += '<text x="'+mid+'" y="'+(mid+10)+'" fill="#777" font-size="7" text-anchor="middle">'+rashiName+'</text>';
+    svg += '<text x="'+mid+'" y="'+(mid-Math.round(fsCenter*0.3))+'" fill="#d4a843" font-size="'+fsCenter+'" font-weight="700" text-anchor="middle" font-family="sans-serif">'+divLabel+'</text>';
+    // Short description under label
+    var shortDesc = chartData.description || '';
+    if (shortDesc.length > 24) shortDesc = shortDesc.substring(0, 22) + '..';
+    svg += '<text x="'+mid+'" y="'+(mid+Math.round(fsCenter*0.8))+'" fill="#666" font-size="'+Math.round(fsCenter*0.55)+'" text-anchor="middle">'+shortDesc+'</text>';
 
     svg += '</svg>';
     return svg;
@@ -4517,8 +5050,8 @@ function drawNorthIndianSVG(chartData, size) {
 
 /* ── Render chart based on style toggle ────────────────────── */
 function renderDiamondChart(chartData, style) {
-    if (style === 'north') return drawNorthIndianSVG(chartData, 340);
-    return drawSouthIndianSVG(chartData, 340);
+    if (style === 'north') return drawNorthIndianSVG(chartData, 420);
+    return drawSouthIndianSVG(chartData, 420);
 }
 
 
@@ -4663,20 +5196,20 @@ function renderShodasvarga(data) {
 
     // Chart area + planet table side by side
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px" id="sv-chart-area">';
-    html += '<div class="card" id="sv-diamond-wrap" style="display:flex;justify-content:center;align-items:center;min-height:360px"></div>';
+    html += '<div class="card" id="sv-diamond-wrap" style="display:flex;justify-content:center;align-items:center;min-height:440px"></div>';
     html += '<div class="card" id="sv-planet-table-wrap"><h3 style="color:var(--gold-light);margin-bottom:8px">Planet Positions</h3><div id="sv-planet-table"></div></div>';
     html += '</div>';
 
     // All 16 mini charts overview
     html += '<div class="card" style="margin-top:16px">';
     html += '<h2 style="color:var(--gold-light);margin-bottom:12px">All 16 Shodasvarga Charts</h2>';
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px" id="sv-all-mini-charts">';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px" id="sv-all-mini-charts">';
     chartList.forEach(function(c){
         var cd = charts[c.id.toLowerCase()];
         if (cd) {
-            html += '<div class="sv-mini-chart-card" data-chart="'+c.id.toLowerCase()+'" style="cursor:pointer;border:1px solid #333;border-radius:6px;padding:4px;transition:border-color 0.2s">';
-            html += '<div style="font-size:0.7rem;color:#d4a843;text-align:center;font-weight:600;padding:2px 0">'+c.id+' '+c.name+'</div>';
-            html += drawNorthIndianSVG(cd, 160);
+            html += '<div class="sv-mini-chart-card" data-chart="'+c.id.toLowerCase()+'" style="cursor:pointer;border:1px solid #333;border-radius:8px;padding:6px;transition:border-color 0.2s">';
+            html += '<div style="font-size:0.75rem;color:#d4a843;text-align:center;font-weight:600;padding:3px 0">'+c.id+' '+c.name+'</div>';
+            html += drawNorthIndianSVG(cd, 210);
             html += '</div>';
         }
     });
@@ -5022,6 +5555,737 @@ function renderGochar(data) {
    GOLD PRICE PREDICTOR TAB
    ═══════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════
+   LAAL KITAB TAB
+   ═══════════════════════════════════════════════════════════════ */
+
+document.getElementById('lk-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById('lk-result');
+    const data = await apiCall('/laal-kitab', {
+        name: document.getElementById('lk-name').value,
+        date: ddmmToApi(document.getElementById('lk-date').value),
+        time: document.getElementById('lk-time').value,
+        place: document.getElementById('lk-place').value,
+        ayanamsa: document.getElementById('lk-ayanamsa').value,
+    }, resultEl);
+    if (!data) return;
+    renderLaalKitab(data);
+});
+
+function renderLaalKitab(data) {
+    var resultDiv = document.getElementById('lk-result');
+    var html = '';
+    var lkRed = '#e53935';
+    var pColors = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080'};
+    var pC = function(n){ return pColors[n]||'#ccc'; };
+
+    /* ── Summary Banner ── */
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid '+lkRed+';background:linear-gradient(135deg,rgba(229,57,53,0.08),transparent)">';
+    html += '<div style="font-size:1.5rem;font-weight:800;color:'+lkRed+'">Laal Kitab — Teva Analysis</div>';
+    html += '<div style="font-size:0.9rem;color:var(--text);margin-top:4px"><b>' + (data.name || '') + '</b></div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:2px">' + (data.input ? data.input.date + ' | ' + data.input.time + ' | ' + data.input.place : '') + '</div>';
+    html += '<div style="font-size:1rem;color:var(--text);margin-top:8px">Ascendant: <b style="color:'+lkRed+'">' + data.ascendant_sign + '</b> (House 1)</div>';
+    /* Flatten yogas dict → array */
+    var yogasRaw = data.yogas || {};
+    var yogas = [];
+    if (Array.isArray(yogasRaw)) {
+        yogas = yogasRaw;
+    } else {
+        Object.keys(yogasRaw).forEach(function(cat){
+            var items = yogasRaw[cat];
+            if (Array.isArray(items)) {
+                items.forEach(function(y){
+                    y.yoga = y.yoga || (cat.charAt(0).toUpperCase() + cat.slice(1));
+                    y.nature = y.nature || (cat === 'tabet' || cat === 'panauti' || cat === 'grahan' ? 'malefic' : 'benefic');
+                    yogas.push(y);
+                });
+            }
+        });
+    }
+    if (yogas.length > 0) {
+        html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px">';
+        yogas.forEach(function(y){
+            var yClr = y.nature === 'benefic' ? 'var(--green)' : y.nature === 'malefic' ? 'var(--red)' : '#FFA500';
+            html += '<span style="font-size:0.7rem;padding:2px 8px;border-radius:12px;border:1px solid '+yClr+';color:'+yClr+';font-weight:600">'+y.yoga+'</span>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+
+    /* ── Sub-tab navigation ── */
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">';
+    var lkTabs = [
+        {id:'lk-predictions',label:'Predictions',icon:'📖'},
+        {id:'lk-house-map',label:'House Map',icon:'🏠'},
+        {id:'lk-yogas',label:'Yogas',icon:'🔮'},
+        {id:'lk-financial',label:'Financial',icon:'💰'},
+        {id:'lk-luck',label:'Luck Activation',icon:'🍀'},
+        {id:'lk-conjunctions',label:'Conjunctions',icon:'🤝'},
+        {id:'lk-debts',label:'Debts (Rin)',icon:'⚖️'},
+        {id:'lk-states',label:'Planet States',icon:'👁️'},
+        {id:'lk-remedies',label:'Remedies',icon:'🙏'},
+        {id:'lk-nakshatras',label:'Nakshatras',icon:'⭐'},
+    ];
+    lkTabs.forEach(function(t, i){
+        var active = i === 0;
+        html += '<button class="lk-sub-tab" data-lk-tab="'+t.id+'" style="padding:6px 14px;border:1px solid '+(active?lkRed:'var(--border)')+';background:'+(active?lkRed:'transparent')+';color:'+(active?'#fff':'var(--text)')+';border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600">'+t.icon+' '+t.label+'</button>';
+    });
+    html += '</div>';
+
+    /* ══════════════════════════════════════════
+       PREDICTIONS TAB (Enhanced)
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-predictions">';
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+lkRed+';margin-bottom:10px">Planet-in-House Predictions (Teva)</h3>';
+    (data.predictions || []).forEach(function(p){
+        var dignityClr = p.dignity === 'Exalted' ? 'var(--green)' : p.dignity === 'Debilitated' ? 'var(--red)' : p.dignity === 'Pakka Ghar' ? '#FFD700' : 'var(--text-dim)';
+        var dignityBadge = '<span style="background:'+dignityClr+';color:#000;padding:1px 6px;border-radius:3px;font-size:0.65rem;font-weight:700">'+p.dignity+'</span>';
+        html += '<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;background:rgba(229,57,53,0.03)">';
+        /* Header */
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+        html += '<span style="color:'+pC(p.planet)+';font-weight:800;font-size:1.15rem">'+p.planet+'</span>';
+        html += '<span style="color:var(--text-dim);font-size:0.85rem">in House '+p.house+' ('+p.sign+')</span>';
+        html += dignityBadge;
+        if (p.conjunctions && p.conjunctions.length > 0) {
+            html += '<span style="font-size:0.75rem;color:var(--text-dim)">with '+p.conjunctions.join(', ')+'</span>';
+        }
+        html += '</div>';
+        /* Core predictions */
+        html += '<div style="font-size:0.85rem;color:var(--text);margin-bottom:6px">'+p.effect+'</div>';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+        html += '<div style="font-size:0.8rem;padding:8px;border-radius:6px;background:rgba(76,175,80,0.08);border:1px solid rgba(76,175,80,0.2)"><b style="color:var(--green)">Good Results</b><br>'+p.good_results+'</div>';
+        html += '<div style="font-size:0.8rem;padding:8px;border-radius:6px;background:rgba(244,67,54,0.08);border:1px solid rgba(244,67,54,0.2)"><b style="color:var(--red)">Bad Results</b><br>'+p.bad_results+'</div>';
+        html += '</div>';
+        /* New enhanced fields */
+        if (p.financial) {
+            html += '<div style="font-size:0.8rem;padding:8px;border-radius:6px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2);margin-bottom:6px"><b style="color:#FFD700">💰 Financial:</b> '+p.financial+'</div>';
+        }
+        if (p.health) {
+            html += '<div style="font-size:0.8rem;padding:8px;border-radius:6px;background:rgba(100,181,246,0.08);border:1px solid rgba(100,181,246,0.2);margin-bottom:6px"><b style="color:#64b5f6">🏥 Health:</b> '+p.health+'</div>';
+        }
+        if (p.family) {
+            html += '<div style="font-size:0.8rem;padding:8px;border-radius:6px;background:rgba(206,147,216,0.08);border:1px solid rgba(206,147,216,0.2);margin-bottom:6px"><b style="color:#ce93d8">👨‍👩‍👧 Family:</b> '+p.family+'</div>';
+        }
+        /* Age triggers */
+        if (p.age_triggers && p.age_triggers.length > 0) {
+            html += '<div style="font-size:0.78rem;margin-bottom:6px"><b style="color:'+lkRed+'">⏰ Age Triggers:</b> ';
+            p.age_triggers.forEach(function(at, idx){
+                html += '<span style="display:inline-block;margin:2px;padding:1px 7px;border-radius:10px;background:rgba(229,57,53,0.1);border:1px solid rgba(229,57,53,0.25);font-size:0.72rem">'+at+'</span>';
+            });
+            html += '</div>';
+        }
+        /* Conditional modifiers */
+        if (p.conditions && p.conditions.length > 0) {
+            html += '<div style="font-size:0.78rem;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid var(--border);margin-bottom:6px">';
+            html += '<b style="color:#FFA500">⚡ Conditional Effects:</b><ul style="margin:4px 0 0 16px;padding:0">';
+            p.conditions.forEach(function(c){
+                html += '<li style="margin-bottom:2px">'+c+'</li>';
+            });
+            html += '</ul></div>';
+        }
+        /* Remedy */
+        html += '<div style="font-size:0.82rem;color:#64b5f6;padding:6px 8px;border-radius:6px;background:rgba(100,181,246,0.05)"><b>🙏 Upay:</b> '+p.remedy+'</div>';
+        html += '</div>';
+    });
+    html += '</div></div>';
+
+    /* ══════════════════════════════════════════
+       HOUSE MAP TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-house-map" style="display:none">';
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+lkRed+';margin-bottom:10px">House-wise Planet Placement (Teva)</h3>';
+    html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:8px">Ascendant '+data.ascendant_sign+' = House 1. Houses counted from ascendant sign.</p>';
+    html += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.82rem">';
+    html += '<thead><tr><th>House</th><th>Sign</th><th>Planets</th><th>Status</th></tr></thead><tbody>';
+    var hs = data.house_summary || {};
+    for (var h = 1; h <= 12; h++) {
+        var hd = hs[h] || hs[String(h)] || {};
+        var planets = hd.planets || [];
+        var isEmpty = planets.length === 0;
+        var pList = planets.map(function(pn){ return '<span style="color:'+pC(pn)+';font-weight:700">'+pn+'</span>'; }).join(', ');
+        html += '<tr>';
+        html += '<td style="font-weight:700;color:'+lkRed+'">H'+h+(h===1?' (Asc)':'')+'</td>';
+        html += '<td>'+(hd.sign||'')+'</td>';
+        html += '<td>'+(isEmpty ? '<span style="color:var(--text-dim)">Empty</span>' : pList)+'</td>';
+        html += '<td>'+(isEmpty ? '—' : planets.length+' planet'+(planets.length>1?'s':''))+'</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    /* Planet → House chips */
+    html += '<div style="margin-top:12px;padding:10px;background:rgba(229,57,53,0.05);border-radius:6px;border:1px solid rgba(229,57,53,0.2)">';
+    html += '<div style="font-size:0.8rem;font-weight:700;color:'+lkRed+';margin-bottom:6px">Planet → LK House Mapping</div>';
+    var phMap = data.planet_houses || {};
+    Object.keys(phMap).forEach(function(pn){
+        html += '<span style="display:inline-block;margin:2px 4px;padding:2px 8px;border-radius:4px;font-size:0.75rem;background:rgba(229,57,53,0.1);border:1px solid rgba(229,57,53,0.3)">';
+        html += '<span style="color:'+pC(pn)+';font-weight:700">'+pn+'</span> → H'+phMap[pn];
+        html += '</span>';
+    });
+    html += '</div></div></div>';
+
+    /* ══════════════════════════════════════════
+       YOGAS TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-yogas" style="display:none">';
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+lkRed+';margin-bottom:10px">LK Yogas — Dharmi, Kamini, Tabet, Panauti & More</h3>';
+    html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px">Laal Kitab identifies special planetary combinations (Yogas) that amplify or diminish results.</p>';
+    if (yogas.length === 0) {
+        html += '<div style="text-align:center;padding:20px;color:var(--text-dim)">No special yogas detected in this chart.</div>';
+    } else {
+        yogas.forEach(function(y){
+            var yClr = y.nature === 'benefic' ? 'var(--green)' : y.nature === 'malefic' ? 'var(--red)' : '#FFA500';
+            var yBg = y.nature === 'benefic' ? 'rgba(76,175,80,0.06)' : y.nature === 'malefic' ? 'rgba(244,67,54,0.06)' : 'rgba(255,165,0,0.06)';
+            var yBdr = y.nature === 'benefic' ? 'rgba(76,175,80,0.3)' : y.nature === 'malefic' ? 'rgba(244,67,54,0.3)' : 'rgba(255,165,0,0.3)';
+            html += '<div style="border:1px solid '+yBdr+';border-left:4px solid '+yClr+';border-radius:8px;padding:12px;margin-bottom:10px;background:'+yBg+'">';
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+            html += '<span style="font-weight:800;font-size:1.05rem;color:'+yClr+'">'+y.yoga+'</span>';
+            html += '<span style="font-size:0.68rem;padding:1px 6px;border-radius:3px;background:'+yClr+';color:#fff;font-weight:700;text-transform:uppercase">'+y.nature+'</span>';
+            html += '</div>';
+            /* Planets involved */
+            if (y.planets) {
+                html += '<div style="font-size:0.8rem;margin-bottom:4px"><b>Planets:</b> ';
+                (Array.isArray(y.planets) ? y.planets : [y.planets]).forEach(function(pn){
+                    html += '<span style="color:'+pC(pn)+';font-weight:700;margin-right:6px">'+pn+'</span>';
+                });
+                html += '</div>';
+            }
+            if (y.planet) {
+                html += '<div style="font-size:0.8rem;margin-bottom:4px"><b>Planet:</b> <span style="color:'+pC(y.planet)+';font-weight:700">'+y.planet+'</span> in H'+(y.house||'?')+'</div>';
+            }
+            html += '<div style="font-size:0.82rem;color:var(--text);margin-bottom:4px">'+(y.description||y.effect||'')+'</div>';
+            if (y.financial) {
+                html += '<div style="font-size:0.8rem;color:#FFD700;margin-bottom:4px"><b>💰 Financial Impact:</b> '+y.financial+'</div>';
+            }
+            if (y.remedy) {
+                html += '<div style="font-size:0.8rem;color:#64b5f6"><b>🙏 Remedy:</b> '+y.remedy+'</div>';
+            }
+            html += '</div>';
+        });
+    }
+    html += '</div></div>';
+
+    /* ══════════════════════════════════════════
+       FINANCIAL ANALYSIS TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-financial" style="display:none">';
+    var fin = data.financial_analysis || {};
+    html += '<div class="card" style="margin-bottom:12px;border:1px solid rgba(255,215,0,0.3)"><h3 style="color:#FFD700;margin-bottom:10px">💰 Financial Analysis — Laal Kitab</h3>';
+
+    /* Wealth Houses */
+    var wh = fin.wealth_houses || {};
+    html += '<div style="margin-bottom:14px"><h4 style="color:'+lkRed+';font-size:0.9rem;margin-bottom:6px">Wealth Houses (H2, H6, H11)</h4>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">';
+    var whKeys = [
+        {key:'h2_family_wealth', lbl:'H2 — Family Wealth', clr:'var(--green)'},
+        {key:'h6_debts', lbl:'H6 — Debts/Enemies', clr:'var(--red)'},
+        {key:'h11_gains', lbl:'H11 — Gains/Income', clr:'var(--green)'},
+    ];
+    whKeys.forEach(function(wk){
+        var hData = wh[wk.key] || {};
+        html += '<div style="padding:8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,215,0,0.03)">';
+        html += '<div style="font-weight:700;font-size:0.8rem;color:'+wk.clr+';margin-bottom:4px">'+wk.lbl+'</div>';
+        if (hData.planets && hData.planets.length > 0) {
+            hData.planets.forEach(function(pn){ html += '<span style="color:'+pC(pn)+';font-weight:700;margin-right:4px;font-size:0.82rem">'+pn+'</span>'; });
+        } else {
+            html += '<span style="color:var(--text-dim);font-size:0.78rem">Empty</span>';
+        }
+        if (hData.analysis) html += '<div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px">'+hData.analysis+'</div>';
+        html += '</div>';
+    });
+    html += '</div></div>';
+
+    /* Wealth & Blocking planets */
+    var wp = fin.wealth_planets || [];
+    var bp = fin.blocking_planets || [];
+    if (wp.length > 0 || bp.length > 0) {
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+        html += '<div style="padding:10px;border-radius:6px;background:rgba(76,175,80,0.06);border:1px solid rgba(76,175,80,0.2)">';
+        html += '<div style="font-weight:700;font-size:0.85rem;color:var(--green);margin-bottom:6px">Wealth-Giving Planets</div>';
+        wp.forEach(function(w){
+            var secs = Array.isArray(w.sectors) ? w.sectors.join(', ') : (w.sectors||'');
+            html += '<div style="font-size:0.8rem;margin-bottom:3px"><span style="color:'+pC(w.planet)+';font-weight:700">'+w.planet+'</span> (H'+w.house+') — <span style="color:var(--text-dim)">'+w.reason+'</span>';
+            if (secs) html += '<div style="font-size:0.72rem;color:var(--text-dim);margin-left:8px">Sectors: '+secs+'</div>';
+            html += '</div>';
+        });
+        if (wp.length === 0) html += '<span style="color:var(--text-dim);font-size:0.78rem">None identified</span>';
+        html += '</div>';
+        html += '<div style="padding:10px;border-radius:6px;background:rgba(244,67,54,0.06);border:1px solid rgba(244,67,54,0.2)">';
+        html += '<div style="font-weight:700;font-size:0.85rem;color:var(--red);margin-bottom:6px">Wealth-Blocking Planets</div>';
+        bp.forEach(function(b){
+            var bsecs = Array.isArray(b.blocked_sectors) ? b.blocked_sectors.join(', ') : (b.blocked_sectors||'');
+            html += '<div style="font-size:0.8rem;margin-bottom:3px"><span style="color:'+pC(b.planet)+';font-weight:700">'+b.planet+'</span> (H'+b.house+') — <span style="color:var(--text-dim)">'+b.reason+'</span>';
+            if (bsecs) html += '<div style="font-size:0.72rem;color:var(--text-dim);margin-left:8px">Blocked: '+bsecs+'</div>';
+            html += '</div>';
+        });
+        if (bp.length === 0) html += '<span style="color:var(--text-dim);font-size:0.78rem">None identified</span>';
+        html += '</div></div>';
+    }
+
+    /* Property & Business */
+    var prop = fin.property_indicators || {};
+    var biz = fin.business_indicators || {};
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+    html += '<div style="padding:10px;border-radius:6px;border:1px solid var(--border)">';
+    html += '<div style="font-weight:700;font-size:0.85rem;color:#FFA500;margin-bottom:4px">🏠 Property (H4)</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text)">'+(prop.analysis||'No specific indicators')+'</div>';
+    html += '</div>';
+    html += '<div style="padding:10px;border-radius:6px;border:1px solid var(--border)">';
+    html += '<div style="font-weight:700;font-size:0.85rem;color:#00CED1;margin-bottom:4px">💼 Business (H7/H10)</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text)">'+(biz.analysis||'No specific indicators')+'</div>';
+    html += '</div></div>';
+
+    /* Debt Risk */
+    var dr = fin.debt_risk || {};
+    if (dr.analysis) {
+        html += '<div style="padding:10px;border-radius:6px;border:1px solid rgba(244,67,54,0.2);background:rgba(244,67,54,0.04);margin-bottom:14px">';
+        html += '<div style="font-weight:700;font-size:0.85rem;color:var(--red);margin-bottom:4px">⚠️ Debt Risk (H6/H8/H12)</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text)">'+dr.analysis+'</div>';
+        html += '</div>';
+    }
+
+    /* Investment Advice */
+    var inv = fin.investment_advice || {};
+    var investIn = Array.isArray(inv.invest_in) ? inv.invest_in : (Array.isArray(inv) ? inv : []);
+    if (investIn.length > 0) {
+        html += '<div style="padding:10px;border-radius:6px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.05);margin-bottom:14px">';
+        html += '<div style="font-weight:700;font-size:0.9rem;color:#FFD700;margin-bottom:8px">📊 Recommended Investment Sectors</div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        investIn.forEach(function(sec){
+            html += '<span style="font-size:0.78rem;padding:3px 10px;border-radius:12px;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);color:#FFD700;font-weight:600">'+sec+'</span>';
+        });
+        html += '</div>';
+        /* Show planet-wise sector breakdown from wealth_planets */
+        if (wp.length > 0) {
+            html += '<div style="margin-top:10px;font-size:0.78rem;color:var(--text-dim)">';
+            wp.forEach(function(w){
+                var secs = Array.isArray(w.sectors) ? w.sectors.join(', ') : '';
+                if (secs) html += '<div style="margin-bottom:2px"><span style="color:'+pC(w.planet)+';font-weight:700">'+w.planet+'</span> → '+secs+'</div>';
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    /* Best periods */
+    var bestP = fin.best_period_for_wealth || [];
+    if (bestP.length > 0) {
+        html += '<div style="padding:10px;border-radius:6px;border:1px solid rgba(76,175,80,0.3);background:rgba(76,175,80,0.05)">';
+        html += '<div style="font-weight:700;font-size:0.85rem;color:var(--green);margin-bottom:6px">⏰ Best Periods for Wealth</div>';
+        bestP.forEach(function(bp){
+            html += '<div style="font-size:0.8rem;margin-bottom:3px"><span style="color:'+pC(bp.planet)+';font-weight:700">'+bp.planet+'</span> (H'+(bp.house||'?')+'): '+(bp.trigger||bp.period||'')+'</div>';
+        });
+        html += '</div>';
+    }
+    html += '</div></div>';
+
+    /* ══════════════════════════════════════════
+       LUCK ACTIVATION TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-luck" style="display:none">';
+    var luck = data.luck_activation || {};
+    var guide = luck.guide || {};
+    html += '<div class="card" style="margin-bottom:12px;border:1px solid rgba(76,175,80,0.3)"><h3 style="color:var(--green);margin-bottom:10px">🍀 Luck Activation — '+data.ascendant_sign+' Ascendant</h3>';
+
+    /* Lucky items grid */
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px">';
+    var luckyItems = [
+        {label:'Lucky Colors', val: guide.lucky_colors, icon:'🎨'},
+        {label:'Lucky Numbers', val: guide.lucky_numbers, icon:'🔢'},
+        {label:'Lucky Days', val: guide.lucky_days, icon:'📅'},
+        {label:'Lucky Metals', val: guide.lucky_metals, icon:'⚙️'},
+        {label:'Lucky Stones', val: guide.lucky_stones, icon:'💎'},
+    ];
+    luckyItems.forEach(function(li){
+        var val = Array.isArray(li.val) ? li.val.join(', ') : (li.val||'—');
+        html += '<div style="padding:8px;border-radius:6px;text-align:center;border:1px solid var(--border);background:rgba(76,175,80,0.03)">';
+        html += '<div style="font-size:1.2rem">'+li.icon+'</div>';
+        html += '<div style="font-size:0.72rem;color:var(--text-dim);font-weight:700;margin-top:2px">'+li.label+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text);font-weight:600;margin-top:2px">'+val+'</div>';
+        html += '</div>';
+    });
+    html += '</div>';
+
+    /* Lucky & Dangerous Planets */
+    var lps = luck.lucky_planets_status || [];
+    var dps = luck.dangerous_planets_status || [];
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+    html += '<div style="padding:10px;border-radius:6px;background:rgba(76,175,80,0.06);border:1px solid rgba(76,175,80,0.2)">';
+    html += '<div style="font-weight:700;font-size:0.85rem;color:var(--green);margin-bottom:6px">Lucky Planets</div>';
+    if (lps.length > 0) {
+        lps.forEach(function(lp){
+            html += '<div style="font-size:0.8rem;margin-bottom:3px"><span style="color:'+pC(lp.planet)+';font-weight:700">'+lp.planet+'</span>';
+            html += ' <span style="font-size:0.7rem;color:var(--text-dim)">H'+(lp.house||'?')+'</span>';
+            html += ' — <span style="color:var(--text-dim)">'+lp.status+'</span></div>';
+        });
+    } else {
+        (guide.lucky_planets||[]).forEach(function(pn){
+            html += '<span style="color:'+pC(pn)+';font-weight:700;margin-right:6px">'+pn+'</span>';
+        });
+    }
+    html += '</div>';
+    html += '<div style="padding:10px;border-radius:6px;background:rgba(244,67,54,0.06);border:1px solid rgba(244,67,54,0.2)">';
+    html += '<div style="font-weight:700;font-size:0.85rem;color:var(--red);margin-bottom:6px">Dangerous Planets</div>';
+    if (dps.length > 0) {
+        dps.forEach(function(dp){
+            html += '<div style="font-size:0.8rem;margin-bottom:3px"><span style="color:'+pC(dp.planet)+';font-weight:700">'+dp.planet+'</span>';
+            html += ' <span style="font-size:0.7rem;color:var(--text-dim)">H'+(dp.house||'?')+'</span>';
+            html += ' — <span style="color:var(--text-dim)">'+dp.status+'</span></div>';
+        });
+    } else {
+        (guide.dangerous_planets||[]).forEach(function(pn){
+            html += '<span style="color:'+pC(pn)+';font-weight:700;margin-right:6px">'+pn+'</span>';
+        });
+    }
+    html += '</div></div>';
+
+    /* Activation Remedies, Career, Wealth, Relationship, Health */
+    var sections = [
+        {key:'activation_remedies', title:'🔑 Activation Remedies', clr:'#64b5f6'},
+        {key:'career_directions', title:'💼 Career Directions', clr:'#FFD700'},
+        {key:'wealth_activation', title:'💰 Wealth Activation', clr:'var(--green)'},
+        {key:'relationship_tips', title:'❤️ Relationship Tips', clr:'#FF69B4'},
+        {key:'health_watch', title:'🏥 Health Watch', clr:'#FFA500'},
+    ];
+    sections.forEach(function(sec){
+        var val = guide[sec.key];
+        if (val) {
+            var content = Array.isArray(val) ? val.join(' | ') : val;
+            html += '<div style="padding:10px;border-radius:6px;border:1px solid var(--border);margin-bottom:8px">';
+            html += '<div style="font-weight:700;font-size:0.85rem;color:'+sec.clr+';margin-bottom:4px">'+sec.title+'</div>';
+            html += '<div style="font-size:0.82rem;color:var(--text)">'+content+'</div>';
+            html += '</div>';
+        }
+    });
+
+    /* Personalized activation */
+    var pa = luck.personalized_activation;
+    if (pa) {
+        html += '<div style="padding:10px;border-radius:6px;border:2px solid rgba(76,175,80,0.4);background:rgba(76,175,80,0.05);margin-bottom:8px">';
+        html += '<div style="font-weight:700;font-size:0.9rem;color:var(--green);margin-bottom:6px">🌟 Personalized Activation</div>';
+        if (Array.isArray(pa)) {
+            pa.forEach(function(step, idx){
+                html += '<div style="font-size:0.82rem;margin-bottom:4px;padding-left:8px;border-left:2px solid var(--green)">';
+                html += '<b style="color:'+lkRed+'">'+(idx+1)+'.</b> '+step;
+                html += '</div>';
+            });
+        } else {
+            html += '<div style="font-size:0.82rem;color:var(--text)">'+pa+'</div>';
+        }
+        html += '</div>';
+    }
+    html += '</div></div>';
+
+    /* ══════════════════════════════════════════
+       CONJUNCTION EFFECTS TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-conjunctions" style="display:none">';
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+lkRed+';margin-bottom:10px">🤝 Planetary Conjunctions</h3>';
+    html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px">When two or more planets share a house in Laal Kitab, they modify each other\'s results.</p>';
+    var conj = data.conjunction_effects || [];
+    if (conj.length === 0) {
+        html += '<div style="text-align:center;padding:20px;color:var(--text-dim)">No planetary conjunctions in this chart.</div>';
+    } else {
+        conj.forEach(function(c){
+            html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:rgba(229,57,53,0.03)">';
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+            html += '<span style="color:'+pC(c.planet_1||c.planet1)+';font-weight:800">'+(c.planet_1||c.planet1)+'</span>';
+            html += '<span style="color:var(--text-dim)">+</span>';
+            html += '<span style="color:'+pC(c.planet_2||c.planet2)+';font-weight:800">'+(c.planet_2||c.planet2)+'</span>';
+            html += '<span style="color:var(--text-dim);font-size:0.8rem">in House '+(c.house||'?')+'</span>';
+            html += '</div>';
+            html += '<div style="font-size:0.82rem;color:var(--text);margin-bottom:4px">'+c.effect+'</div>';
+            if (c.financial) {
+                html += '<div style="font-size:0.8rem;color:#FFD700;margin-bottom:4px"><b>💰 Financial:</b> '+c.financial+'</div>';
+            }
+            if (c.remedy) {
+                html += '<div style="font-size:0.8rem;color:#64b5f6"><b>🙏 Remedy:</b> '+c.remedy+'</div>';
+            }
+            html += '</div>';
+        });
+    }
+    html += '</div></div>';
+
+    /* ══════════════════════════════════════════
+       DEBTS (RIN) TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-debts" style="display:none">';
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+lkRed+';margin-bottom:10px">⚖️ Planetary Debts (Rins)</h3>';
+    html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px">Laal Kitab identifies 5 types of karmic debts (Rin). Active debts indicate areas requiring urgent remedial measures.</p>';
+    var debts = data.debts || [];
+    if (debts.length === 0) {
+        html += '<div style="text-align:center;padding:20px;color:var(--green);font-weight:700;font-size:1.1rem">No active debts found — Good karma!</div>';
+    } else {
+        debts.forEach(function(d){
+            html += '<div style="border:1px solid var(--border);border-left:4px solid var(--red);border-radius:8px;padding:12px;margin-bottom:10px">';
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+            html += '<span style="font-weight:800;font-size:1rem;color:'+lkRed+'">'+(d.label||d.debt)+'</span>';
+            html += '<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:var(--red);color:#fff;font-weight:700">Active</span>';
+            html += '</div>';
+            html += '<div style="font-size:0.82rem;color:var(--text);margin-bottom:4px"><b>Description:</b> '+(d.description||'')+'</div>';
+            if (d.symptoms) {
+                html += '<div style="font-size:0.82rem;color:#FFA500;margin-bottom:4px"><b>Symptoms:</b> '+d.symptoms+'</div>';
+            }
+            if (d.triggers && d.triggers.length > 0) {
+                html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:4px"><b>Triggers:</b> '+d.triggers.join(', ')+'</div>';
+            }
+            if (d.remedy) {
+                html += '<div style="font-size:0.82rem;color:#64b5f6;margin-top:4px"><b>🙏 Remedy:</b> '+d.remedy+'</div>';
+            }
+            html += '</div>';
+        });
+    }
+    html += '</div></div>';
+
+    /* ══════════════════════════════════════════
+       PLANET STATES TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-states" style="display:none">';
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+lkRed+';margin-bottom:10px">👁️ Planet States — Soya / Andha / Jaagta</h3>';
+    html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px">Jaagta (Awake) = full results, Soya (Sleeping) = delayed/dormant, Andha (Blind) = reversed/wrong results.</p>';
+    html += '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.82rem">';
+    html += '<thead><tr><th>Planet</th><th>House</th><th>State</th><th>Strength</th><th>Friends</th><th>Enemies</th><th>Details</th></tr></thead><tbody>';
+    var states = data.planet_states || [];
+    states.forEach(function(s){
+        var stLower = (s.state||'').toLowerCase();
+        var stClr = stLower.indexOf('awake')>=0||stLower.indexOf('jaagta')>=0 ? 'var(--green)' : stLower.indexOf('sleeping')>=0||stLower.indexOf('soya')>=0 ? '#FFA500' : stLower.indexOf('blind')>=0||stLower.indexOf('andha')>=0 ? 'var(--red)' : 'var(--text-dim)';
+        var stIcon = stLower.indexOf('awake')>=0||stLower.indexOf('jaagta')>=0 ? '👁️' : stLower.indexOf('sleeping')>=0||stLower.indexOf('soya')>=0 ? '😴' : stLower.indexOf('blind')>=0||stLower.indexOf('andha')>=0 ? '🔒' : '—';
+        html += '<tr>';
+        html += '<td style="color:'+pC(s.planet)+';font-weight:700">'+s.planet+'</td>';
+        html += '<td>H'+(s.house||'—')+'</td>';
+        html += '<td style="color:'+stClr+';font-weight:700">'+stIcon+' '+s.state+'</td>';
+        html += '<td style="font-weight:600">'+(s.strength||'—')+'</td>';
+        html += '<td style="font-size:0.75rem;color:var(--green)">'+(s.friends_supporting&&s.friends_supporting.length?s.friends_supporting.map(function(f){return '<span style="color:'+pC(f)+'">'+f+'</span>';}).join(', '):'—')+'</td>';
+        html += '<td style="font-size:0.75rem;color:var(--red)">'+(s.enemies_affecting&&s.enemies_affecting.length?s.enemies_affecting.map(function(f){return '<span style="color:'+pC(f)+'">'+f+'</span>';}).join(', '):'—')+'</td>';
+        html += '<td style="font-size:0.75rem">'+(s.description||'')+'</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table></div></div></div>';
+
+    /* ══════════════════════════════════════════
+       REMEDIES TAB
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-remedies" style="display:none">';
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+lkRed+';margin-bottom:10px">🙏 Remedies (Upay)</h3>';
+    var remedies = data.remedies || [];
+    if (remedies.length === 0) {
+        html += '<div style="text-align:center;padding:20px;color:var(--green);font-weight:700;font-size:1.1rem">No urgent remedies needed!</div>';
+    } else {
+        remedies.sort(function(a,b){ return a.urgency === 'High' ? -1 : b.urgency === 'High' ? 1 : 0; });
+        remedies.forEach(function(r){
+            var urgClr = r.urgency === 'High' ? 'var(--red)' : '#FFA500';
+            html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:rgba(100,181,246,0.03)">';
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+            html += '<span style="color:'+pC(r.planet)+';font-weight:800;font-size:1rem">'+r.planet+'</span>';
+            html += '<span style="color:var(--text-dim);font-size:0.8rem">in House '+r.house+'</span>';
+            html += '<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:'+urgClr+';color:#fff;font-weight:700">'+r.urgency+'</span>';
+            html += '</div>';
+            if (r.issue) {
+                html += '<div style="font-size:0.82rem;color:var(--red);margin-bottom:4px"><b>Issue:</b> '+r.issue+'</div>';
+            }
+            html += '<div style="font-size:0.85rem;color:#64b5f6;font-weight:600"><b>🙏 Upay:</b> '+r.remedy+'</div>';
+            html += '</div>';
+        });
+    }
+    html += '</div></div>';
+
+    /* ══════════════════════════════════════════
+       NAKSHATRAS TAB (separate API call)
+       ══════════════════════════════════════════ */
+    html += '<div class="lk-tab-pane" id="lk-nakshatras" style="display:none">';
+    html += '<div class="card" style="margin-bottom:12px;border:1px solid rgba(255,215,0,0.3)">';
+    html += '<h3 style="color:#FFD700;margin-bottom:8px">⭐ Nakshatra-Planet Deep Predictions</h3>';
+    html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px">Advanced analysis: each planet\'s nakshatra placement reveals personality, events, career, relationships, health, finances, and spiritual path. Multi-planet nakshatra effects included.</p>';
+    html += '<button id="lk-fetch-nakshatras" style="padding:8px 20px;background:#FFD700;color:#000;font-weight:700;border:none;border-radius:6px;cursor:pointer;font-size:0.9rem">⭐ Fetch Nakshatra Analysis</button>';
+    html += '</div>';
+    html += '<div id="lk-nakshatra-result"></div>';
+    html += '</div>';
+
+    resultDiv.innerHTML = html;
+
+    /* ── Nakshatra fetch button ── */
+    var nakBtn = document.getElementById('lk-fetch-nakshatras');
+    if (nakBtn) {
+        nakBtn.addEventListener('click', async function(){
+            var nakResultDiv = document.getElementById('lk-nakshatra-result');
+            nakResultDiv.innerHTML = '<p style="color:#FFD700;text-align:center;padding:20px">⭐ Calculating Nakshatra Predictions...</p>';
+            var nakData = await apiCall('/nakshatra-predictions', {
+                name: document.getElementById('lk-name').value,
+                date: ddmmToApi(document.getElementById('lk-date').value),
+                time: document.getElementById('lk-time').value,
+                place: document.getElementById('lk-place').value,
+                ayanamsa: document.getElementById('lk-ayanamsa').value,
+            }, nakResultDiv);
+            if (!nakData) return;
+            renderNakshatraPredictions(nakData, nakResultDiv);
+        });
+    }
+
+    /* ── Sub-tab click handler ── */
+    document.querySelectorAll('.lk-sub-tab').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            document.querySelectorAll('.lk-sub-tab').forEach(function(b){
+                b.style.background = 'transparent';
+                b.style.color = 'var(--text)';
+                b.style.borderColor = 'var(--border)';
+            });
+            this.style.background = lkRed;
+            this.style.color = '#fff';
+            this.style.borderColor = lkRed;
+            var target = this.getAttribute('data-lk-tab');
+            document.querySelectorAll('.lk-tab-pane').forEach(function(pane){
+                pane.style.display = pane.id === target ? 'block' : 'none';
+            });
+        });
+    });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   NAKSHATRA PREDICTIONS RENDERER
+   ══════════════════════════════════════════════════════════════════ */
+
+function renderNakshatraPredictions(data, container) {
+    var html = '';
+    var pColors = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080'};
+    var pC = function(n){ return pColors[n]||'#ccc'; };
+    var gold = '#FFD700';
+
+    /* ── Ascendant Nakshatra Banner ── */
+    var asc = data.ascendant_nakshatra || {};
+    html += '<div class="card" style="margin-bottom:14px;border:2px solid '+gold+';background:linear-gradient(135deg,rgba(255,215,0,0.06),transparent)">';
+    html += '<div style="text-align:center;margin-bottom:10px">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:'+gold+'">Ascendant Nakshatra: '+asc.nakshatra+'</div>';
+    html += '<div style="font-size:0.85rem;color:var(--text-dim)">Lord: <b>'+asc.lord+'</b> | Pada: <b>'+asc.pada+'</b> | Navamsha: <b>'+(asc.pada_navamsha||'')+'</b></div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">'+asc.deity+' | '+asc.symbol+'</div>';
+    html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    html += '<div style="padding:8px;border-radius:6px;background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.2)">';
+    html += '<div style="font-size:0.75rem;font-weight:700;color:'+gold+';margin-bottom:3px">Temperament</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text)">'+(asc.temperament||'—')+'</div></div>';
+    html += '<div style="padding:8px;border-radius:6px;background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.2)">';
+    html += '<div style="font-size:0.75rem;font-weight:700;color:'+gold+';margin-bottom:3px">General Traits</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text)">'+(asc.general_traits||'—')+'</div></div>';
+    html += '<div style="padding:8px;border-radius:6px;background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.2)">';
+    html += '<div style="font-size:0.75rem;font-weight:700;color:'+gold+';margin-bottom:3px">Career Traits</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text)">'+(asc.career_traits||'—')+'</div></div>';
+    html += '<div style="padding:8px;border-radius:6px;background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.2)">';
+    html += '<div style="font-size:0.75rem;font-weight:700;color:'+gold+';margin-bottom:3px">Spiritual Traits</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text)">'+(asc.spiritual_traits||'—')+'</div></div>';
+    html += '</div></div>';
+
+    /* ── Multi-Planet Nakshatra Effects (if any) ── */
+    var multi = data.multi_planet_nakshatras || [];
+    if (multi.length > 0) {
+        html += '<div class="card" style="margin-bottom:14px;border:1px solid rgba(255,69,0,0.4);background:rgba(255,69,0,0.04)">';
+        html += '<h3 style="color:#FF4500;margin-bottom:10px">🔥 Multi-Planet Nakshatra Effects</h3>';
+        html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px">When 2+ planets share the same nakshatra, their combined energy creates intensified life themes.</p>';
+        multi.forEach(function(m){
+            html += '<div style="border:1px solid rgba(255,69,0,0.3);border-radius:8px;padding:12px;margin-bottom:10px">';
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">';
+            html += '<span style="font-weight:800;font-size:1.05rem;color:#FF4500">'+m.nakshatra+'</span>';
+            html += '<span style="font-size:0.7rem;padding:2px 8px;border-radius:10px;background:rgba(255,69,0,0.15);color:#FF4500;font-weight:700">'+m.intensity+'</span>';
+            m.planets.forEach(function(pn){
+                html += '<span style="color:'+pC(pn)+';font-weight:700;font-size:0.9rem">'+pn+'</span>';
+            });
+            html += '</div>';
+            html += '<div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:4px"><b>Deity:</b> '+m.deity+' | <b>Shakti:</b> '+m.shakti+'</div>';
+            html += '<div style="font-size:0.82rem;color:var(--text)">'+m.combined_effect+'</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    /* ── Planet-in-Nakshatra Cards ── */
+    var planets = data.planet_nakshatras || [];
+    html += '<div class="card" style="margin-bottom:12px"><h3 style="color:'+gold+';margin-bottom:10px">⭐ Planet-Nakshatra Blend Predictions</h3>';
+    html += '<p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px">Each planet blends its energy with the nakshatra it occupies, revealing deep personality and life-event patterns.</p>';
+
+    planets.forEach(function(p){
+        html += '<div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;background:rgba(255,215,0,0.02)">';
+
+        /* Header */
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">';
+        html += '<span style="color:'+pC(p.planet)+';font-weight:800;font-size:1.2rem">'+p.planet+'</span>';
+        html += '<span style="font-size:0.9rem;color:var(--text)">in <b style="color:'+gold+'">'+p.nakshatra+'</b></span>';
+        html += '<span style="font-size:0.75rem;padding:2px 8px;border-radius:10px;background:rgba(255,215,0,0.12);color:'+gold+';border:1px solid rgba(255,215,0,0.3)">Pada '+p.pada+' ('+p.pada_navamsha+')</span>';
+        html += '<span style="font-size:0.7rem;color:var(--text-dim)">Lord: '+p.nakshatra_lord+'</span>';
+        html += '</div>';
+
+        /* Nakshatra attributes chips */
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">';
+        var attrs = [
+            {lbl:'Deity', val:p.deity},
+            {lbl:'Symbol', val:p.symbol},
+            {lbl:'Shakti', val:p.shakti},
+            {lbl:'Guna', val:p.guna},
+            {lbl:'Gana', val:p.gana},
+            {lbl:'Element', val:p.element},
+            {lbl:'Dosha', val:p.dosha},
+            {lbl:'Motivation', val:p.motivation},
+        ];
+        attrs.forEach(function(a){
+            if (a.val) html += '<span style="font-size:0.68rem;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text-dim)"><b>'+a.lbl+':</b> '+a.val+'</span>';
+        });
+        html += '</div>';
+
+        /* Pada quality */
+        if (p.pada_quality) {
+            html += '<div style="font-size:0.8rem;margin-bottom:8px;padding:6px 8px;border-radius:6px;background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.15)"><b style="color:'+gold+'">Pada '+p.pada+' Quality:</b> '+p.pada_quality+'</div>';
+        }
+
+        /* Planet-specific predictions */
+        if (p.personality) {
+            html += '<div style="font-size:0.85rem;color:var(--text);margin-bottom:8px;padding:8px;border-radius:6px;background:rgba(100,181,246,0.06);border:1px solid rgba(100,181,246,0.2)"><b style="color:#64b5f6">🧠 Personality:</b> '+p.personality+'</div>';
+        }
+        if (p.nature) {
+            html += '<div style="font-size:0.83rem;color:var(--text);margin-bottom:8px;padding:8px;border-radius:6px;background:rgba(206,147,216,0.06);border:1px solid rgba(206,147,216,0.2)"><b style="color:#ce93d8">🌀 Nature:</b> '+p.nature+'</div>';
+        }
+        if (p.events) {
+            html += '<div style="font-size:0.83rem;color:var(--text);margin-bottom:8px;padding:8px;border-radius:6px;background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2)"><b style="color:#FFA500">⚡ Key Events:</b> '+p.events+'</div>';
+        }
+
+        /* Grid of predictions */
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+        var predFields = [
+            {key:'career', lbl:'💼 Career', clr:'#00CED1'},
+            {key:'relationship', lbl:'❤️ Relationship', clr:'#FF69B4'},
+            {key:'health', lbl:'🏥 Health', clr:'#66bb6a'},
+            {key:'financial', lbl:'💰 Financial', clr:'#FFD700'},
+            {key:'spiritual', lbl:'🙏 Spiritual', clr:'#9C27B0'},
+        ];
+        predFields.forEach(function(f){
+            if (p[f.key]) {
+                html += '<div style="padding:8px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.02)">';
+                html += '<div style="font-size:0.72rem;font-weight:700;color:'+f.clr+';margin-bottom:3px">'+f.lbl+'</div>';
+                html += '<div style="font-size:0.78rem;color:var(--text)">'+p[f.key]+'</div>';
+                html += '</div>';
+            }
+        });
+        html += '</div>';
+
+        /* Age Events */
+        if (p.age_events && p.age_events.length > 0) {
+            html += '<div style="padding:8px;border-radius:6px;border:1px solid rgba(255,165,0,0.2);background:rgba(255,165,0,0.04);margin-bottom:8px">';
+            html += '<div style="font-size:0.75rem;font-weight:700;color:#FFA500;margin-bottom:4px">⏰ Age-wise Events</div>';
+            p.age_events.forEach(function(ae){
+                html += '<div style="font-size:0.78rem;color:var(--text);margin-bottom:2px;padding-left:8px;border-left:2px solid #FFA500">'+ae+'</div>';
+            });
+            html += '</div>';
+        }
+
+        /* Remedies */
+        if (p.remedies) {
+            html += '<div style="font-size:0.82rem;color:#64b5f6;padding:8px;border-radius:6px;background:rgba(100,181,246,0.05);border:1px solid rgba(100,181,246,0.15)"><b>🙏 Remedies:</b> '+p.remedies+'</div>';
+        }
+
+        html += '</div>';
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+var SIGNS_LK = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+
 /* Apply DD-MM-YYYY auto-format to gold date inputs */
 document.querySelectorAll('.gold-date').forEach(setupDateInput);
 
@@ -5364,4 +6628,1619 @@ function renderGold(data) {
             applyGoldEventFilters();
         });
     });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DEITY ANALYSIS TAB — D3/D7/D9/D10/D12/D60 + Dasha-Deity Timeline
+   ═══════════════════════════════════════════════════════════════ */
+
+var deityDataCache = null;
+
+var deityBtn = document.getElementById('deity-fetch');
+if (deityBtn) {
+    deityBtn.addEventListener('click', async function(){
+        var resultDiv = document.getElementById('deity-result');
+        var name  = document.getElementById('master-name').value;
+        var date  = document.getElementById('master-date').value;
+        var time  = document.getElementById('master-time').value;
+        var place = document.getElementById('master-place').value;
+
+        if (!date || !time) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Please enter birth date and time in the Master Birth Data panel above.</p>';
+            return;
+        }
+
+        resultDiv.innerHTML = '<div class="loading" style="color:#9C27B0">Analyzing divisional deities across D3/D7/D9/D10/D12/D60...</div>';
+
+        try {
+            var resp = await fetch(API + '/deities', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: name,
+                    date: ddmmToApi(date),
+                    time: time,
+                    place: place,
+                    ayanamsa: 'lahiri'
+                })
+            });
+            if (!resp.ok) {
+                var errBody = await resp.json().catch(function(){ return {}; });
+                throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+            }
+            var data = await resp.json();
+            deityDataCache = data;
+
+            // Show sub-tabs
+            var subTabsEl = document.getElementById('deity-sub-tabs');
+            if (subTabsEl) subTabsEl.style.display = 'flex';
+
+            renderDeityOverview(data);
+        } catch(err) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+        }
+    });
+}
+
+// Sub-tab switching
+document.querySelectorAll('[data-deity-tab]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+        document.querySelectorAll('[data-deity-tab]').forEach(function(b){
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.color = 'var(--text)';
+            b.style.borderColor = 'var(--border)';
+        });
+        this.classList.add('active');
+        this.style.background = '#9C27B0';
+        this.style.color = '#fff';
+        this.style.borderColor = '#9C27B0';
+        if (!deityDataCache) return;
+        var tab = this.dataset.deityTab;
+        if (tab === 'deity-overview') renderDeityOverview(deityDataCache);
+        else if (tab === 'deity-d3')  renderDeityD3(deityDataCache);
+        else if (tab === 'deity-d7')  renderDeityD7(deityDataCache);
+        else if (tab === 'deity-d9')  renderDeityD9(deityDataCache);
+        else if (tab === 'deity-d10') renderDeityD10(deityDataCache);
+        else if (tab === 'deity-d12') renderDeityD12(deityDataCache);
+        else if (tab === 'deity-d60') renderDeityD60(deityDataCache);
+        else if (tab === 'deity-dasha') renderDashaDeityTimeline(deityDataCache);
+    });
+});
+
+var dPurple = '#9C27B0';
+var dPColors = {Sun:'#FFA500',Moon:'#C0C0C0',Mars:'#FF4444',Mercury:'#00CED1',Jupiter:'#FFD700',Venus:'#FF69B4',Saturn:'#4169E1',Rahu:'#8B008B',Ketu:'#808080',Ascendant:'#FF6F00'};
+function dPC(n){ return dPColors[n]||'#ccc'; }
+function natureBadge(nature) {
+    if (!nature) return '';
+    var c = nature === 'benefic' ? '#4CAF50' : nature === 'malefic' ? '#f44336' : '#FF9800';
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:700;background:'+c+'22;color:'+c+';border:1px solid '+c+'44">'+nature.toUpperCase()+'</span>';
+}
+
+/* ── OVERVIEW ─────────────────────────────────────────────────── */
+function renderDeityOverview(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var da = data.deity_analysis || {};
+    var planets = da.planet_deities || [];
+    var cur = data.current_dasha || {};
+    var html = '';
+
+    // Banner
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid '+dPurple+';background:linear-gradient(135deg,rgba(156,39,176,0.08),transparent)">';
+    html += '<div style="font-size:1.5rem;font-weight:800;color:'+dPurple+'">Divisional Deity Analysis</div>';
+    html += '<div style="font-size:0.9rem;color:var(--text);margin-top:4px"><b>' + (data.name || '') + '</b></div>';
+    if (data.input) {
+        html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:2px">' + data.input.date + ' | ' + data.input.time + ' | ' + data.input.place + '</div>';
+    }
+    html += '</div>';
+
+    // Current Dasha Deity Summary
+    if (cur && cur.mahadasha) {
+        var timeline = data.dasha_deity_timeline || [];
+        var curMaha = timeline.find(function(t){ return t.mahadasha_lord === cur.mahadasha; });
+        html += '<div class="card" style="margin-bottom:16px;border-left:4px solid '+dPurple+'">';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:'+dPurple+';margin-bottom:8px">Current Dasha Deity Rulers</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
+
+        html += '<div style="background:var(--card-bg);padding:10px;border-radius:8px;border:1px solid var(--border)">';
+        html += '<div style="font-size:0.75rem;color:var(--text-dim)">Mahadasha</div>';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:'+dPC(cur.mahadasha)+'">'+cur.mahadasha+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text-dim)">'+cur.mahadasha_start+' → '+cur.mahadasha_end+'</div>';
+        html += '</div>';
+
+        if (cur.antardasha) {
+            html += '<div style="background:var(--card-bg);padding:10px;border-radius:8px;border:1px solid var(--border)">';
+            html += '<div style="font-size:0.75rem;color:var(--text-dim)">Antardasha</div>';
+            html += '<div style="font-size:1.1rem;font-weight:700;color:'+dPC(cur.antardasha)+'">'+cur.antardasha+'</div>';
+            html += '<div style="font-size:0.8rem;color:var(--text-dim)">'+cur.antardasha_start+' → '+cur.antardasha_end+'</div>';
+            html += '</div>';
+        }
+        if (curMaha) {
+            html += '<div style="background:var(--card-bg);padding:10px;border-radius:8px;border:1px solid var(--border)">';
+            html += '<div style="font-size:0.75rem;color:var(--text-dim)">D10 Career Deity</div>';
+            html += '<div style="font-size:1.1rem;font-weight:700;color:#FF9800">'+curMaha.d10_deity+'</div>';
+            html += '<div style="font-size:0.75rem;color:var(--text-dim)">'+curMaha.d10_domain+'</div>';
+            html += '</div>';
+
+            html += '<div style="background:var(--card-bg);padding:10px;border-radius:8px;border:1px solid var(--border)">';
+            html += '<div style="font-size:0.75rem;color:var(--text-dim)">D60 Karma Deity</div>';
+            html += '<div style="font-size:1.1rem;font-weight:700;color:#E91E63">'+curMaha.d60_deity+'</div>';
+            html += '<div style="font-size:0.75rem;color:var(--text-dim)">'+curMaha.d60_karma.substring(0,80)+'...</div>';
+            html += '</div>';
+
+            html += '<div style="background:var(--card-bg);padding:10px;border-radius:8px;border:1px solid var(--border)">';
+            html += '<div style="font-size:0.75rem;color:var(--text-dim)">D9 Fortune Deity</div>';
+            html += '<div style="font-size:1.1rem;font-weight:700;color:#00BCD4">'+curMaha.d9_deity+'</div>';
+            html += '<div style="font-size:0.75rem;color:var(--text-dim)">'+curMaha.d9_fortune.substring(0,80)+'...</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+
+        // Current dasha combined interpretation
+        if (curMaha && curMaha.interpretation) {
+            var ci = curMaha.interpretation;
+            html += '<div style="margin-top:12px;padding:14px;background:linear-gradient(135deg,rgba(156,39,176,0.06),rgba(255,152,0,0.04));border-radius:10px;border:1px solid '+dPurple+'44">';
+            html += '<div style="font-size:1rem;font-weight:700;color:'+dPurple+';margin-bottom:10px">Your Current Dasha-Deity Reading</div>';
+
+            html += '<div style="margin-bottom:10px">';
+            html += '<div style="font-size:0.82rem;font-weight:700;color:#FF9800;margin-bottom:4px">Career Path ('+cur.mahadasha+' × D10 '+curMaha.d10_deity+')</div>';
+            html += '<div style="font-size:0.85rem;color:var(--text);line-height:1.5">'+ci.career_interpretation+'</div>';
+            html += '</div>';
+
+            html += '<div style="margin-bottom:10px">';
+            html += '<div style="font-size:0.82rem;font-weight:700;color:#F44336;margin-bottom:4px">Karmic Pattern ('+cur.mahadasha+' × D60 '+curMaha.d60_deity+')</div>';
+            html += '<div style="font-size:0.85rem;color:var(--text);line-height:1.5">'+ci.karma_interpretation+'</div>';
+            html += '</div>';
+
+            html += '<div style="margin-bottom:10px">';
+            html += '<div style="font-size:0.82rem;font-weight:700;color:#00BCD4;margin-bottom:4px">Fortune Flow ('+cur.mahadasha+' × D9 '+curMaha.d9_deity+')</div>';
+            html += '<div style="font-size:0.85rem;color:var(--text);line-height:1.5">'+ci.fortune_interpretation+'</div>';
+            html += '</div>';
+
+            if (ci.practical_advice) {
+                html += '<div style="padding:10px;background:'+dPurple+'11;border-radius:8px;border-left:4px solid '+dPurple+'">';
+                html += '<div style="font-size:0.82rem;font-weight:700;color:'+dPurple+';margin-bottom:4px">Practical Advice</div>';
+                html += '<div style="font-size:0.85rem;color:var(--text);line-height:1.5">'+ci.practical_advice+'</div>';
+                html += '</div>';
+            }
+
+            html += '</div>';
+        }
+
+        html += '</div>';
+    }
+
+    // Planet Deity Summary Table
+    html += '<div class="card" style="margin-bottom:16px">';
+    html += '<div style="font-size:1.1rem;font-weight:700;color:'+dPurple+';margin-bottom:10px">Planet-Deity Matrix</div>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+    html += '<thead><tr style="background:'+dPurple+'22">';
+    html += '<th style="padding:8px;text-align:left;border-bottom:2px solid '+dPurple+'">Planet</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:2px solid '+dPurple+'">D3</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:2px solid '+dPurple+'">D7</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:2px solid '+dPurple+'">D9</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:2px solid '+dPurple+'">D10</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:2px solid '+dPurple+'">D12</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:2px solid '+dPurple+'">D60</th>';
+    html += '</tr></thead><tbody>';
+
+    planets.forEach(function(p){
+        html += '<tr style="border-bottom:1px solid var(--border)">';
+        html += '<td style="padding:6px 8px;font-weight:700;color:'+dPC(p.planet)+'">'+p.planet+'</td>';
+        html += '<td style="padding:6px 8px">'+(p.d3.deity||'-')+'</td>';
+        html += '<td style="padding:6px 8px">'+(p.d7.deity||'-')+'</td>';
+        html += '<td style="padding:6px 8px">'+(p.d9.deity||'-')+'</td>';
+        html += '<td style="padding:6px 8px">'+(p.d10.deity||'-')+'</td>';
+        html += '<td style="padding:6px 8px">'+(p.d12.deity||'-')+'</td>';
+        html += '<td style="padding:6px 8px">'+(p.d60.deity||'-')+'</td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table></div></div>';
+
+    resultDiv.innerHTML = html;
+}
+
+/* ── D3 DREKKANA ──────────────────────────────────────────────── */
+function renderDeityD3(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var planets = (data.deity_analysis || {}).planet_deities || [];
+    var html = '';
+
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid #FF5722">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:#FF5722">D3 Drekkana — 36 Deities of Courage & Siblings</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">Each sign divided into 3 parts (10° each) — reveals innate courage, co-born & life pattern</div>';
+    html += '</div>';
+
+    planets.forEach(function(p){
+        var d = p.d3;
+        if (!d.deity) return;
+        html += '<div class="card" style="margin-bottom:10px;border-left:4px solid '+dPC(p.planet)+'">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html += '<div><span style="font-size:1rem;font-weight:700;color:'+dPC(p.planet)+'">'+p.planet+'</span>';
+        html += ' <span style="font-size:0.8rem;color:var(--text-dim)">('+p.d1_sign+' '+p.longitude.toFixed(2)+'°)</span></div>';
+        html += natureBadge(d.nature);
+        html += '</div>';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:#FF5722;margin-bottom:4px">'+d.deity+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:4px"><b>Domain:</b> '+d.domain+'</div>';
+        html += '<div style="font-size:0.85rem;color:var(--text)">'+d.result+'</div>';
+        html += '</div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+/* ── D7 SAPTAMSHA ─────────────────────────────────────────────── */
+function renderDeityD7(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var planets = (data.deity_analysis || {}).planet_deities || [];
+    var html = '';
+
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid #E91E63">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:#E91E63">D7 Saptamsha — 7 Matrikas (Divine Mothers)</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">Each sign divided into 7 parts (4°17\' each) — reveals children, creative power & progeny</div>';
+    html += '</div>';
+
+    planets.forEach(function(p){
+        var d = p.d7;
+        if (!d.deity) return;
+        html += '<div class="card" style="margin-bottom:10px;border-left:4px solid '+dPC(p.planet)+'">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html += '<div><span style="font-size:1rem;font-weight:700;color:'+dPC(p.planet)+'">'+p.planet+'</span>';
+        html += ' <span style="font-size:0.8rem;color:var(--text-dim)">('+p.d1_sign+')</span></div>';
+        html += natureBadge(d.nature);
+        html += '</div>';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:#E91E63;margin-bottom:4px">'+d.deity+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:4px"><b>Domain:</b> '+d.domain+'</div>';
+        html += '<div style="font-size:0.85rem;color:var(--text)">'+d.result+'</div>';
+        html += '</div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+/* ── D9 NAVAMSHA ──────────────────────────────────────────────── */
+function renderDeityD9(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var planets = (data.deity_analysis || {}).planet_deities || [];
+    var html = '';
+
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid #00BCD4">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:#00BCD4">D9 Navamsha — 12 Fortune Deities</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">9-fold division (3°20\' each) — dharma path, fortune, spouse & spiritual destiny</div>';
+    html += '</div>';
+
+    planets.forEach(function(p){
+        var d = p.d9;
+        if (!d.deity) return;
+        html += '<div class="card" style="margin-bottom:10px;border-left:4px solid '+dPC(p.planet)+'">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html += '<div><span style="font-size:1rem;font-weight:700;color:'+dPC(p.planet)+'">'+p.planet+'</span>';
+        html += ' <span style="font-size:0.8rem;color:var(--text-dim)">('+p.d1_sign+' → D9: '+d.sign+')</span></div>';
+        html += natureBadge(d.nature);
+        html += '</div>';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:#00BCD4;margin-bottom:4px">'+d.deity+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text);margin-bottom:3px"><b style="color:#00BCD4">Fortune:</b> '+d.fortune+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text);margin-bottom:3px"><b style="color:#00BCD4">Dharma:</b> '+d.dharma+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text)"><b style="color:#00BCD4">Marriage:</b> '+d.marriage+'</div>';
+        html += '</div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+/* ── D10 DASHAMSHA ────────────────────────────────────────────── */
+function renderDeityD10(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var planets = (data.deity_analysis || {}).planet_deities || [];
+    var html = '';
+
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid #FF9800">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:#FF9800">D10 Dashamsha — 10 Career Deities</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">Each sign divided into 10 parts (3° each) — career path, professional destiny & public standing</div>';
+    html += '</div>';
+
+    planets.forEach(function(p){
+        var d = p.d10;
+        if (!d.deity) return;
+        html += '<div class="card" style="margin-bottom:10px;border-left:4px solid '+dPC(p.planet)+'">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html += '<div><span style="font-size:1rem;font-weight:700;color:'+dPC(p.planet)+'">'+p.planet+'</span>';
+        html += ' <span style="font-size:0.8rem;color:var(--text-dim)">('+p.d1_sign+')</span></div>';
+        html += natureBadge(d.nature);
+        html += '</div>';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:#FF9800;margin-bottom:4px">'+d.deity+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:4px"><b>Domain:</b> '+d.domain+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text);margin-bottom:3px"><b style="color:#FF9800">Career:</b> '+d.career+'</div>';
+        html += '<div style="font-size:0.85rem;color:var(--text)"><b style="color:#FF9800">Result:</b> '+d.result+'</div>';
+        html += '</div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+/* ── D12 DWADASHAMSHA ─────────────────────────────────────────── */
+function renderDeityD12(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var planets = (data.deity_analysis || {}).planet_deities || [];
+    var html = '';
+
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid #8BC34A">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:#8BC34A">D12 Dwadashamsha — 12 Adityas (Solar Deities)</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">Each sign divided into 12 parts (2°30\' each) — parents, lineage & ancestral karma</div>';
+    html += '</div>';
+
+    planets.forEach(function(p){
+        var d = p.d12;
+        if (!d.deity) return;
+        html += '<div class="card" style="margin-bottom:10px;border-left:4px solid '+dPC(p.planet)+'">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html += '<div><span style="font-size:1rem;font-weight:700;color:'+dPC(p.planet)+'">'+p.planet+'</span>';
+        html += ' <span style="font-size:0.8rem;color:var(--text-dim)">('+p.d1_sign+')</span></div>';
+        html += natureBadge(d.nature);
+        html += '</div>';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:#8BC34A;margin-bottom:4px">'+d.deity+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:4px"><b>Domain:</b> '+d.domain+'</div>';
+        html += '<div style="font-size:0.85rem;color:var(--text)">'+d.result+'</div>';
+        html += '</div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+/* ── D60 SHASHTIAMSHA ─────────────────────────────────────────── */
+function renderDeityD60(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var planets = (data.deity_analysis || {}).planet_deities || [];
+    var html = '';
+
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid #F44336">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:#F44336">D60 Shashtiamsha — 60 Karmic Deities</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">Each sign divided into 60 parts (0°30\' each) — deep past-life karma, fortune & final destiny</div>';
+    html += '</div>';
+
+    planets.forEach(function(p){
+        var d = p.d60;
+        if (!d.deity) return;
+        html += '<div class="card" style="margin-bottom:10px;border-left:4px solid '+dPC(p.planet)+'">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html += '<div><span style="font-size:1rem;font-weight:700;color:'+dPC(p.planet)+'">'+p.planet+'</span>';
+        html += ' <span style="font-size:0.8rem;color:var(--text-dim)">('+p.d1_sign+' '+p.longitude.toFixed(2)+'°)</span></div>';
+        html += natureBadge(d.nature);
+        html += '</div>';
+        html += '<div style="font-size:1.1rem;font-weight:700;color:#F44336;margin-bottom:4px">'+d.deity+'</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text);margin-bottom:3px"><b style="color:#F44336">Karma:</b> '+d.karma+'</div>';
+        html += '<div style="font-size:0.85rem;color:var(--text)"><b style="color:#F44336">Fortune:</b> '+d.fortune+'</div>';
+        html += '</div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+/* ── DASHA-DEITY TIMELINE ─────────────────────────────────────── */
+function renderDashaDeityTimeline(data) {
+    var resultDiv = document.getElementById('deity-result');
+    var timeline = data.dasha_deity_timeline || [];
+    var cur = data.current_dasha || {};
+    var html = '';
+
+    html += '<div class="card" style="text-align:center;margin-bottom:16px;border:2px solid '+dPurple+'">';
+    html += '<div style="font-size:1.3rem;font-weight:800;color:'+dPurple+'">Dasha-Deity Timeline</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">Each Mahadasha mapped to D9 Fortune, D10 Career & D60 Karma deities with antardasha breakdown</div>';
+    html += '</div>';
+
+    timeline.forEach(function(maha){
+        var isCurrent = (cur.mahadasha === maha.mahadasha_lord);
+        var borderColor = isCurrent ? '#FFD700' : dPC(maha.mahadasha_lord);
+        var bgExtra = isCurrent ? ';background:linear-gradient(135deg,rgba(255,215,0,0.06),transparent)' : '';
+
+        html += '<div class="card" style="margin-bottom:14px;border-left:5px solid '+borderColor+bgExtra+'">';
+
+        // Header
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+        html += '<div>';
+        html += '<span style="font-size:1.15rem;font-weight:800;color:'+dPC(maha.mahadasha_lord)+'">'+maha.mahadasha_lord+' Mahadasha</span>';
+        if (isCurrent) html += ' <span style="background:#FFD700;color:#000;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:700">ACTIVE</span>';
+        html += '</div>';
+        html += '<div style="font-size:0.8rem;color:var(--text-dim)">'+maha.start_date+' → '+maha.end_date+' ('+maha.duration_years.toFixed(1)+' yrs)</div>';
+        html += '</div>';
+
+        // Deity cards row
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:10px">';
+
+        // D9
+        html += '<div style="background:var(--bg);padding:10px;border-radius:8px;border:1px solid #00BCD422">';
+        html += '<div style="font-size:0.7rem;color:#00BCD4;font-weight:700">D9 FORTUNE</div>';
+        html += '<div style="font-size:1rem;font-weight:700;color:#00BCD4">'+maha.d9_deity+'</div>';
+        html += '<div style="font-size:0.75rem;color:var(--text);margin-top:4px">'+maha.d9_fortune+'</div>';
+        if (maha.d9_dharma) html += '<div style="font-size:0.75rem;color:var(--text-dim);margin-top:2px"><i>Dharma: '+maha.d9_dharma+'</i></div>';
+        html += '</div>';
+
+        // D10
+        html += '<div style="background:var(--bg);padding:10px;border-radius:8px;border:1px solid #FF980022">';
+        html += '<div style="font-size:0.7rem;color:#FF9800;font-weight:700">D10 CAREER</div>';
+        html += '<div style="font-size:1rem;font-weight:700;color:#FF9800">'+maha.d10_deity+'</div>';
+        html += '<div style="font-size:0.75rem;color:var(--text-dim)">'+maha.d10_domain+'</div>';
+        html += '<div style="font-size:0.75rem;color:var(--text);margin-top:4px">'+maha.d10_career+'</div>';
+        html += '</div>';
+
+        // D60
+        html += '<div style="background:var(--bg);padding:10px;border-radius:8px;border:1px solid #F4433622">';
+        html += '<div style="font-size:0.7rem;color:#F44336;font-weight:700">D60 KARMA</div>';
+        html += '<div style="font-size:1rem;font-weight:700;color:#F44336">'+maha.d60_deity+'</div>';
+        html += '<div style="font-size:0.75rem;color:var(--text);margin-top:4px">'+maha.d60_karma+'</div>';
+        html += '<div style="font-size:0.75rem;color:var(--text-dim);margin-top:2px"><i>Fortune: '+maha.d60_fortune+'</i></div>';
+        html += '</div>';
+
+        html += '</div>';
+
+        // ── COMBINED INTERPRETATION SECTION ──
+        var interp = maha.interpretation || {};
+        if (interp.career_interpretation) {
+            html += '<div style="margin:10px 0;padding:12px;background:linear-gradient(135deg,rgba(156,39,176,0.04),rgba(255,152,0,0.04));border-radius:8px;border:1px solid '+dPurple+'33">';
+            html += '<div style="font-size:0.85rem;font-weight:700;color:'+dPurple+';margin-bottom:8px">Combined Interpretation — '+maha.mahadasha_lord+' Dasha × Deities</div>';
+
+            html += '<div style="margin-bottom:8px">';
+            html += '<div style="font-size:0.75rem;font-weight:700;color:#FF9800;margin-bottom:3px">Career Reading ('+maha.mahadasha_lord+' + D10 '+maha.d10_deity+')</div>';
+            html += '<div style="font-size:0.8rem;color:var(--text)">'+interp.career_interpretation+'</div>';
+            html += '</div>';
+
+            html += '<div style="margin-bottom:8px">';
+            html += '<div style="font-size:0.75rem;font-weight:700;color:#F44336;margin-bottom:3px">Karmic Reading ('+maha.mahadasha_lord+' + D60 '+maha.d60_deity+')</div>';
+            html += '<div style="font-size:0.8rem;color:var(--text)">'+interp.karma_interpretation+'</div>';
+            html += '</div>';
+
+            html += '<div style="margin-bottom:8px">';
+            html += '<div style="font-size:0.75rem;font-weight:700;color:#00BCD4;margin-bottom:3px">Fortune Reading ('+maha.mahadasha_lord+' + D9 '+maha.d9_deity+')</div>';
+            html += '<div style="font-size:0.8rem;color:var(--text)">'+interp.fortune_interpretation+'</div>';
+            html += '</div>';
+
+            if (interp.practical_advice) {
+                html += '<div style="padding:8px;background:'+dPurple+'11;border-radius:6px;border-left:3px solid '+dPurple+'">';
+                html += '<div style="font-size:0.75rem;font-weight:700;color:'+dPurple+';margin-bottom:3px">Practical Advice</div>';
+                html += '<div style="font-size:0.8rem;color:var(--text)">'+interp.practical_advice+'</div>';
+                html += '</div>';
+            }
+
+            html += '</div>';
+        }
+
+        // Antardasha collapsible
+        if (maha.antardashas && maha.antardashas.length > 0) {
+            var toggleId = 'antar-toggle-' + maha.mahadasha_lord;
+            html += '<details style="margin-top:6px">';
+            html += '<summary style="cursor:pointer;color:'+dPurple+';font-size:0.85rem;font-weight:600">View Antardasha Deity Breakdown ('+maha.antardashas.length+' periods)</summary>';
+            html += '<div style="margin-top:8px">';
+
+            maha.antardashas.forEach(function(a){
+                var isActive = cur.antardasha === a.antardasha_lord && isCurrent;
+                var aBorder = isActive ? '#FFD700' : dPC(a.antardasha_lord);
+                var aBg = isActive ? ';background:linear-gradient(135deg,rgba(255,215,0,0.06),transparent)' : '';
+
+                html += '<div style="margin-bottom:8px;padding:10px;border-left:3px solid '+aBorder+';border-radius:6px;background:var(--bg)'+aBg+'">';
+
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+                html += '<div><span style="font-weight:700;color:'+dPC(a.antardasha_lord)+'">'+maha.mahadasha_lord+' / '+a.antardasha_lord+'</span>';
+                if (isActive) html += ' <span style="background:#FFD700;color:#000;padding:1px 6px;border-radius:8px;font-size:0.65rem;font-weight:700">NOW</span>';
+                html += '</div>';
+                html += '<span style="font-size:0.72rem;color:var(--text-dim)">'+a.start_date+' → '+a.end_date+'</span>';
+                html += '</div>';
+
+                html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">';
+                html += '<div style="font-size:0.75rem"><span style="color:#FF9800;font-weight:600">D10: '+a.d10_deity+'</span> — '+a.d10_career.substring(0,80)+'</div>';
+                html += '<div style="font-size:0.75rem"><span style="color:#F44336;font-weight:600">D60: '+a.d60_deity+'</span> — '+a.d60_karma.substring(0,80)+'</div>';
+                html += '</div>';
+
+                if (a.interpretation) {
+                    html += '<div style="font-size:0.78rem;color:var(--text);padding:6px;background:'+dPurple+'08;border-radius:4px">';
+                    html += '<b style="color:'+dPurple+'">Reading:</b> '+a.interpretation;
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            });
+
+            html += '</div></details>';
+        }
+
+        html += '</div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// ASTROLOGICAL EVENTS — Fetch + Render all 9 event types
+// ═══════════════════════════════════════════════════════════════
+
+var astroEvtBtn = document.getElementById('astro-evt-fetch');
+if (astroEvtBtn) {
+    astroEvtBtn.addEventListener('click', async function(){
+        var resultDiv = document.getElementById('astro-evt-result');
+        var startDate = document.getElementById('astro-evt-start').value;
+        var endDate = document.getElementById('astro-evt-end').value;
+        var ayanamsa = document.getElementById('astro-evt-ayanamsa').value;
+
+        if (!startDate || !endDate) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Please select both start and end dates</p>';
+            return;
+        }
+
+        resultDiv.innerHTML = '<p style="color:#FF6F00;font-weight:600">Calculating all 9 astrological event types... This may take a moment.</p>';
+
+        var payload = {
+            start_date: startDate,
+            end_date: endDate,
+            ayanamsa: ayanamsa,
+            timezone_offset_minutes: 330
+        };
+
+        try {
+            var resp = await fetch(API + '/astro-events', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) {
+                var errBody = await resp.json().catch(function(){ return {}; });
+                throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+            }
+            var data = await resp.json();
+            renderAstroEvents(data, resultDiv);
+        } catch(err) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+        }
+    });
+}
+
+// ── Color palette for event sections ─────────────────────────
+var EVT_COLORS = {
+    combustion: '#F44336',
+    retrograde: '#9C27B0',
+    transits: '#2196F3',
+    positions: '#009688',
+    mutual_aspects: '#FF9800',
+    lunar_aspects: '#3F51B5',
+    mutual_parallel: '#795548',
+    ecliptic_crossings: '#607D8B',
+    graha_yuddha: '#E91E63'
+};
+
+var EVT_ICONS = {
+    combustion: '🔥',
+    retrograde: '↺',
+    transits: '→',
+    positions: '📍',
+    mutual_aspects: '⚔',
+    lunar_aspects: '🌙',
+    mutual_parallel: '∥',
+    ecliptic_crossings: '✕',
+    graha_yuddha: '⚔'
+};
+
+var EVT_TITLES = {
+    combustion: 'Planets Combustion',
+    retrograde: 'Planets Retrograde',
+    transits: 'Planets Transit (Sign Ingress)',
+    positions: 'Planetary Positions',
+    mutual_aspects: 'Planets Mutual Aspects',
+    lunar_aspects: 'Lunar Aspects',
+    mutual_parallel: 'Planets Mutual Parallel',
+    ecliptic_crossings: 'Ecliptic Crossings',
+    graha_yuddha: 'Graha Yuddha (Planetary War)'
+};
+
+function renderAstroEvents(data, resultDiv) {
+    var html = '';
+    html += '<div style="background:var(--card-bg);border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #FF6F00">';
+    html += '<h3 style="color:#FF6F00;margin:0 0 6px 0">Astrological Events Summary</h3>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:0.85rem;color:var(--text-dim)">';
+    html += '<span><b>Period:</b> ' + data.start_date + ' to ' + data.end_date + '</span>';
+    html += '<span><b>Days:</b> ' + data.total_days + '</span>';
+    html += '<span><b>Ayanamsa:</b> ' + data.ayanamsa + '</span>';
+    html += '</div></div>';
+
+    // Render each of the 9 sections
+    var sections = ['combustion','retrograde','transits','positions','mutual_aspects','lunar_aspects','mutual_parallel','ecliptic_crossings','graha_yuddha'];
+    sections.forEach(function(key) {
+        var events = data[key];
+        var color = EVT_COLORS[key];
+        var icon = EVT_ICONS[key];
+        var title = EVT_TITLES[key];
+        var count = Array.isArray(events) ? events.length : 0;
+
+        html += '<div style="background:var(--card-bg);border-radius:10px;padding:14px;margin-bottom:14px;border-left:4px solid '+color+'">';
+        html += '<h3 style="color:'+color+';margin:0 0 10px 0;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+        html += icon + ' ' + title + ' <span style="font-size:0.8rem;background:'+color+'22;color:'+color+';padding:2px 8px;border-radius:10px;margin-left:6px">' + count + ' events</span>';
+        html += ' <span style="font-size:0.7rem;color:var(--text-dim)">click to toggle</span></h3>';
+        html += '<div>';
+
+        if (count === 0) {
+            html += '<p style="color:var(--text-dim);font-style:italic;margin:4px 0">No events found in this period</p>';
+        } else {
+            switch(key) {
+                case 'combustion': html += renderEvtCombustion(events, color); break;
+                case 'retrograde': html += renderEvtRetrograde(events, color); break;
+                case 'transits': html += renderEvtTransits(events, color); break;
+                case 'positions': html += renderEvtPositions(events, color); break;
+                case 'mutual_aspects': html += renderEvtMutualAspects(events, color); break;
+                case 'lunar_aspects': html += renderEvtLunarAspects(events, color); break;
+                case 'mutual_parallel': html += renderEvtMutualParallel(events, color); break;
+                case 'ecliptic_crossings': html += renderEvtEclipticCrossings(events, color); break;
+                case 'graha_yuddha': html += renderEvtGrahaYuddha(events, color); break;
+            }
+        }
+
+        html += '</div></div>';
+    });
+
+    resultDiv.innerHTML = html;
+}
+
+// ── Helper: table wrapper ────────────────────────────────────
+function evtTable(headers, rows, color) {
+    var h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr>';
+    headers.forEach(function(hdr) {
+        h += '<th style="background:'+color+'15;color:'+color+';padding:6px 8px;text-align:left;border-bottom:2px solid '+color+'33;white-space:nowrap">'+hdr+'</th>';
+    });
+    h += '</tr></thead><tbody>';
+    rows.forEach(function(row, i) {
+        var bg = i % 2 === 0 ? 'transparent' : 'var(--card-bg)';
+        h += '<tr style="background:'+bg+'">';
+        row.forEach(function(cell) {
+            h += '<td style="padding:5px 8px;border-bottom:1px solid var(--border,#333)">'+(cell||'')+'</td>';
+        });
+        h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    return h;
+}
+
+// ── 1. Combustion ────────────────────────────────────────────
+function renderEvtCombustion(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            '<b style="color:'+color+'">'+e.planet+'</b>',
+            e.date || '',
+            e.event || e.status || '',
+            e.distance_from_sun != null ? e.distance_from_sun.toFixed(2)+'°' : '',
+            e.combustion_orb ? e.combustion_orb+'°' : '',
+            e.planet_sign || '',
+            e.planet_longitude != null ? e.planet_longitude.toFixed(2)+'°' : ''
+        ];
+    });
+    return evtTable(['Planet','Date','Event','Dist from Sun','Orb','Sign','Longitude'], rows, color);
+}
+
+// ── 2. Retrograde ────────────────────────────────────────────
+function renderEvtRetrograde(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            '<b style="color:'+color+'">'+(e.planet||'')+'</b>',
+            e.date || '',
+            '<span style="color:'+(e.event==='retrograde_start'?'#F44336':'#4CAF50')+';font-weight:600">'+(e.event==='retrograde_start'?'Retrograde ↺':'Direct →')+'</span>',
+            e.sign || '',
+            e.longitude != null ? e.longitude.toFixed(2)+'°' : ''
+        ];
+    });
+    return evtTable(['Planet','Date','Event','Sign','Longitude'], rows, color);
+}
+
+// ── 3. Transits (Sign Ingress) ───────────────────────────────
+function renderEvtTransits(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            '<b style="color:'+color+'">'+(e.planet||'')+'</b>',
+            e.date || '',
+            e.from_sign ? e.from_sign+' → <b>'+e.to_sign+'</b>' : (e.to_sign || e.sign || ''),
+            e.longitude != null ? e.longitude.toFixed(2)+'°' : ''
+        ];
+    });
+    return evtTable(['Planet','Date','Transit','Longitude'], rows, color);
+}
+
+// ── 4. Positions ─────────────────────────────────────────────
+function renderEvtPositions(events, color) {
+    // Group by date
+    var byDate = {};
+    events.forEach(function(e) {
+        var d = e.date || 'unknown';
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(e);
+    });
+
+    var h = '';
+    var dates = Object.keys(byDate);
+    dates.forEach(function(date, di) {
+        var planets = byDate[date];
+        h += '<details'+(di===0?' open':'')+' style="margin-bottom:8px">';
+        h += '<summary style="font-weight:600;color:'+color+';cursor:pointer;font-size:0.85rem;padding:4px 0">'+date+' ('+planets.length+' planets)</summary>';
+        var rows = planets.map(function(p) {
+            return [
+                '<b>'+p.planet+'</b>',
+                p.sign || '',
+                p.longitude != null ? p.longitude.toFixed(2)+'°' : '',
+                p.nakshatra || '',
+                p.retrograde ? '<span style="color:#F44336;font-weight:700">R</span>' : ''
+            ];
+        });
+        h += evtTable(['Planet','Sign','Longitude','Nakshatra','Retro'], rows, color);
+        h += '</details>';
+    });
+    return h;
+}
+
+// ── 5. Mutual Aspects ────────────────────────────────────────
+function renderEvtMutualAspects(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            e.date || '',
+            '<b style="color:'+color+'">'+(e.planet1||'')+'</b>',
+            e.aspect_type || e.aspect || '',
+            '<b style="color:'+color+'">'+(e.planet2||'')+'</b>',
+            e.angle != null ? e.angle.toFixed(1)+'°' : '',
+            e.sign1 || '',
+            e.sign2 || ''
+        ];
+    });
+    return evtTable(['Date','Planet 1','Aspect','Planet 2','Angle','Sign 1','Sign 2'], rows, color);
+}
+
+// ── 6. Lunar Aspects ─────────────────────────────────────────
+function renderEvtLunarAspects(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            e.date || '',
+            '<b style="color:'+color+'">Moon</b>',
+            e.aspect_type || e.aspect || '',
+            '<b>'+(e.planet||'')+'</b>',
+            e.angle != null ? e.angle.toFixed(1)+'°' : '',
+            e.moon_sign || '',
+            e.planet_sign || ''
+        ];
+    });
+    return evtTable(['Date','Moon','Aspect','Planet','Angle','Moon Sign','Planet Sign'], rows, color);
+}
+
+// ── 7. Mutual Parallel ──────────────────────────────────────
+function renderEvtMutualParallel(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            e.date || '',
+            '<b style="color:'+color+'">'+(e.planet1||'')+'</b>',
+            '<b style="color:'+color+'">'+(e.planet2||'')+'</b>',
+            e.type || e.parallel_type || '',
+            e.declination1 != null ? e.declination1.toFixed(2)+'°' : '',
+            e.declination2 != null ? e.declination2.toFixed(2)+'°' : ''
+        ];
+    });
+    return evtTable(['Date','Planet 1','Planet 2','Type','Decl. 1','Decl. 2'], rows, color);
+}
+
+// ── 8. Ecliptic Crossings ────────────────────────────────────
+function renderEvtEclipticCrossings(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            e.date || '',
+            '<b style="color:'+color+'">'+(e.planet||'')+'</b>',
+            e.direction || '',
+            e.sign || '',
+            e.longitude != null ? e.longitude.toFixed(2)+'°' : ''
+        ];
+    });
+    return evtTable(['Date','Planet','Direction','Sign','Longitude'], rows, color);
+}
+
+// ── 9. Graha Yuddha ─────────────────────────────────────────
+function renderEvtGrahaYuddha(events, color) {
+    var rows = events.map(function(e) {
+        return [
+            e.date || '',
+            '<b style="color:'+color+'">'+(e.planet1||'')+'</b>',
+            'vs',
+            '<b style="color:'+color+'">'+(e.planet2||'')+'</b>',
+            e.separation != null ? e.separation.toFixed(2)+'°' : '',
+            e.winner ? '<span style="color:#4CAF50;font-weight:700">'+e.winner+'</span>' : '',
+            e.sign || ''
+        ];
+    });
+    return evtTable(['Date','Planet 1','','Planet 2','Separation','Winner','Sign'], rows, color);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// NUMEROLOGY — Fetch + Render
+// ═══════════════════════════════════════════════════════════════
+
+var numBtn = document.getElementById('num-fetch');
+if (numBtn) {
+    numBtn.addEventListener('click', async function(){
+        var resultDiv = document.getElementById('num-result');
+        var nameEl = document.getElementById('num-name');
+        var dobEl = document.getElementById('num-dob');
+        var mobileEl = document.getElementById('num-mobile');
+        var carEl = document.getElementById('num-car');
+        var passEl = document.getElementById('num-password');
+
+        // Auto-fill from master birth data if empty
+        var name = nameEl.value.trim();
+        var dob = dobEl.value.trim();
+        if (!name) {
+            var masterName = document.querySelector('.birth-name');
+            if (masterName && masterName !== nameEl) name = masterName.value.trim();
+            if (name) nameEl.value = name;
+        }
+        if (!dob) {
+            var masterDob = document.querySelector('#master-birth-panel .birth-date');
+            if (masterDob && masterDob !== dobEl) dob = masterDob.value.trim();
+            if (dob) dobEl.value = dob;
+        }
+
+        if (!name || !dob) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Please enter Name and DOB</p>';
+            return;
+        }
+
+        resultDiv.innerHTML = '<p style="color:#E65100;font-weight:600">Calculating numerology...</p>';
+
+        var payload = { name: name, dob: dob, system: "both" };
+        if (mobileEl.value.trim()) payload.mobile = mobileEl.value.trim();
+        if (carEl.value.trim()) payload.car_number = carEl.value.trim();
+        if (passEl.value.trim()) payload.password = passEl.value.trim();
+
+        try {
+            var resp = await fetch(API + '/numerology', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) {
+                var errBody = await resp.json().catch(function(){ return {}; });
+                throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+            }
+            var data = await resp.json();
+            renderNumerology(data, resultDiv);
+        } catch(err) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+        }
+    });
+}
+
+var NC = '#E65100'; // Numerology color
+
+function renderNumerology(data, resultDiv) {
+    var html = '';
+
+    // ── 1. Core Numbers Summary ──────────────────────────
+    html += numSection('Core Numbers', '🔢', renderCoreNumbers(data));
+
+    // ── 2. Date Addition Analysis ────────────────────────
+    html += numSection('Date Addition Analysis', '📅', renderDateAddition(data));
+
+    // ── 3. Name Analysis (Pythagorean + Chaldean) ────────
+    html += numSection('Name Analysis', '✍', renderNameAnalysis(data));
+
+    // ── 4. Loshu Grid ────────────────────────────────────
+    html += numSection('Loshu Grid (Lo Shu Magic Square)', '⊞', renderLoshuGrid(data));
+
+    // ── 5. Raj Yogas (Golden / Silver / All) ─────────────
+    html += numSection('Raj Yogas — Golden, Silver & Numerological Yogas', '👑', renderRajYogas(data));
+
+    // ── 6. Personality & Characteristics ─────────────────
+    html += numSection('Personality & Characteristics', '👤', renderCharacteristics(data));
+
+    // ── 7. Yearly Predictions (15-Year Forecast) ─────────
+    html += numSection('Yearly Predictions — Loshu Grid Forecast', '📊', renderYearlyPredictions(data));
+
+    // ── 8. Name Correction ───────────────────────────────
+    html += numSection('Name Correction', '✏', renderNameCorrection(data));
+
+    // ── 9. Mobile Number Analysis ────────────────────────
+    if (data.mobile_analysis) {
+        html += numSection('Mobile Number Analysis', '📱', renderNumberAnalysis(data.mobile_analysis));
+    }
+
+    // ── 10. Car Number Analysis ──────────────────────────
+    if (data.car_analysis) {
+        html += numSection('Car/Vehicle Number Analysis', '🚗', renderNumberAnalysis(data.car_analysis));
+    }
+
+    // ── 11. Password Analysis ────────────────────────────
+    html += numSection('Password Numerology', '🔐', renderPasswordAnalysis(data));
+
+    // ── 12. Personal Year Cycle ──────────────────────────
+    html += numSection('Personal Year Cycle', '🔄', renderPersonalCycle(data));
+
+    resultDiv.innerHTML = html;
+}
+
+function numSection(title, icon, content) {
+    return '<div style="background:var(--card-bg);border-radius:10px;padding:14px;margin-bottom:14px;border-left:4px solid '+NC+'">'
+         + '<h3 style="color:'+NC+';margin:0 0 10px 0">'+icon+' '+title+'</h3>'
+         + content + '</div>';
+}
+
+function numCard(label, value, sub, color) {
+    color = color || NC;
+    var h = '<div style="display:inline-block;background:'+color+'11;border:1px solid '+color+'33;border-radius:8px;padding:10px 16px;margin:4px;text-align:center;min-width:120px">';
+    h += '<div style="font-size:0.75rem;color:var(--text-dim)">'+label+'</div>';
+    h += '<div style="font-size:1.8rem;font-weight:800;color:'+color+'">'+value+'</div>';
+    if (sub) h += '<div style="font-size:0.72rem;color:var(--text-dim);margin-top:2px">'+sub+'</div>';
+    h += '</div>';
+    return h;
+}
+
+// ── Core Numbers ─────────────────────────────────────────────
+function renderCoreNumbers(data) {
+    var c = data.core_numbers;
+    var h = '<div style="display:flex;flex-wrap:wrap;gap:0">';
+    h += numCard('Life Path', c.life_path.number, c.life_path.is_master ? 'MASTER NUMBER' : 'Primary Number', '#D32F2F');
+    h += numCard('Birthday', c.birthday.number, 'Day: '+c.birthday.raw_day, '#1565C0');
+    h += numCard('Maturity', c.maturity.number, 'After age 35+', '#6A1B9A');
+
+    // Name numbers from pythagorean
+    var na = data.name_analysis;
+    var pyth = na.pythagorean || na.chaldean;
+    if (pyth) {
+        h += numCard('Destiny', pyth.destiny_number, 'Expression', '#2E7D32');
+        h += numCard('Soul Urge', pyth.soul_urge_number, 'Heart\'s Desire', '#C62828');
+        h += numCard('Personality', pyth.personality_number, 'Outer Self', '#00695C');
+    }
+    h += '</div>';
+
+    // Calculation details
+    h += '<div style="margin-top:10px;font-size:0.8rem;color:var(--text-dim)">';
+    h += '<div><b>Life Path:</b> ' + c.life_path.calculation + '</div>';
+    h += '<div><b>Maturity:</b> ' + c.maturity.calculation + ' — ' + c.maturity.meaning + '</div>';
+    if (c.life_path.karmic_debt) {
+        h += '<div style="color:#F44336;margin-top:6px;padding:8px;background:#F4433611;border-radius:6px"><b>⚠ Karmic Debt:</b> ' + c.life_path.karmic_debt + '</div>';
+    }
+    h += '</div>';
+    return h;
+}
+
+// ── Date Addition Analysis ───────────────────────────────────
+function renderDateAddition(data) {
+    var da = data.core_numbers.date_addition;
+    var h = '<div style="display:flex;flex-wrap:wrap;gap:0">';
+    h += numCard('Day Number', da.day_number, da.day_calculation, '#1565C0');
+    h += numCard('Total DOB', da.total_dob_reduced, 'Sum: ' + da.total_dob_sum, '#D32F2F');
+    h += '</div>';
+
+    h += '<div style="margin-top:8px;font-size:0.8rem;color:var(--text-dim)">';
+    h += '<div><b>Day Calculation:</b> ' + da.day_calculation + '</div>';
+    h += '<div><b>Total Calculation:</b> ' + da.total_calculation + '</div>';
+    h += '</div>';
+
+    // Day number traits
+    if (da.day_traits && da.day_traits.personality) {
+        h += '<div style="margin-top:10px;padding:10px;background:#1565C011;border-radius:8px;border-left:3px solid #1565C0">';
+        h += '<div style="font-weight:700;color:#1565C0;margin-bottom:4px">Day Number ' + da.day_number + ' Personality:</div>';
+        h += '<div style="font-size:0.82rem">' + da.day_traits.personality + '</div>';
+        h += '</div>';
+    }
+    // Total traits (if different)
+    if (da.total_traits && da.total_traits.personality && da.total_dob_reduced !== da.day_number) {
+        h += '<div style="margin-top:8px;padding:10px;background:#D32F2F11;border-radius:8px;border-left:3px solid #D32F2F">';
+        h += '<div style="font-weight:700;color:#D32F2F;margin-bottom:4px">Total Number ' + da.total_dob_reduced + ' Personality:</div>';
+        h += '<div style="font-size:0.82rem">' + da.total_traits.personality + '</div>';
+        h += '</div>';
+    }
+    return h;
+}
+
+// ── Name Analysis ────────────────────────────────────────────
+function renderNameAnalysis(data) {
+    var na = data.name_analysis;
+    var h = '';
+    var systems = ['pythagorean', 'chaldean'];
+    systems.forEach(function(sys) {
+        var nd = na[sys];
+        if (!nd) return;
+        var label = sys.charAt(0).toUpperCase() + sys.slice(1);
+        var color = sys === 'pythagorean' ? '#1565C0' : '#6A1B9A';
+        h += '<div style="margin-bottom:12px;padding:10px;background:'+color+'08;border-radius:8px;border:1px solid '+color+'22">';
+        h += '<div style="font-weight:700;color:'+color+';margin-bottom:6px">'+label+' System</div>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:0">';
+        h += numCard('Destiny', nd.destiny_number, 'Total: '+nd.destiny_total, color);
+        h += numCard('Soul Urge', nd.soul_urge_number, 'Vowels: '+nd.soul_urge_total, '#C62828');
+        h += numCard('Personality', nd.personality_number, 'Consonants: '+nd.personality_total, '#00695C');
+        h += '</div>';
+
+        // Letter values table
+        if (nd.letter_values && nd.letter_values.length > 0) {
+            h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:2px">';
+            nd.letter_values.forEach(function(lv) {
+                var isVowel = 'AEIOU'.indexOf(lv.letter) >= 0;
+                h += '<span style="display:inline-block;width:28px;text-align:center;padding:3px 0;font-size:0.75rem;border-radius:4px;background:'+(isVowel?'#C6282822':'#00695C22')+'">';
+                h += '<div style="font-weight:700">'+lv.letter+'</div>';
+                h += '<div style="color:var(--text-dim)">'+lv.value+'</div>';
+                h += '</span>';
+            });
+            h += '</div>';
+        }
+
+        if (nd.karmic_debt) {
+            h += '<div style="color:#F44336;margin-top:6px;font-size:0.8rem"><b>⚠ Karmic Debt:</b> ' + nd.karmic_debt + '</div>';
+        }
+        h += '</div>';
+    });
+    return h;
+}
+
+// ── Loshu Grid ───────────────────────────────────────────────
+function renderLoshuGrid(data) {
+    var lg = data.loshu_grid;
+    var h = '';
+
+    // Draw the 3x3 grid
+    h += '<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">';
+    h += '<div>';
+    h += '<table style="border-collapse:collapse;margin-bottom:10px">';
+    for (var r = 0; r < 3; r++) {
+        h += '<tr>';
+        for (var c = 0; c < 3; c++) {
+            var cell = lg.grid[r][c];
+            var num = cell.number;
+            var cnt = cell.count;
+            var bg = cnt === 0 ? '#33333344' : (cnt === 1 ? NC+'22' : (cnt >= 3 ? '#F4433644' : NC+'44'));
+            var fw = cnt > 0 ? '800' : '400';
+            var textColor = cnt === 0 ? 'var(--text-dim)' : NC;
+            h += '<td style="width:70px;height:70px;text-align:center;border:2px solid '+NC+'44;background:'+bg+';vertical-align:middle">';
+            h += '<div style="font-size:1.4rem;font-weight:'+fw+';color:'+textColor+'">'+num+'</div>';
+            if (cnt > 0) {
+                h += '<div style="font-size:0.7rem;color:'+NC+'">×'+cnt+'</div>';
+            } else {
+                h += '<div style="font-size:0.65rem;color:var(--text-dim)">missing</div>';
+            }
+            h += '</td>';
+        }
+        h += '</tr>';
+    }
+    h += '</table>';
+    h += '</div>';
+
+    // Summary beside grid
+    h += '<div style="flex:1;min-width:200px">';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>DOB Digits:</b> ' + (lg.dob_raw_digits||[]).join(', ') + '</div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b style="color:#1565C0">Driver (Moolank):</b> <span style="font-weight:800;font-size:1rem;color:#1565C0">'+lg.driver_number+'</span></div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b style="color:#D32F2F">Conductor (Bhagyank):</b> <span style="font-weight:800;font-size:1rem;color:#D32F2F">'+lg.conductor_number+'</span></div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>All Grid Digits:</b> ' + (lg.all_digits||[]).join(', ') + '</div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b style="color:#4CAF50">Present:</b> ' + lg.present_numbers.join(', ') + '</div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b style="color:#F44336">Missing:</b> ' + (lg.missing_numbers.length ? lg.missing_numbers.join(', ') : 'None!') + '</div>';
+
+    // Repeated numbers
+    if (lg.repeated_meanings && Object.keys(lg.repeated_meanings).length > 0) {
+        h += '<div style="margin-top:6px;font-size:0.8rem"><b>Repeated Numbers:</b></div>';
+        Object.keys(lg.repeated_meanings).forEach(function(num) {
+            var rm = lg.repeated_meanings[num];
+            h += '<div style="font-size:0.78rem;padding:3px 6px;margin:2px 0;background:#FF980022;border-radius:4px"><b>'+num+' (×'+rm.count+'):</b> '+rm.meaning+'</div>';
+        });
+    }
+    h += '</div></div>';
+
+    // Arrows
+    if (lg.arrows && lg.arrows.length > 0) {
+        h += '<div style="margin-top:12px"><b style="color:'+NC+'">Arrows Found:</b></div>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">';
+        lg.arrows.forEach(function(arr) {
+            var arrColor = arr.type === 'strength' ? '#4CAF50' : '#F44336';
+            h += '<div style="padding:8px 12px;background:'+arrColor+'11;border:1px solid '+arrColor+'33;border-radius:8px;font-size:0.8rem;flex:1;min-width:250px">';
+            h += '<div style="font-weight:700;color:'+arrColor+'">'+arr.key.replace(/_/g,' ').toUpperCase()+' ['+arr.numbers.join('-')+']</div>';
+            h += '<div>'+arr.desc+'</div>';
+            h += '</div>';
+        });
+        h += '</div>';
+    }
+
+    // Planes
+    h += '<details style="margin-top:12px"><summary style="font-weight:700;color:'+NC+';cursor:pointer">Planes Analysis (click to expand)</summary>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+    lg.planes.forEach(function(pl) {
+        var sColor = pl.strength === 'strong' ? '#4CAF50' : (pl.strength === 'moderate' ? '#FF9800' : (pl.strength === 'weak' ? '#F44336' : '#666'));
+        h += '<div style="padding:8px;background:'+sColor+'11;border:1px solid '+sColor+'22;border-radius:8px;font-size:0.78rem;flex:1;min-width:200px">';
+        h += '<div style="font-weight:700;color:'+sColor+'">'+pl.name+' <span style="background:'+sColor+'22;padding:1px 6px;border-radius:4px;font-size:0.7rem">'+pl.strength.toUpperCase()+'</span></div>';
+        h += '<div style="color:var(--text-dim);font-size:0.72rem">Numbers: '+pl.numbers.join(', ')+' | Present: '+pl.present_count+'/3</div>';
+        h += '<div style="margin-top:3px">'+pl.desc+'</div>';
+        h += '</div>';
+    });
+    h += '</div></details>';
+
+    // Missing number remedies
+    if (lg.missing_remedies && lg.missing_remedies.length > 0) {
+        h += '<details style="margin-top:10px"><summary style="font-weight:700;color:#F44336;cursor:pointer">Remedies for Missing Numbers</summary>';
+        h += '<div style="margin-top:6px">';
+        lg.missing_remedies.forEach(function(rem) {
+            h += '<div style="padding:8px;margin-bottom:4px;background:#F4433611;border-radius:6px;font-size:0.8rem;border-left:3px solid #F44336">';
+            h += '<b style="color:#F44336">Number '+rem.number+'</b> (Lucky Color: '+rem.color+'): '+rem.remedy;
+            h += '</div>';
+        });
+        h += '</div></details>';
+    }
+
+    return h;
+}
+
+// ── Personality & Characteristics ────────────────────────────
+function renderCharacteristics(data) {
+    var ch = data.characteristics;
+    var h = '';
+    var sections = [
+        {key:'life_path', label:'Life Path '+data.core_numbers.life_path.number, color:'#D32F2F'},
+        {key:'destiny', label:'Destiny Number', color:'#2E7D32'},
+        {key:'birthday', label:'Birthday Number '+data.core_numbers.birthday.number, color:'#1565C0'},
+    ];
+    sections.forEach(function(sec) {
+        var c = ch[sec.key];
+        if (!c || !c.personality) return;
+        h += '<details'+(sec.key==='life_path'?' open':'')+' style="margin-bottom:10px">';
+        h += '<summary style="font-weight:700;color:'+sec.color+';cursor:pointer;font-size:0.9rem">'+sec.label+' — '+c.ruler+' ('+c.element+')</summary>';
+        h += '<div style="padding:10px;background:'+sec.color+'08;border-radius:8px;margin-top:4px">';
+
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Personality:</b> '+c.personality+'</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Behavior:</b> '+c.behavior+'</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Traits:</b> '+c.traits+'</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b style="color:#4CAF50">Strengths:</b> '+c.strengths+'</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b style="color:#F44336">Weaknesses:</b> '+c.weaknesses+'</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Career:</b> '+c.career+'</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Health:</b> '+c.health+'</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Vedic Deity:</b> '+c.vedic_deity+'</div>';
+
+        // Lucky items
+        h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:0.78rem">';
+        if (c.lucky_colors) h += '<span style="padding:3px 8px;background:#FF980022;border-radius:4px"><b>Colors:</b> '+c.lucky_colors.join(', ')+'</span>';
+        if (c.lucky_days) h += '<span style="padding:3px 8px;background:#2196F322;border-radius:4px"><b>Days:</b> '+c.lucky_days.join(', ')+'</span>';
+        if (c.lucky_gems) h += '<span style="padding:3px 8px;background:#9C27B022;border-radius:4px"><b>Gems:</b> '+c.lucky_gems.join(', ')+'</span>';
+        if (c.compatible) h += '<span style="padding:3px 8px;background:#4CAF5022;border-radius:4px"><b>Compatible:</b> '+c.compatible.join(', ')+'</span>';
+        if (c.incompatible) h += '<span style="padding:3px 8px;background:#F4433622;border-radius:4px"><b>Incompatible:</b> '+c.incompatible.join(', ')+'</span>';
+        if (c.best_dates) h += '<span style="padding:3px 8px;background:#FF980022;border-radius:4px"><b>Best Dates:</b> '+c.best_dates.join(', ')+'</span>';
+        h += '</div>';
+
+        h += '</div></details>';
+    });
+    return h;
+}
+
+// ── Name Correction ──────────────────────────────────────────
+function renderNameCorrection(data) {
+    var nc = data.name_correction;
+    var h = '';
+    ['pythagorean', 'chaldean'].forEach(function(sys) {
+        var corr = nc[sys];
+        if (!corr) return;
+        var label = sys.charAt(0).toUpperCase() + sys.slice(1);
+        var vColor = corr.is_compatible ? '#4CAF50' : '#F44336';
+        h += '<div style="margin-bottom:10px;padding:10px;border:1px solid '+vColor+'33;border-radius:8px;background:'+vColor+'08">';
+        h += '<div style="font-weight:700;color:'+vColor+';margin-bottom:4px">'+label+': '+corr.verdict+'</div>';
+        h += '<div style="font-size:0.8rem;color:var(--text-dim)">Current Name Number: <b>'+corr.current_destiny_number+'</b> | Life Path: <b>'+corr.life_path_number+'</b> | Compatible Numbers: <b>'+corr.compatible_name_numbers.join(', ')+'</b></div>';
+
+        if (corr.spelling_suggestions && corr.spelling_suggestions.length > 0) {
+            h += '<div style="margin-top:8px;font-size:0.82rem"><b>Spelling Suggestions:</b></div>';
+            h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">';
+            corr.spelling_suggestions.forEach(function(ss) {
+                h += '<span style="padding:4px 10px;background:#4CAF5022;border:1px solid #4CAF5033;border-radius:6px;font-size:0.8rem">';
+                h += '<b>'+ss.modified_name+'</b> → <span style="color:#4CAF50">'+ss.new_number+'</span>';
+                h += '</span>';
+            });
+            h += '</div>';
+        }
+        h += '</div>';
+    });
+    return h;
+}
+
+// ── Number Analysis (Mobile / Car) ───────────────────────────
+function renderNumberAnalysis(analysis) {
+    var vColor = analysis.compatible_with_life_path ? '#4CAF50' : '#F44336';
+    var h = '<div style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:8px">';
+    h += numCard(analysis.label, analysis.final_number, 'Sum: ' + analysis.digit_sum, vColor);
+    h += numCard('Compound', analysis.compound_number, analysis.is_master ? 'MASTER' : '', '#6A1B9A');
+    h += '</div>';
+
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Original:</b> ' + analysis.original + ' | <b>Calculation:</b> ' + analysis.calculation + '</div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px;color:'+vColor+';font-weight:600">' + analysis.verdict + '</div>';
+    h += '<div style="font-size:0.8rem;padding:6px;background:#6A1B9A11;border-radius:6px;margin-bottom:6px"><b>Compound '+analysis.compound_number+':</b> ' + analysis.compound_meaning + '</div>';
+    h += '<div style="font-size:0.8rem;color:var(--text-dim)"><b>Ideal numbers for your Life Path:</b> ' + analysis.ideal_numbers_for_you.join(', ') + '</div>';
+
+    if (analysis.tips) {
+        h += '<div style="margin-top:8px">';
+        analysis.tips.forEach(function(tip) {
+            h += '<div style="font-size:0.8rem;padding:3px 0;color:var(--text-dim)">• '+tip+'</div>';
+        });
+        h += '</div>';
+    }
+    return h;
+}
+
+// ── Password Analysis ────────────────────────────────────────
+function renderPasswordAnalysis(data) {
+    var h = '';
+
+    // Current password analysis
+    if (data.password_current) {
+        var pc = data.password_current;
+        var vColor = pc.compatible_with_life_path ? '#4CAF50' : '#F44336';
+        h += '<div style="margin-bottom:10px;padding:10px;border:1px solid '+vColor+'33;border-radius:8px;background:'+vColor+'08">';
+        h += '<div style="font-weight:700;color:'+vColor+'">Current Password Analysis</div>';
+        h += '<div style="font-size:0.82rem">Number: <b>'+pc.final_number+'</b> | Compound: <b>'+pc.compound_number+'</b></div>';
+        h += '<div style="font-size:0.82rem;color:'+vColor+'">'+pc.verdict+'</div>';
+        h += '</div>';
+    }
+
+    // Suggestions
+    var ps = data.password_suggestions;
+    if (ps) {
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Ideal Password Lengths:</b> ' + ps.ideal_lengths.join(', ') + ' characters</div>';
+        h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Lucky Digits:</b> ' + ps.lucky_digits.join(', ') + '</div>';
+
+        if (ps.tips) {
+            ps.tips.forEach(function(tip) {
+                h += '<div style="font-size:0.8rem;padding:3px 0;color:var(--text-dim)">• '+tip+'</div>';
+            });
+        }
+
+        if (ps.example_patterns) {
+            h += '<div style="margin-top:8px;font-size:0.82rem"><b>Pattern Examples:</b></div>';
+            h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">';
+            ps.example_patterns.forEach(function(p) {
+                h += '<code style="padding:4px 10px;background:var(--card-bg);border:1px solid var(--border);border-radius:4px;font-size:0.8rem">'+p+'</code>';
+            });
+            h += '</div>';
+        }
+        h += '<div style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;font-style:italic">'+ps.note+'</div>';
+    }
+    return h;
+}
+
+// ── Personal Year Cycle ──────────────────────────────────────
+function renderPersonalCycle(data) {
+    var pc = data.personal_cycles;
+    if (!pc) return '';
+    var h = '<div style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:8px">';
+    h += numCard('Personal Year', pc.personal_year_number, pc.current_year.toString(), '#6A1B9A');
+    h += '</div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:6px"><b>Calculation:</b> ' + pc.calculation + '</div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:4px"><b>Cycle:</b> ' + pc.cycle_position + '</div>';
+    h += '<div style="padding:10px;background:#6A1B9A11;border-radius:8px;font-size:0.85rem;border-left:3px solid #6A1B9A">';
+    h += '<b style="color:#6A1B9A">Year Energy:</b> ' + pc.meaning;
+    h += '</div>';
+    return h;
+}
+
+// ── Raj Yogas ────────────────────────────────────────────────
+function renderRajYogas(data) {
+    var ry = data.raj_yogas;
+    if (!ry) return '<p style="color:var(--text-dim)">No yoga data available</p>';
+
+    var h = '';
+
+    // Status badge
+    var statusColors = {
+        double_raj_yoga: '#FFD700', golden_raj_yoga: '#FFD700', silver_raj_yoga: '#C0C0C0',
+        multi_yoga: '#4CAF50', yoga_present: '#2196F3', ordinary: '#666'
+    };
+    var statusLabels = {
+        double_raj_yoga: 'DOUBLE RAJ YOGA (Golden + Silver)', golden_raj_yoga: 'GOLDEN RAJ YOGA',
+        silver_raj_yoga: 'SILVER RAJ YOGA', multi_yoga: 'MULTIPLE YOGAS',
+        yoga_present: 'YOGA PRESENT', ordinary: 'No Major Yoga'
+    };
+    var sc = statusColors[ry.status] || '#666';
+    var sl = statusLabels[ry.status] || ry.status;
+    h += '<div style="text-align:center;margin-bottom:14px;padding:12px;background:'+sc+'22;border:2px solid '+sc+';border-radius:10px">';
+    h += '<div style="font-size:1.3rem;font-weight:800;color:'+sc+'">'+sl+'</div>';
+    h += '<div style="font-size:0.82rem;color:var(--text-dim)">'+ry.grid_yoga_count+' yoga(s) found in your Loshu Grid</div>';
+    h += '</div>';
+
+    // Grid yogas
+    if (ry.grid_yogas && ry.grid_yogas.length > 0) {
+        ry.grid_yogas.forEach(function(yoga) {
+            var yc = yoga.type === 'golden' ? '#FFD700' : (yoga.type === 'silver' ? '#C0C0C0' : NC);
+            var badge = yoga.type === 'golden' ? '🥇 GOLDEN' : (yoga.type === 'silver' ? '🥈 SILVER' : '✦');
+            h += '<div style="margin-bottom:10px;padding:12px;border:1px solid '+yc+'55;border-radius:10px;background:'+yc+'11;border-left:4px solid '+yc+'">';
+            h += '<div style="font-weight:800;font-size:1rem;color:'+yc+'">'+badge+' '+yoga.name+'</div>';
+            h += '<div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:6px">Numbers: '+yoga.numbers.join('-')+' | Strength: <b>'+yoga.strength.toUpperCase()+'</b> ('+yoga.total_occurrences+' hits) | Rarity: '+yoga.rarity+'</div>';
+            h += '<div style="font-size:0.82rem;margin-bottom:6px">'+yoga.desc+'</div>';
+
+            h += '<div style="display:flex;flex-wrap:wrap;gap:6px;font-size:0.78rem">';
+            h += '<div style="flex:1;min-width:150px;padding:6px;background:'+yc+'0A;border-radius:6px"><b style="color:#2E7D32">Career:</b> '+yoga.career+'</div>';
+            h += '<div style="flex:1;min-width:150px;padding:6px;background:'+yc+'0A;border-radius:6px"><b style="color:#D32F2F">Wealth:</b> '+yoga.wealth+'</div>';
+            h += '<div style="flex:1;min-width:150px;padding:6px;background:'+yc+'0A;border-radius:6px"><b style="color:#1565C0">Health:</b> '+yoga.health+'</div>';
+            h += '<div style="flex:1;min-width:150px;padding:6px;background:'+yc+'0A;border-radius:6px"><b style="color:#6A1B9A">Relationships:</b> '+yoga.relationships+'</div>';
+            h += '</div></div>';
+        });
+    } else {
+        h += '<p style="color:var(--text-dim);font-style:italic">No Loshu Grid yogas detected. Missing numbers prevent yoga formation. Check Name Correction and Remedies below.</p>';
+    }
+
+    // Driver-Conductor yoga
+    if (ry.driver_conductor_yoga) {
+        var dc = ry.driver_conductor_yoga;
+        h += '<div style="margin-top:12px;padding:12px;background:#9C27B011;border:1px solid #9C27B033;border-radius:10px;border-left:4px solid #9C27B0">';
+        h += '<div style="font-weight:800;color:#9C27B0;font-size:0.95rem">Driver-Conductor Yoga: '+dc.name+'</div>';
+        h += '<div style="font-size:0.78rem;color:var(--text-dim)">Driver: '+dc.driver+' × Conductor: '+dc.conductor+'</div>';
+        h += '<div style="font-size:0.82rem;margin-top:4px">'+dc.desc+'</div>';
+        h += '</div>';
+    }
+
+    return h;
+}
+
+// ── Yearly Predictions ───────────────────────────────────────
+function renderYearlyPredictions(data) {
+    var yp = data.yearly_predictions;
+    if (!yp || !yp.yearly_predictions) return '<p style="color:var(--text-dim)">No yearly data</p>';
+
+    var h = '';
+    var currentYear = new Date().getFullYear();
+
+    // Quick year rating bar
+    h += '<div style="margin-bottom:14px;overflow-x:auto">';
+    h += '<div style="display:flex;gap:3px;min-width:600px">';
+    yp.yearly_predictions.forEach(function(yr) {
+        var barColor = yr.classification === 'golden_year' ? '#FFD700' :
+                       yr.classification === 'excellent' ? '#4CAF50' :
+                       yr.classification === 'good' ? '#2196F3' :
+                       yr.classification === 'average' ? '#FF9800' : '#F44336';
+        var isCurrent = yr.year === currentYear;
+        var border = isCurrent ? '3px solid #fff' : '1px solid '+barColor+'33';
+        h += '<div style="flex:1;text-align:center;padding:6px 2px;background:'+barColor+'33;border:'+border+';border-radius:6px;min-width:50px;cursor:pointer" title="'+yr.year+': '+yr.class_label+' ('+yr.rating+'/10)">';
+        h += '<div style="font-size:0.65rem;color:var(--text-dim)">'+yr.year+'</div>';
+        h += '<div style="font-size:1rem;font-weight:800;color:'+barColor+'">'+yr.rating+'</div>';
+        if (yr.has_golden) h += '<div style="font-size:0.6rem">🥇</div>';
+        else if (yr.has_silver) h += '<div style="font-size:0.6rem">🥈</div>';
+        h += '</div>';
+    });
+    h += '</div></div>';
+
+    // Legend
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-size:0.72rem">';
+    h += '<span style="padding:2px 8px;background:#FFD70033;border-radius:4px;color:#FFD700;font-weight:700">Golden Year (9-10)</span>';
+    h += '<span style="padding:2px 8px;background:#4CAF5033;border-radius:4px;color:#4CAF50;font-weight:700">Excellent (7-8)</span>';
+    h += '<span style="padding:2px 8px;background:#2196F333;border-radius:4px;color:#2196F3;font-weight:700">Good (5-6)</span>';
+    h += '<span style="padding:2px 8px;background:#FF980033;border-radius:4px;color:#FF9800;font-weight:700">Average (4)</span>';
+    h += '<span style="padding:2px 8px;background:#F4433633;border-radius:4px;color:#F44336;font-weight:700">Challenging (1-3)</span>';
+    h += '</div>';
+
+    // Detailed yearly cards
+    yp.yearly_predictions.forEach(function(yr) {
+        var isCurrent = yr.year === currentYear;
+        var barColor = yr.classification === 'golden_year' ? '#FFD700' :
+                       yr.classification === 'excellent' ? '#4CAF50' :
+                       yr.classification === 'good' ? '#2196F3' :
+                       yr.classification === 'average' ? '#FF9800' : '#F44336';
+
+        h += '<details'+(isCurrent?' open':'')+' style="margin-bottom:8px">';
+        h += '<summary style="cursor:pointer;padding:8px 12px;background:'+barColor+'15;border:1px solid '+barColor+'33;border-radius:8px;border-left:4px solid '+barColor+'">';
+        h += '<span style="font-weight:800;font-size:0.95rem;color:'+barColor+'">'+yr.year+'</span>';
+        h += ' <span style="font-size:0.82rem;font-weight:600">'+yr.class_label+'</span>';
+        h += ' <span style="font-size:0.75rem;color:var(--text-dim)">| PY: '+yr.personal_year+' | Rating: '+yr.rating+'/10</span>';
+        if (yr.has_golden) h += ' <span style="font-size:0.75rem">🥇 Golden Yoga</span>';
+        if (yr.has_silver) h += ' <span style="font-size:0.75rem">🥈 Silver Yoga</span>';
+        if (yr.yoga_count > 0) h += ' <span style="font-size:0.72rem;color:var(--text-dim)">('+yr.yoga_count+' yogas)</span>';
+        if (isCurrent) h += ' <span style="background:'+barColor+';color:#000;padding:1px 6px;border-radius:4px;font-size:0.65rem;font-weight:700">CURRENT</span>';
+        h += '</summary>';
+
+        h += '<div style="padding:10px;background:var(--card-bg);border:1px solid var(--border);border-radius:0 0 8px 8px;margin-top:-2px">';
+        h += '<div style="font-weight:700;color:'+barColor+';margin-bottom:6px;font-size:0.9rem">Theme: '+yr.theme+'</div>';
+
+        h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;font-size:0.8rem">';
+        h += '<div style="padding:8px;background:#2E7D3211;border-radius:6px;border-left:3px solid #2E7D32"><b style="color:#2E7D32">Career:</b> '+yr.career+'</div>';
+        h += '<div style="padding:8px;background:#D32F2F11;border-radius:6px;border-left:3px solid #D32F2F"><b style="color:#D32F2F">Money:</b> '+yr.money+'</div>';
+        h += '<div style="padding:8px;background:#1565C011;border-radius:6px;border-left:3px solid #1565C0"><b style="color:#1565C0">Health:</b> '+yr.health+'</div>';
+        h += '<div style="padding:8px;background:#6A1B9A11;border-radius:6px;border-left:3px solid #6A1B9A"><b style="color:#6A1B9A">Relationships:</b> '+yr.relationships+'</div>';
+        h += '</div>';
+
+        h += '<div style="margin-top:8px;padding:6px 10px;background:'+barColor+'11;border-radius:6px;font-size:0.82rem"><b style="color:'+barColor+'">Advice:</b> '+yr.advice+'</div>';
+
+        // Year grid info
+        h += '<div style="margin-top:6px;font-size:0.72rem;color:var(--text-dim)">';
+        h += 'Year Digits: '+yr.year_digits.join(',')+' | Present: '+yr.present_numbers.join(',')+' | Missing: '+(yr.missing_numbers.length?yr.missing_numbers.join(','):'None');
+        if (yr.year_yogas.length) h += ' | Yogas: '+yr.year_yogas.map(function(y){return y.replace(/_/g,' ')}).join(', ');
+        h += '</div>';
+
+        h += '</div></details>';
+    });
+
+    return h;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// TAROT CARD READING — Fetch + Render
+// ═══════════════════════════════════════════════════════════════
+
+var tarotBtn = document.getElementById('tarot-draw');
+if (tarotBtn) {
+    tarotBtn.addEventListener('click', async function(){
+        var resultDiv = document.getElementById('tarot-result');
+        var numCards = parseInt(document.getElementById('tarot-count').value) || 3;
+        var question = document.getElementById('tarot-question').value.trim();
+
+        resultDiv.innerHTML = '<p style="color:#7B1FA2;font-weight:600;font-size:1.1rem;text-align:center">Shuffling the deck and drawing your cards...</p>';
+
+        var payload = { num_cards: numCards };
+        if (question) payload.question = question;
+
+        try {
+            var resp = await fetch(API + '/tarot', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) {
+                var errBody = await resp.json().catch(function(){ return {}; });
+                throw new Error('API error ' + resp.status + ': ' + (errBody.detail || JSON.stringify(errBody)));
+            }
+            var data = await resp.json();
+            renderTarot(data, resultDiv);
+        } catch(err) {
+            resultDiv.innerHTML = '<p style="color:var(--red)">Error: ' + err.message + '</p>';
+        }
+    });
+}
+
+var TC = '#7B1FA2'; // Tarot color
+
+function renderTarot(data, resultDiv) {
+    var html = '';
+
+    // Header
+    html += '<div style="text-align:center;margin-bottom:16px;padding:14px;background:'+TC+'11;border-radius:12px;border:1px solid '+TC+'33">';
+    html += '<div style="font-size:1.2rem;font-weight:800;color:'+TC+'">'+data.spread_type+'</div>';
+    if (data.question) {
+        html += '<div style="font-size:0.9rem;color:var(--text-dim);margin-top:4px;font-style:italic">"'+data.question+'"</div>';
+    }
+    html += '<div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px">Deck: '+data.deck_size+' cards (22 Major + 56 Minor Arcana)</div>';
+    html += '</div>';
+
+    // Cards display
+    html += '<div style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-bottom:18px">';
+    data.cards.forEach(function(card, i) {
+        html += renderTarotCard(card, i);
+    });
+    html += '</div>';
+
+    // Combination analysis
+    if (data.combination_analysis && data.num_cards >= 2) {
+        html += renderCombinationAnalysis(data.combination_analysis);
+    }
+
+    // Draw again button
+    html += '<div style="text-align:center;margin-top:16px">';
+    html += '<button onclick="document.getElementById(\'tarot-draw\').click()" style="background:'+TC+';color:#fff;padding:10px 28px;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer">Draw Again</button>';
+    html += '</div>';
+
+    resultDiv.innerHTML = html;
+}
+
+function renderTarotCard(card, index) {
+    var isRev = card.is_reversed;
+    var isMajor = card.arcana === 'major';
+    var borderColor = isMajor ? '#FFD700' : (SUIT_COLORS[card.suit] || TC);
+    var bgGrad = isRev
+        ? 'linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)'
+        : 'linear-gradient(180deg, #1a1a2e 0%, '+borderColor+'15 100%)';
+    var rotation = isRev ? 'transform:rotate(180deg);' : '';
+
+    var h = '<div style="width:220px;background:'+bgGrad+';border:2px solid '+borderColor+';border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.3)">';
+
+    // Position label
+    h += '<div style="padding:6px 10px;background:'+borderColor+'33;text-align:center;font-size:0.72rem;font-weight:700;color:'+borderColor+';text-transform:uppercase">'+card.position+'</div>';
+
+    // Card face
+    h += '<div style="padding:14px;text-align:center">';
+
+    // Card number/suit symbol
+    var symbol = isMajor ? _majorSymbol(card.number) : _suitSymbol(card.suit);
+    h += '<div style="font-size:2.5rem;'+rotation+'">'+symbol+'</div>';
+
+    // Roman numeral for major
+    if (isMajor) {
+        h += '<div style="font-size:0.7rem;color:'+borderColor+';margin:2px 0">'+_toRoman(card.number)+'</div>';
+    }
+
+    // Card name
+    h += '<div style="font-size:1rem;font-weight:800;color:#fff;margin:6px 0">'+card.name+'</div>';
+
+    // Orientation badge
+    var orientColor = isRev ? '#F44336' : '#4CAF50';
+    var orientLabel = isRev ? 'REVERSED' : 'UPRIGHT';
+    h += '<div style="display:inline-block;padding:2px 10px;background:'+orientColor+'33;color:'+orientColor+';border-radius:10px;font-size:0.7rem;font-weight:700">'+orientLabel+'</div>';
+
+    // Arcana type
+    h += '<div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px">';
+    if (isMajor) h += 'Major Arcana | '+card.element+' | '+card.planet;
+    else h += card.suit+' | '+card.element+' | '+card.domain;
+    h += '</div>';
+
+    h += '</div>';
+
+    // Active meaning
+    h += '<div style="padding:10px 12px;background:rgba(0,0,0,0.3);border-top:1px solid '+borderColor+'33">';
+    h += '<div style="font-size:0.8rem;color:#eee;line-height:1.4">'+card.active_meaning+'</div>';
+
+    // Keywords
+    if (card.active_keywords && card.active_keywords.length) {
+        h += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px">';
+        card.active_keywords.forEach(function(kw) {
+            h += '<span style="font-size:0.65rem;padding:1px 6px;background:'+borderColor+'22;color:'+borderColor+';border-radius:4px">'+kw+'</span>';
+        });
+        h += '</div>';
+    }
+    h += '</div>';
+
+    // Detailed meanings (expandable)
+    if (isMajor) {
+        h += '<details style="padding:0 12px 10px 12px">';
+        h += '<summary style="font-size:0.72rem;color:'+borderColor+';cursor:pointer;padding:6px 0">Detailed Meanings</summary>';
+        h += '<div style="font-size:0.75rem;line-height:1.4">';
+        var meanKey = isRev ? 'rev' : 'up';
+        if (card['love_'+meanKey]) h += '<div style="margin:3px 0"><b style="color:#E91E63">Love:</b> '+card['love_'+meanKey]+'</div>';
+        if (card['career_'+meanKey]) h += '<div style="margin:3px 0"><b style="color:#2E7D32">Career:</b> '+card['career_'+meanKey]+'</div>';
+        if (card['money_'+meanKey]) h += '<div style="margin:3px 0"><b style="color:#FF6F00">Money:</b> '+card['money_'+meanKey]+'</div>';
+        if (card['health_'+meanKey]) h += '<div style="margin:3px 0"><b style="color:#1565C0">Health:</b> '+card['health_'+meanKey]+'</div>';
+        h += '</div></details>';
+    }
+
+    h += '</div>';
+    return h;
+}
+
+var SUIT_COLORS = { Wands: '#FF6F00', Cups: '#1565C0', Swords: '#607D8B', Pentacles: '#2E7D32' };
+
+function _suitSymbol(suit) {
+    var m = { Wands: '🪄', Cups: '🏆', Swords: '⚔', Pentacles: '⭐' };
+    return m[suit] || '✦';
+}
+
+function _majorSymbol(num) {
+    var symbols = ['🃏','✨','🌙','👑','🏛','📜','❤','🏇','🦁','🏔','🎡',
+                   '⚖','🔄','💀','⚗','😈','🗼','⭐','🌊','☀','📯','🌍'];
+    return symbols[num] || '✦';
+}
+
+function _toRoman(n) {
+    if (n === 0) return '0';
+    var roman = ['','I','II','III','IV','V','VI','VII','VIII','IX','X',
+                 'XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX','XXI'];
+    return roman[n] || n.toString();
+}
+
+function renderCombinationAnalysis(combo) {
+    var h = '<div style="background:var(--card-bg);border-radius:12px;padding:14px;border-left:4px solid '+TC+';margin-bottom:14px">';
+    h += '<h3 style="color:'+TC+';margin:0 0 10px 0">Combination Analysis</h3>';
+
+    // Stats
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:0.8rem">';
+    h += '<span style="padding:4px 10px;background:#FFD70022;border-radius:6px"><b>Major:</b> '+combo.major_count+'</span>';
+    h += '<span style="padding:4px 10px;background:#2196F322;border-radius:6px"><b>Minor:</b> '+combo.minor_count+'</span>';
+    h += '<span style="padding:4px 10px;background:#F4433622;border-radius:6px"><b>Reversed:</b> '+combo.reversals+' ('+combo.reversal_percentage+'%)</span>';
+    if (combo.dominant_suit) h += '<span style="padding:4px 10px;background:'+(SUIT_COLORS[combo.dominant_suit]||TC)+'22;border-radius:6px"><b>Dominant:</b> '+combo.dominant_suit+'</span>';
+    if (combo.dominant_element) h += '<span style="padding:4px 10px;background:#FF980022;border-radius:6px"><b>Element:</b> '+combo.dominant_element+'</span>';
+    h += '</div>';
+
+    // Energy analysis
+    if (combo.energy_analysis && combo.energy_analysis.length) {
+        combo.energy_analysis.forEach(function(msg) {
+            if (!msg) return;
+            h += '<div style="padding:8px 12px;margin-bottom:6px;background:'+TC+'11;border-radius:8px;font-size:0.82rem;border-left:3px solid '+TC+'">'+msg+'</div>';
+        });
+    }
+
+    // Special combos
+    if (combo.special_combos && combo.special_combos.length) {
+        h += '<div style="margin-top:8px">';
+        combo.special_combos.forEach(function(sc) {
+            h += '<div style="padding:8px 12px;margin-bottom:4px;background:#FFD70011;border-radius:8px;font-size:0.82rem;border-left:3px solid #FFD700"><b style="color:#FFD700">Special:</b> '+sc+'</div>';
+        });
+        h += '</div>';
+    }
+
+    // Overall summary
+    h += '<div style="margin-top:10px;padding:10px;background:'+TC+'22;border-radius:8px;font-size:0.85rem;font-weight:600;color:'+TC+'">'+combo.summary+'</div>';
+
+    h += '</div>';
+    return h;
 }

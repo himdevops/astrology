@@ -543,20 +543,41 @@ def _get_rahu_ketu_agents(
 # 5. PLANET SIGNIFICATION TABLE
 # ═════════════════════════════════════════════════════════════
 
+def _make_ascendant_pseudo_planet(ascendant: Dict) -> Dict:
+    """
+    Create a pseudo-planet dict for the Ascendant so it can appear
+    alongside planets in KP tables (planet_table, nadi, sig v2, status).
+    """
+    return {
+        "planet": "Ascendant",
+        "longitude": ascendant.get("longitude", 0.0),
+        "sign": ascendant.get("sign", ""),
+        "degree_in_sign": ascendant.get("degree_in_sign", 0.0),
+        "speed": 0,
+    }
+
+
 def build_planet_signification_table(
     planets: List[Dict],
     significator_data: Dict,
+    ascendant: Optional[Dict] = None,
 ) -> List[Dict]:
     """
     Build a table showing each planet's complete house significations.
     For each planet: which houses it signifies and through what connection.
+    Includes Ascendant as an additional entry when provided.
     """
     planet_houses = significator_data["planet_houses"]
     lord_houses = significator_data["lord_houses"]
     house_sigs = significator_data["houses"]
 
+    # Include Ascendant alongside planets
+    all_bodies = list(planets)
+    if ascendant:
+        all_bodies.append(_make_ascendant_pseudo_planet(ascendant))
+
     table = []
-    for p in planets:
+    for p in all_bodies:
         pname = p["planet"]
         kp = get_kp_pointer(p["longitude"])
 
@@ -595,7 +616,7 @@ def build_planet_signification_table(
             "kp_number":           kp["kp_number"],
             "nakshatra":           kp["nakshatra"],
             "pada":                kp["pada"],
-            "house_occupied":      planet_houses.get(pname, 0),
+            "house_occupied":      1 if pname == "Ascendant" else planet_houses.get(pname, 0),
             "houses_owned":        lord_houses.get(pname, []),
             "star_lord_occupied":  star_lord_occupied,
             "star_lord_owned":     star_lord_owned,
@@ -2241,15 +2262,21 @@ def calculate_cuspal_sub_sub(
 def build_nakshatra_nadi(
     planets: List[Dict],
     significator_data: Dict,
+    ascendant: Optional[Dict] = None,
 ) -> List[Dict]:
     """
     Nakshatra Nadi view: for each planet, show the star lord and sub lord
     with their signified house numbers in a compact nadi string.
+    Includes Ascendant when provided.
     """
     house_sigs = significator_data["houses"]
     results = []
 
-    for p in planets:
+    all_bodies = list(planets)
+    if ascendant:
+        all_bodies.append(_make_ascendant_pseudo_planet(ascendant))
+
+    for p in all_bodies:
         pname = p["planet"]
         kp = get_kp_pointer(p["longitude"])
         star_lord = kp["star_lord"]
@@ -2286,16 +2313,22 @@ def build_nakshatra_nadi(
 def build_planet_signification_v2(
     planets: List[Dict],
     significator_data: Dict,
+    ascendant: Optional[Dict] = None,
 ) -> List[Dict]:
     """
     Enhanced planet signification view showing occupancy and ownership
     for both the planet and its star lord, with combined signified houses.
+    Includes Ascendant when provided.
     """
     planet_houses = significator_data["planet_houses"]
     lord_houses = significator_data["lord_houses"]
     results = []
 
-    for p in planets:
+    all_bodies = list(planets)
+    if ascendant:
+        all_bodies.append(_make_ascendant_pseudo_planet(ascendant))
+
+    for p in all_bodies:
         pname = p["planet"]
         kp = get_kp_pointer(p["longitude"])
         star_lord = kp["star_lord"]
@@ -2563,16 +2596,22 @@ OWN_SIGNS = {
 def calculate_planet_status(
     planets: List[Dict],
     houses: List[Dict],
+    ascendant: Optional[Dict] = None,
 ) -> List[Dict]:
     """
     Detailed status for each planet: combustion, retrograde, speed,
     dignity (exalted/debilitated/own sign), and KP-specific details.
+    Includes Ascendant when provided.
     """
     sun = next((p for p in planets if p["planet"] == "Sun"), None)
     sun_long = sun["longitude"] if sun else 0
 
+    all_bodies = list(planets)
+    if ascendant:
+        all_bodies.append(_make_ascendant_pseudo_planet(ascendant))
+
     results = []
-    for p in planets:
+    for p in all_bodies:
         pname = p["planet"]
         plong = p["longitude"]
         speed = p.get("speed", 0)
@@ -2605,7 +2644,9 @@ def calculate_planet_status(
             dignity = "Own Sign"
 
         # Speed category
-        if abs(speed) < 0.01:
+        if pname == "Ascendant":
+            speed_status = "—"
+        elif abs(speed) < 0.01:
             speed_status = "Stationary"
         elif is_retro:
             speed_status = "Retrograde"
@@ -2788,6 +2829,7 @@ def calculate_kp_analysis(
     dasha_data: Optional[Dict] = None,
     current_dasha: Optional[Dict] = None,
     kp_horary_number: Optional[int] = None,
+    transit_ascendant: Optional[Dict] = None,
 ) -> Dict:
     """
     Complete advanced KP analysis.
@@ -2808,8 +2850,8 @@ def calculate_kp_analysis(
     # 2. 4-step significators
     sig_data = calculate_significators(planets, houses, ascendant)
 
-    # 3. Planet signification table
-    planet_table = build_planet_signification_table(planets, sig_data)
+    # 3. Planet signification table (includes Ascendant)
+    planet_table = build_planet_signification_table(planets, sig_data, ascendant)
 
     # 4. Promise/Denial
     promise = analyze_promise_denial(cuspal, sig_data, planet_table)
@@ -2817,11 +2859,12 @@ def calculate_kp_analysis(
     # 5. Financial analysis
     financial = kp_financial_analysis(cuspal, sig_data, promise)
 
-    # 6. Ruling planets
+    # 6. Ruling planets (use transit ascendant if available, else birth ascendant)
     ruling_planets = None
     if transit_planets and transit_datetime:
+        rp_asc = transit_ascendant if transit_ascendant else ascendant
         ruling_planets = calculate_ruling_planets(
-            transit_planets, transit_datetime, ascendant
+            transit_planets, transit_datetime, rp_asc
         )
 
     # 7. DBA analysis
@@ -2846,11 +2889,11 @@ def calculate_kp_analysis(
     # 11. Cuspal sub-sub with signified houses
     cuspal_sub_sub = calculate_cuspal_sub_sub(houses, sig_data)
 
-    # 12. Nakshatra Nadi view
-    nakshatra_nadi = build_nakshatra_nadi(planets, sig_data)
+    # 12. Nakshatra Nadi view (includes Ascendant)
+    nakshatra_nadi = build_nakshatra_nadi(planets, sig_data, ascendant)
 
-    # 13. Planet signification v2
-    planet_sig_v2 = build_planet_signification_v2(planets, sig_data)
+    # 13. Planet signification v2 (includes Ascendant)
+    planet_sig_v2 = build_planet_signification_v2(planets, sig_data, ascendant)
 
     # 14. House significators view
     house_sig_view = build_house_significators_view(sig_data)
@@ -2861,8 +2904,8 @@ def calculate_kp_analysis(
     # 16. Yogi / Avayogi
     yogi = calculate_yogi_avayogi(planets, ascendant, houses)
 
-    # 17. Planet status (combustion, retro, dignity, speed)
-    planet_status = calculate_planet_status(planets, houses)
+    # 17. Planet status (combustion, retro, dignity, speed — includes Ascendant)
+    planet_status = calculate_planet_status(planets, houses, ascendant)
 
     # 18. Aspect definitions reference
     aspect_defs = [

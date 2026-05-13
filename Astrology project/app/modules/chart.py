@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.models import BirthDataInput, TransitDataInput, resolve_chart
 from app.nakshatra import get_all_planet_nakshatras, get_moon_nakshatra_signal
+from app.divisional import calc_d1_rasi, calc_d9_navamsha
 
 router = APIRouter(tags=["Charts"])
 
@@ -22,6 +23,8 @@ def chart(payload: BirthDataInput):
     try:
         data = resolve_chart(payload, need_houses=True)
         nakshatras = get_all_planet_nakshatras(data.planets)
+        d1 = calc_d1_rasi(data.planets, data.ascendant)
+        d9 = calc_d9_navamsha(data.planets, data.ascendant)
         return {
             "type": "birth_chart",
             "name": payload.name,
@@ -39,6 +42,8 @@ def chart(payload: BirthDataInput):
             "planets": data.planets,
             "planet_nakshatras": nakshatras,
             "houses": data.houses,
+            "d1_chart": d1,
+            "d9_chart": d9,
         }
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

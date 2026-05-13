@@ -12,11 +12,15 @@ from fastapi import APIRouter, HTTPException
 from pydantic import Field
 
 from app.models import BirthDataInput, resolve_chart
+from zoneinfo import ZoneInfo
+
 from app.core import (
     resolve_location_and_time,
     to_julian_day_utc,
     calculate_planets,
     calculate_ascendant,
+    geocode_place,
+    resolve_timezone_name,
 )
 from app.kp_system import (
     calculate_kp_analysis, calculate_current_ruling_planets,
@@ -30,6 +34,21 @@ from app.kp_system import (
 from app.dasha import calculate_vimshottari_dasha, get_current_dasha
 
 router = APIRouter(tags=["v3.0 — KP System"])
+
+
+def _local_now(place: str, latitude=None, longitude=None):
+    """
+    Get the current LOCAL date/time at a given place.
+    Returns (date_str, time_str) in 'YYYY-MM-DD' and 'HH:MM' format.
+    MUST be used instead of datetime.utcnow() when the result is passed
+    to resolve_location_and_time (which treats it as local time).
+    """
+    lat, lon = latitude, longitude
+    if lat is None or lon is None:
+        lat, lon, _ = geocode_place(place)
+    tz_name = resolve_timezone_name(lat, lon)
+    now = datetime.now(ZoneInfo(tz_name))
+    return now.strftime("%Y-%m-%d"), now.strftime("%H:%M")
 
 
 # ── schemas ───────────────────────────────────────────────────
@@ -81,6 +100,7 @@ def kp_analysis(payload: KPAnalysisInput):
         # Transit data for Ruling Planets
         transit_planets = None
         transit_dt = None
+        transit_asc = None
         if payload.transit_date:
             tr, tdt = resolve_location_and_time(
                 place=payload.place,
@@ -92,6 +112,9 @@ def kp_analysis(payload: KPAnalysisInput):
             )
             tjd = to_julian_day_utc(tdt, tr.timezone_offset_minutes)
             transit_planets = calculate_planets(tjd, payload.ayanamsa)
+            transit_asc = calculate_ascendant(
+                tjd, tr.latitude, tr.longitude, payload.ayanamsa
+            )
             transit_dt = tdt
 
         # Dasha data for DBA analysis
@@ -105,7 +128,7 @@ def kp_analysis(payload: KPAnalysisInput):
             as_of = datetime.utcnow()
             current_dasha = get_current_dasha(dasha_data, as_of)
 
-        # Full KP analysis
+        # Full KP analysis (pass transit ascendant for RP calculation)
         kp_data = calculate_kp_analysis(
             data.planets,
             data.houses,
@@ -115,6 +138,7 @@ def kp_analysis(payload: KPAnalysisInput):
             dasha_data,
             current_dasha,
             payload.kp_horary_number,
+            transit_ascendant=transit_asc,
         )
 
         return {
@@ -142,15 +166,15 @@ def current_ruling_planets(payload: CurrentRPInput):
     Returns the 7 standard RP sources used in KP prashna.
     """
     try:
-        # Use specific date/time if provided, otherwise current moment
+        # Use specific date/time if provided, otherwise current LOCAL moment
         if payload.rp_date and payload.rp_time:
             use_date = payload.rp_date
             use_time = payload.rp_time
             is_realtime = False
         else:
-            now = datetime.utcnow()
-            use_date = now.strftime("%Y-%m-%d")
-            use_time = now.strftime("%H:%M")
+            use_date, use_time = _local_now(
+                payload.place, payload.latitude, payload.longitude
+            )
             is_realtime = True
 
         res, local_dt = resolve_location_and_time(
@@ -217,7 +241,9 @@ def daily_moon_nl_sl_ssl(payload: DailyMoonNLInput):
         # Resolve date/time
         use_date = payload.query_date
         if not use_date:
-            use_date = datetime.utcnow().strftime("%Y-%m-%d")
+            use_date, _ = _local_now(
+                payload.place, payload.latitude, payload.longitude
+            )
         use_time = payload.query_time or "00:00"
         duration_min = (payload.duration_hours or 24) * 60
 
@@ -308,9 +334,9 @@ def prashna_yesno(payload: PrashnaYesNoInput):
             use_date = payload.query_date
             use_time = payload.query_time
         else:
-            now = datetime.utcnow()
-            use_date = now.strftime("%Y-%m-%d")
-            use_time = now.strftime("%H:%M")
+            use_date, use_time = _local_now(
+                payload.place, payload.latitude, payload.longitude
+            )
 
         tr_res, tr_dt = resolve_location_and_time(
             place=payload.place,
@@ -329,7 +355,7 @@ def prashna_yesno(payload: PrashnaYesNoInput):
         # Cuspal sub-lords and significators for the chart
         cuspal = calculate_cuspal_sublords(data.houses)
         sig_data = calculate_significators(data.planets, data.houses, data.ascendant)
-        planet_table = build_planet_signification_table(data.planets, sig_data)
+        planet_table = build_planet_signification_table(data.planets, sig_data, data.ascendant)
 
         # Run Prashna Yes/No
         result = calculate_prashna_yesno(
@@ -414,9 +440,9 @@ def match_prediction(payload: MatchPredictionInput):
             use_date = payload.query_date
             use_time = payload.query_time
         else:
-            now = datetime.utcnow()
-            use_date = now.strftime("%Y-%m-%d")
-            use_time = now.strftime("%H:%M")
+            use_date, use_time = _local_now(
+                payload.place, payload.latitude, payload.longitude
+            )
 
         tr_res, tr_dt = resolve_location_and_time(
             place=payload.place,
@@ -503,9 +529,9 @@ def toss_prediction(payload: TossPredictionInput):
             use_date = payload.query_date
             use_time = payload.query_time
         else:
-            now = datetime.utcnow()
-            use_date = now.strftime("%Y-%m-%d")
-            use_time = now.strftime("%H:%M")
+            use_date, use_time = _local_now(
+                payload.place, payload.latitude, payload.longitude
+            )
 
         tr_res, tr_dt = resolve_location_and_time(
             place=payload.place,
@@ -664,12 +690,15 @@ def dba_timing(payload: DBATimingInput):
         # Use the already-resolved local datetime from resolve_chart
         birth_dt = data.local_dt
 
-        # Parse search window
-        now = datetime.utcnow()
+        # Parse search window — use local now for default dates
+        local_date_str, local_time_str = _local_now(
+            payload.place, payload.latitude, payload.longitude
+        )
+        now_local = datetime.strptime(f"{local_date_str} {local_time_str}", "%Y-%m-%d %H:%M")
         if payload.search_start_date:
             search_start = datetime.strptime(payload.search_start_date, "%Y-%m-%d")
         else:
-            search_start = now
+            search_start = now_local
 
         if payload.search_end_date:
             search_end = datetime.strptime(payload.search_end_date, "%Y-%m-%d")
@@ -684,8 +713,8 @@ def dba_timing(payload: DBATimingInput):
             use_date = payload.query_date
             use_time = payload.query_time
         else:
-            use_date = now.strftime("%Y-%m-%d")
-            use_time = now.strftime("%H:%M")
+            use_date = local_date_str
+            use_time = local_time_str
 
         try:
             tr_res, tr_dt = resolve_location_and_time(

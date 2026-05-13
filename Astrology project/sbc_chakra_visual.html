@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sarvatobhadra Chakra — Transit Vedha Analysis</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+    font-family: Arial, sans-serif; 
+    background: #f5f0e6; 
+    display: flex; flex-direction: column; 
+    align-items: center; padding: 10px;
+    min-height: 100vh;
+}
+h1 { font-size: 20px; margin: 8px 0 2px; color: #1a1a5e; }
+.subtitle { font-size: 13px; color: #444; margin-bottom: 8px; }
+
+.sbc-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.sbc-grid {
+    display: grid;
+    grid-template-columns: repeat(9, 90px);
+    grid-template-rows: repeat(9, 90px);
+    border: 3px solid #333;
+    background: #fff;
+    position: relative;
+    z-index: 1;
+}
+
+.cell {
+    border: 1px solid #999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.2;
+    text-align: center;
+    padding: 2px;
+}
+
+/* Zone colors matching Parashara Light */
+.cell.nakshatra { background: #fffde0; border-color: #ccc; }
+.cell.corner { background: #fffde0; border-color: #ccc; }
+.cell.consonant { background: #ffd699; border-color: #cc9; }
+.cell.svara { background: #ffb84d; border-color: #b80; }
+.cell.rashi { background: #e8f5e9; border-color: #9c9; }
+.cell.vara { background: #ffe0b2; border-color: #c90; }
+.cell.vara.nanda { background: #ffcccc; }
+.cell.vara.bhadra { background: #cce5ff; }
+.cell.vara.jaya { background: #e6ffe6; }
+.cell.vara.rikta { background: #ffe6cc; }
+.cell.vara.poorna { background: #fff2cc; }
+.cell.empty { background: #f0f0f0; }
+
+/* Nakshatra name */
+.nak-name {
+    font-size: 8px;
+    font-weight: bold;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 86px;
+}
+
+/* Pada sounds */
+.pada-row {
+    display: flex;
+    gap: 1px;
+    font-size: 8px;
+    color: #555;
+    margin-top: 1px;
+}
+.pada-cell {
+    width: 20px;
+    text-align: center;
+    font-size: 7px;
+}
+.pada-num {
+    font-size: 6px;
+    color: #888;
+    display: flex;
+    gap: 2px;
+    justify-content: center;
+}
+
+/* Hindi/Devanagari labels */
+.hindi { 
+    font-size: 22px; 
+    font-weight: bold; 
+    color: #333;
+    line-height: 1;
+}
+.rashi-label { 
+    font-size: 11px; 
+    font-weight: bold; 
+    color: #1a5e1a; 
+}
+.vara-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: #8b4513;
+}
+.tithi-label {
+    font-size: 8px;
+    color: #666;
+    font-weight: bold;
+}
+
+/* Planet markers */
+.planet-marker {
+    position: absolute;
+    font-size: 9px;
+    font-weight: bold;
+    color: #fff;
+    padding: 1px 3px;
+    border-radius: 3px;
+    z-index: 10;
+    line-height: 1.1;
+    text-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+.planet-marker.malefic { background: #c0392b; }
+.planet-marker.benefic { background: #27ae60; }
+.planet-marker.node { background: #8e44ad; }
+.planet-marker.asc { background: #2980b9; }
+
+/* Vedha line SVG overlay */
+.vedha-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Side labels (nakshatra names along edges) */
+.direction-label {
+    position: absolute;
+    font-size: 11px;
+    font-weight: bold;
+    color: #1a1a5e;
+}
+
+/* Legend */
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 11px;
+    max-width: 810px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.legend-swatch {
+    width: 14px; height: 14px;
+    border: 1px solid #999;
+    border-radius: 2px;
+}
+
+/* Planet info panel */
+.planet-info {
+    margin-top: 8px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    max-width: 810px;
+    width: 100%;
+    font-size: 11px;
+}
+.planet-info table { width: 100%; border-collapse: collapse; }
+.planet-info th { 
+    background: #1f4e79; color: #fff; 
+    padding: 4px 6px; text-align: left; font-size: 10px;
+}
+.planet-info td { padding: 3px 6px; border-bottom: 1px solid #eee; font-size: 10px; }
+.planet-info tr:nth-child(even) { background: #f9f9f9; }
+.papa { color: #c0392b; font-weight: bold; }
+.shubha { color: #27ae60; font-weight: bold; }
+
+/* Vedha targets panel */
+.vedha-panel {
+    margin-top: 8px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    max-width: 810px;
+    width: 100%;
+}
+.vedha-panel h3 { font-size: 13px; color: #1a1a5e; margin-bottom: 6px; }
+.vedha-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.vedha-table th { background: #2c3e50; color: #fff; padding: 4px 6px; text-align: left; }
+.vedha-table td { padding: 3px 6px; border-bottom: 1px solid #eee; }
+.vedha-table tr.papa-row { background: #fff0f0; }
+.vedha-table tr.shubha-row { background: #f0fff0; }
+
+/* Controls */
+.controls {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+    flex-wrap: wrap;
+}
+.controls label { font-size: 11px; display: flex; align-items: center; gap: 3px; cursor: pointer; }
+.controls input[type=checkbox] { cursor: pointer; }
+
+/* Tooltip */
+.tooltip {
+    display: none;
+    position: absolute;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    z-index: 100;
+    pointer-events: none;
+    white-space: pre-line;
+    max-width: 250px;
+    line-height: 1.4;
+}
+</style>
+</head>
+<body>
+
+<h1>Sarvatobhadra Chakra</h1>
+<div class="subtitle">Himanshu Gupta | May 13, 2026 17:01:57 | Ujjain, Madhya Pradesh, India</div>
+
+<div class="controls">
+    <label><input type="checkbox" id="toggleVedha" checked> Show Vedha Lines</label>
+    <label><input type="checkbox" id="togglePlanets" checked> Show Planets</label>
+    <label><input type="checkbox" id="togglePada" checked> Show Pada Sounds</label>
+    <label>
+        <select id="highlightPlanet" style="font-size:11px;">
+            <option value="all">All Vedha Lines</option>
+            <option value="Sun">Sun only</option>
+            <option value="Moon">Moon only</option>
+            <option value="Mars">Mars only</option>
+            <option value="Mercury">Mercury only</option>
+            <option value="Jupiter">Jupiter only</option>
+            <option value="Venus">Venus only</option>
+            <option value="Saturn">Saturn only</option>
+            <option value="Rahu">Rahu only</option>
+            <option value="Ketu">Ketu only</option>
+        </select>
+    </label>
+</div>
+
+<div class="sbc-wrapper">
+    <div class="sbc-grid" id="sbcGrid"></div>
+    <svg class="vedha-overlay" id="vedhaOverlay" viewBox="0 0 810 810" preserveAspectRatio="none"></svg>
+    <div class="tooltip" id="tooltip"></div>
+</div>
+
+<div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#fffde0;"></div>Nakshatra</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ffd699;"></div>Consonant (Vyanjana)</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ffb84d;"></div>Svara (Vowel)</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#e8f5e9;"></div>Rashi</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ffcccc;"></div>Nanda Tithi</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#cce5ff;"></div>Bhadra Tithi</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#e6ffe6;"></div>Jaya Tithi</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ffe6cc;"></div>Rikta Tithi</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fff2cc;"></div>Poorna Tithi</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#c0392b;"></div><span style="color:#fff;padding:0 4px;background:#c0392b;border-radius:2px;font-size:9px;">Papa</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#27ae60;"></div><span style="color:#fff;padding:0 4px;background:#27ae60;border-radius:2px;font-size:9px;">Shubha</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#8e44ad;"></div><span style="color:#fff;padding:0 4px;background:#8e44ad;border-radius:2px;font-size:9px;">Node</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#2980b9;"></div><span style="color:#fff;padding:0 4px;background:#2980b9;border-radius:2px;font-size:9px;">Asc</span></div>
+</div>
+
+<div class="planet-info">
+    <table>
+        <tr>
+            <th>Planet</th><th>Nature</th><th>Nakshatra</th><th>Pada</th>
+            <th>Vedha Type</th><th>Vama Targets</th><th>Dakshina Targets</th><th>Sammukha</th>
+            <th>Traditional Pair</th>
+        </tr>
+        <tbody id="planetTable"></tbody>
+    </table>
+</div>
+
+<div class="vedha-panel">
+    <h3>Vedha Detail — Which Transit Planet Vedhas Which Nakshatra &amp; Planets</h3>
+    <table class="vedha-table">
+        <tr>
+            <th>Transit Planet</th><th>Nature</th><th>From Nakshatra</th>
+            <th>Direction</th><th>Vedha To Nakshatra</th><th>Rashi</th><th>Nak Lord</th>
+        </tr>
+        <tbody id="vedhaTable"></tbody>
+    </table>
+</div>
+
+<script>
+const DATA = {"grid": [[{"row": 0, "col": 0, "type": "corner", "label": "NE", "label_hi": "अ", "zone": "outer", "planets": [], "pada_sounds": []}, {"row": 0, "col": 1, "type": "nakshatra", "label": "Krittika", "label_hi": "", "zone": "outer", "planets": ["Su", "Me"], "pada_sounds": ["Aa", "Ei", "Ou", "Ae"]}, {"row": 0, "col": 2, "type": "nakshatra", "label": "Rohini", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["O", "Va", "Vi", "Vu"]}, {"row": 0, "col": 3, "type": "nakshatra", "label": "Mrigashira", "label_hi": "", "zone": "outer", "planets": ["Ve"], "pada_sounds": ["Ve", "Vo", "Ka", "Ki"]}, {"row": 0, "col": 4, "type": "nakshatra", "label": "Ardra", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Ku", "Gha", "Ng", "Chha"]}, {"row": 0, "col": 5, "type": "nakshatra", "label": "Punarvasu", "label_hi": "", "zone": "outer", "planets": ["Ju"], "pada_sounds": ["Ke", "Ko", "Ha", "Hi"]}, {"row": 0, "col": 6, "type": "nakshatra", "label": "Pushya", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Hu", "He", "Ho", "Da"]}, {"row": 0, "col": 7, "type": "nakshatra", "label": "Ashlesha", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Di", "Du", "De", "Do"]}, {"row": 0, "col": 8, "type": "corner", "label": "SE", "label_hi": "आ", "zone": "outer", "planets": [], "pada_sounds": []}], [{"row": 1, "col": 0, "type": "nakshatra", "label": "Bharani", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Li", "Lu", "Le", "Lo"]}, {"row": 1, "col": 1, "type": "svara", "label": "", "label_hi": "उ", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 1, "col": 2, "type": "consonant", "label": "", "label_hi": "अ", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 1, "col": 3, "type": "consonant", "label": "", "label_hi": "व", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 1, "col": 4, "type": "consonant", "label": "", "label_hi": "क", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 1, "col": 5, "type": "consonant", "label": "", "label_hi": "ह", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 1, "col": 6, "type": "consonant", "label": "", "label_hi": "ड", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 1, "col": 7, "type": "svara", "label": "", "label_hi": "ऊ", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 1, "col": 8, "type": "nakshatra", "label": "Magha", "label_hi": "", "zone": "outer", "planets": ["Ke"], "pada_sounds": ["Ma", "Mi", "Mu", "Me"]}], [{"row": 2, "col": 0, "type": "nakshatra", "label": "Ashwini", "label_hi": "", "zone": "outer", "planets": ["Mo", "Ma"], "pada_sounds": ["Chu", "Che", "Cho", "La"]}, {"row": 2, "col": 1, "type": "consonant", "label": "", "label_hi": "ल", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 2, "col": 2, "type": "svara", "label": "", "label_hi": "ऌ", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 2, "col": 3, "type": "rashi", "label": "Taurus", "label_hi": "वृष", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 2, "col": 4, "type": "rashi", "label": "Gemini", "label_hi": "मिथुन", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 2, "col": 5, "type": "rashi", "label": "Cancer", "label_hi": "कर्क", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 2, "col": 6, "type": "svara", "label": "", "label_hi": "ॡ", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 2, "col": 7, "type": "consonant", "label": "", "label_hi": "म", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 2, "col": 8, "type": "nakshatra", "label": "Purva Phalguni", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Mo", "Ta", "Ti", "Tu"]}], [{"row": 3, "col": 0, "type": "nakshatra", "label": "Revati", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["De", "Tho", "Cha", "Chi"]}, {"row": 3, "col": 1, "type": "consonant", "label": "", "label_hi": "च", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 3, "col": 2, "type": "rashi", "label": "Aries", "label_hi": "मेष", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 3, "col": 3, "type": "svara", "label": "", "label_hi": "ओ", "zone": "fourth", "planets": [], "pada_sounds": []}, {"row": 3, "col": 4, "type": "vara", "label": "Sunday, Tuesday", "label_hi": "", "zone": "fourth", "planets": [], "pada_sounds": [], "tithi_group": "Nanda"}, {"row": 3, "col": 5, "type": "svara", "label": "", "label_hi": "औ", "zone": "fourth", "planets": [], "pada_sounds": []}, {"row": 3, "col": 6, "type": "rashi", "label": "Leo", "label_hi": "सिंह", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 3, "col": 7, "type": "consonant", "label": "", "label_hi": "ट", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 3, "col": 8, "type": "nakshatra", "label": "Uttara Phalguni", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Te", "To", "Pa", "Pi"]}], [{"row": 4, "col": 0, "type": "nakshatra", "label": "Uttara Bhadrapada", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Du", "Tha", "Jha", "Da"]}, {"row": 4, "col": 1, "type": "consonant", "label": "", "label_hi": "द", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 4, "col": 2, "type": "rashi", "label": "Pisces", "label_hi": "मीन", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 4, "col": 3, "type": "vara", "label": "Friday", "label_hi": "", "zone": "fourth", "planets": [], "pada_sounds": [], "tithi_group": "Rikta"}, {"row": 4, "col": 4, "type": "vara", "label": "Saturday", "label_hi": "", "zone": "center", "planets": [], "pada_sounds": [], "tithi_group": "Poorna"}, {"row": 4, "col": 5, "type": "vara", "label": "Monday, Wednesday", "label_hi": "", "zone": "fourth", "planets": [], "pada_sounds": [], "tithi_group": "Bhadra"}, {"row": 4, "col": 6, "type": "rashi", "label": "Virgo", "label_hi": "कन्या", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 4, "col": 7, "type": "consonant", "label": "", "label_hi": "प", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 4, "col": 8, "type": "nakshatra", "label": "Hasta", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Pu", "Sha", "Na", "Tha"]}], [{"row": 5, "col": 0, "type": "nakshatra", "label": "Purva Bhadrapada", "label_hi": "", "zone": "outer", "planets": ["Sa"], "pada_sounds": ["Se", "So", "Da", "Di"]}, {"row": 5, "col": 1, "type": "consonant", "label": "", "label_hi": "स", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 5, "col": 2, "type": "rashi", "label": "Aquarius", "label_hi": "कुंभ", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 5, "col": 3, "type": "svara", "label": "", "label_hi": "अः", "zone": "fourth", "planets": [], "pada_sounds": []}, {"row": 5, "col": 4, "type": "vara", "label": "Thursday", "label_hi": "", "zone": "fourth", "planets": [], "pada_sounds": [], "tithi_group": "Jaya"}, {"row": 5, "col": 5, "type": "svara", "label": "", "label_hi": "अं", "zone": "fourth", "planets": [], "pada_sounds": []}, {"row": 5, "col": 6, "type": "rashi", "label": "Libra", "label_hi": "तुला", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 5, "col": 7, "type": "consonant", "label": "", "label_hi": "र", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 5, "col": 8, "type": "nakshatra", "label": "Chitra", "label_hi": "", "zone": "outer", "planets": ["As"], "pada_sounds": ["Pe", "Po", "Ra", "Ri"]}], [{"row": 6, "col": 0, "type": "nakshatra", "label": "Shatabhisha", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Go", "Sa", "Si", "Su"]}, {"row": 6, "col": 1, "type": "consonant", "label": "", "label_hi": "ग", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 6, "col": 2, "type": "svara", "label": "", "label_hi": "ऐ", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 6, "col": 3, "type": "rashi", "label": "Capricorn", "label_hi": "मकर", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 6, "col": 4, "type": "rashi", "label": "Sagittarius", "label_hi": "धनु", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 6, "col": 5, "type": "rashi", "label": "Scorpio", "label_hi": "वृश्चिक", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 6, "col": 6, "type": "svara", "label": "", "label_hi": "ए", "zone": "third", "planets": [], "pada_sounds": []}, {"row": 6, "col": 7, "type": "consonant", "label": "", "label_hi": "त", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 6, "col": 8, "type": "nakshatra", "label": "Swati", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Ru", "Re", "Ro", "Ta"]}], [{"row": 7, "col": 0, "type": "nakshatra", "label": "Dhanishtha", "label_hi": "", "zone": "outer", "planets": ["Ra"], "pada_sounds": ["Ga", "Gi", "Gu", "Ge"]}, {"row": 7, "col": 1, "type": "svara", "label": "", "label_hi": "ॠ", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 7, "col": 2, "type": "consonant", "label": "", "label_hi": "ख", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 7, "col": 3, "type": "consonant", "label": "", "label_hi": "ज", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 7, "col": 4, "type": "consonant", "label": "", "label_hi": "भ", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 7, "col": 5, "type": "consonant", "label": "", "label_hi": "य", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 7, "col": 6, "type": "consonant", "label": "", "label_hi": "न", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 7, "col": 7, "type": "svara", "label": "", "label_hi": "ऋ", "zone": "second", "planets": [], "pada_sounds": []}, {"row": 7, "col": 8, "type": "nakshatra", "label": "Vishakha", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Ti", "Tu", "Te", "To"]}], [{"row": 8, "col": 0, "type": "corner", "label": "NW", "label_hi": "ई", "zone": "outer", "planets": [], "pada_sounds": []}, {"row": 8, "col": 1, "type": "nakshatra", "label": "Shravana", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Khi", "Khu", "Khe", "Kho"]}, {"row": 8, "col": 2, "type": "nakshatra", "label": "Abhijit", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Ju", "Je", "Jo", "Gha"]}, {"row": 8, "col": 3, "type": "nakshatra", "label": "Uttara Ashadha", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Bhe", "Bho", "Ja", "Ji"]}, {"row": 8, "col": 4, "type": "nakshatra", "label": "Purva Ashadha", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Bhu", "Dha", "Pha", "Dha"]}, {"row": 8, "col": 5, "type": "nakshatra", "label": "Mula", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Ye", "Yo", "Bha", "Bhi"]}, {"row": 8, "col": 6, "type": "nakshatra", "label": "Jyeshtha", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["No", "Ya", "Yi", "Yu"]}, {"row": 8, "col": 7, "type": "nakshatra", "label": "Anuradha", "label_hi": "", "zone": "outer", "planets": [], "pada_sounds": ["Na", "Ni", "Nu", "Ne"]}, {"row": 8, "col": 8, "type": "corner", "label": "SW", "label_hi": "इ", "zone": "outer", "planets": [], "pada_sounds": []}]], "planets": {"Sun": {"row": 0, "col": 1, "abbr": "Su"}, "Mercury": {"row": 0, "col": 1, "abbr": "Me"}, "Venus": {"row": 0, "col": 3, "abbr": "Ve"}, "Jupiter": {"row": 0, "col": 5, "abbr": "Ju"}, "Moon": {"row": 2, "col": 0, "abbr": "Mo"}, "Mars": {"row": 2, "col": 0, "abbr": "Ma"}, "Saturn": {"row": 5, "col": 0, "abbr": "Sa"}, "Rahu": {"row": 7, "col": 0, "abbr": "Ra"}, "Ketu": {"row": 1, "col": 8, "abbr": "Ke"}, "Ascendant": {"row": 5, "col": 8, "abbr": "As"}}, "transit_info": {"Sun": {"nak": "Krittika", "pada": 3}, "Mercury": {"nak": "Krittika", "pada": 2}, "Venus": {"nak": "Mrigashira", "pada": 1}, "Jupiter": {"nak": "Punarvasu", "pada": 3}, "Moon": {"nak": "Ashwini", "pada": 2}, "Mars": {"nak": "Ashwini", "pada": 1}, "Saturn": {"nak": "Purva Bhadrapada", "pada": 3}, "Rahu": {"nak": "Dhanishtha", "pada": 2}, "Ketu": {"nak": "Magha", "pada": 2}}, "ascendant": {"nakshatra": "Chitra", "pada": 3, "abbr": "As"}, "vedha_lines": {"Sun": {"origin": [0, 1], "lines": [{"type": "horizontal", "from": [0, 0], "to": [0, 8]}, {"type": "vertical", "from": [0, 1], "to": [8, 1]}, {"type": "diagonal_main", "from": [0, 1], "to": [7, 8]}, {"type": "diagonal_anti", "from": [0, 1], "to": [1, 0]}], "is_malefic": true, "vedha_type": "3-Way Vedha"}, "Mercury": {"origin": [0, 1], "lines": [{"type": "horizontal", "from": [0, 0], "to": [0, 8]}, {"type": "vertical", "from": [0, 1], "to": [8, 1]}, {"type": "diagonal_main", "from": [0, 1], "to": [7, 8]}, {"type": "diagonal_anti", "from": [0, 1], "to": [1, 0]}], "is_malefic": false, "vedha_type": "Front Vedha"}, "Venus": {"origin": [0, 3], "lines": [{"type": "horizontal", "from": [0, 0], "to": [0, 8]}, {"type": "vertical", "from": [0, 3], "to": [8, 3]}, {"type": "diagonal_main", "from": [0, 3], "to": [5, 8]}, {"type": "diagonal_anti", "from": [0, 3], "to": [3, 0]}], "is_malefic": false, "vedha_type": "Front Vedha"}, "Jupiter": {"origin": [0, 5], "lines": [{"type": "horizontal", "from": [0, 0], "to": [0, 8]}, {"type": "vertical", "from": [0, 5], "to": [8, 5]}, {"type": "diagonal_main", "from": [0, 5], "to": [3, 8]}, {"type": "diagonal_anti", "from": [0, 5], "to": [5, 0]}], "is_malefic": false, "vedha_type": "Front Vedha"}, "Moon": {"origin": [2, 0], "lines": [{"type": "horizontal", "from": [2, 0], "to": [2, 8]}, {"type": "vertical", "from": [0, 0], "to": [8, 0]}, {"type": "diagonal_main", "from": [2, 0], "to": [8, 6]}, {"type": "diagonal_anti", "from": [0, 2], "to": [2, 0]}], "is_malefic": false, "vedha_type": "3-Way Vedha"}, "Mars": {"origin": [2, 0], "lines": [{"type": "horizontal", "from": [2, 0], "to": [2, 8]}, {"type": "vertical", "from": [0, 0], "to": [8, 0]}, {"type": "diagonal_main", "from": [2, 0], "to": [8, 6]}, {"type": "diagonal_anti", "from": [0, 2], "to": [2, 0]}], "is_malefic": true, "vedha_type": "Front Vedha"}, "Saturn": {"origin": [5, 0], "lines": [{"type": "horizontal", "from": [5, 0], "to": [5, 8]}, {"type": "vertical", "from": [0, 0], "to": [8, 0]}, {"type": "diagonal_main", "from": [5, 0], "to": [8, 3]}, {"type": "diagonal_anti", "from": [0, 5], "to": [5, 0]}], "is_malefic": true, "vedha_type": "Front Vedha"}, "Rahu": {"origin": [7, 0], "lines": [{"type": "horizontal", "from": [7, 0], "to": [7, 8]}, {"type": "vertical", "from": [0, 0], "to": [8, 0]}, {"type": "diagonal_main", "from": [7, 0], "to": [8, 1]}, {"type": "diagonal_anti", "from": [0, 7], "to": [7, 0]}], "is_malefic": true, "vedha_type": "3-Way Vedha"}, "Ketu": {"origin": [1, 8], "lines": [{"type": "horizontal", "from": [1, 0], "to": [1, 8]}, {"type": "vertical", "from": [0, 8], "to": [8, 8]}, {"type": "diagonal_main", "from": [0, 7], "to": [1, 8]}, {"type": "diagonal_anti", "from": [1, 8], "to": [8, 1]}], "is_malefic": true, "vedha_type": "3-Way Vedha"}}, "nakshatra_pada_sounds": {"Ashwini": ["Chu", "Che", "Cho", "La"], "Bharani": ["Li", "Lu", "Le", "Lo"], "Krittika": ["Aa", "Ei", "Ou", "Ae"], "Rohini": ["O", "Va", "Vi", "Vu"], "Mrigashira": ["Ve", "Vo", "Ka", "Ki"], "Ardra": ["Ku", "Gha", "Ng", "Chha"], "Punarvasu": ["Ke", "Ko", "Ha", "Hi"], "Pushya": ["Hu", "He", "Ho", "Da"], "Ashlesha": ["Di", "Du", "De", "Do"], "Magha": ["Ma", "Mi", "Mu", "Me"], "Purva Phalguni": ["Mo", "Ta", "Ti", "Tu"], "Uttara Phalguni": ["Te", "To", "Pa", "Pi"], "Hasta": ["Pu", "Sha", "Na", "Tha"], "Chitra": ["Pe", "Po", "Ra", "Ri"], "Swati": ["Ru", "Re", "Ro", "Ta"], "Vishakha": ["Ti", "Tu", "Te", "To"], "Anuradha": ["Na", "Ni", "Nu", "Ne"], "Jyeshtha": ["No", "Ya", "Yi", "Yu"], "Mula": ["Ye", "Yo", "Bha", "Bhi"], "Purva Ashadha": ["Bhu", "Dha", "Pha", "Dha"], "Uttara Ashadha": ["Bhe", "Bho", "Ja", "Ji"], "Abhijit": ["Ju", "Je", "Jo", "Gha"], "Shravana": ["Khi", "Khu", "Khe", "Kho"], "Dhanishtha": ["Ga", "Gi", "Gu", "Ge"], "Shatabhisha": ["Go", "Sa", "Si", "Su"], "Purva Bhadrapada": ["Se", "So", "Da", "Di"], "Uttara Bhadrapada": ["Du", "Tha", "Jha", "Da"], "Revati": ["De", "Tho", "Cha", "Chi"]}, "traditional_vedha": {"Ashwini": {"vama": ["Bharani", "Krittika", "Rohini", "Mrigashira"], "dakshina": ["Revati", "Uttara Bhadrapada", "Purva Bhadrapada"], "sammukha": ["Ashlesha"]}, "Bharani": {"vama": ["Krittika", "Rohini", "Mrigashira", "Ardra"], "dakshina": ["Ashwini", "Revati", "Uttara Bhadrapada"], "sammukha": ["Pushya"]}, "Krittika": {"vama": ["Rohini", "Mrigashira", "Ardra", "Punarvasu"], "dakshina": ["Bharani", "Ashwini", "Revati"], "sammukha": ["Punarvasu"]}, "Rohini": {"vama": ["Mrigashira", "Ardra", "Punarvasu", "Pushya"], "dakshina": ["Krittika", "Bharani", "Ashwini"], "sammukha": ["Magha"]}, "Mrigashira": {"vama": ["Ardra", "Punarvasu", "Pushya", "Ashlesha"], "dakshina": ["Rohini", "Krittika", "Bharani"], "sammukha": ["Purva Phalguni"]}, "Ardra": {"vama": ["Punarvasu", "Pushya", "Ashlesha", "Magha"], "dakshina": ["Mrigashira", "Rohini", "Krittika"], "sammukha": ["Uttara Phalguni"]}, "Punarvasu": {"vama": ["Pushya", "Ashlesha", "Magha", "Purva Phalguni"], "dakshina": ["Ardra", "Mrigashira", "Rohini"], "sammukha": ["Hasta"]}, "Pushya": {"vama": ["Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni"], "dakshina": ["Punarvasu", "Ardra", "Mrigashira"], "sammukha": ["Chitra"]}, "Ashlesha": {"vama": ["Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta"], "dakshina": ["Pushya", "Punarvasu", "Ardra"], "sammukha": ["Swati"]}, "Magha": {"vama": ["Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra"], "dakshina": ["Ashlesha", "Pushya", "Punarvasu"], "sammukha": ["Vishakha"]}, "Purva Phalguni": {"vama": ["Uttara Phalguni", "Hasta", "Chitra", "Swati"], "dakshina": ["Magha", "Ashlesha", "Pushya"], "sammukha": ["Anuradha"]}, "Uttara Phalguni": {"vama": ["Hasta", "Chitra", "Swati", "Vishakha"], "dakshina": ["Purva Phalguni", "Magha", "Ashlesha"], "sammukha": ["Jyeshtha"]}, "Hasta": {"vama": ["Chitra", "Swati", "Vishakha", "Anuradha"], "dakshina": ["Uttara Phalguni", "Purva Phalguni", "Magha"], "sammukha": ["Mula"]}, "Chitra": {"vama": ["Swati", "Vishakha", "Anuradha", "Jyeshtha"], "dakshina": ["Hasta", "Uttara Phalguni", "Purva Phalguni"], "sammukha": ["Purva Ashadha"]}, "Swati": {"vama": ["Vishakha", "Anuradha", "Jyeshtha", "Mula"], "dakshina": ["Chitra", "Hasta", "Uttara Phalguni"], "sammukha": ["Uttara Ashadha"]}, "Vishakha": {"vama": ["Anuradha", "Jyeshtha", "Mula", "Purva Ashadha"], "dakshina": ["Swati", "Chitra", "Hasta"], "sammukha": ["Shravana"]}, "Anuradha": {"vama": ["Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha"], "dakshina": ["Vishakha", "Swati", "Chitra"], "sammukha": ["Dhanishtha"]}, "Jyeshtha": {"vama": ["Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana"], "dakshina": ["Anuradha", "Vishakha", "Swati"], "sammukha": ["Shatabhisha"]}, "Mula": {"vama": ["Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishtha"], "dakshina": ["Jyeshtha", "Anuradha", "Vishakha"], "sammukha": ["Purva Bhadrapada"]}, "Purva Ashadha": {"vama": ["Uttara Ashadha", "Shravana", "Dhanishtha", "Shatabhisha"], "dakshina": ["Mula", "Jyeshtha", "Anuradha"], "sammukha": ["Uttara Bhadrapada"]}, "Uttara Ashadha": {"vama": ["Shravana", "Dhanishtha", "Shatabhisha", "Purva Bhadrapada"], "dakshina": ["Purva Ashadha", "Mula", "Jyeshtha"], "sammukha": ["Revati"]}, "Shravana": {"vama": ["Dhanishtha", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada"], "dakshina": ["Uttara Ashadha", "Purva Ashadha", "Mula"], "sammukha": ["Ashwini"]}, "Dhanishtha": {"vama": ["Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"], "dakshina": ["Shravana", "Uttara Ashadha", "Purva Ashadha"], "sammukha": ["Bharani"]}, "Shatabhisha": {"vama": ["Purva Bhadrapada", "Uttara Bhadrapada", "Revati", "Ashwini"], "dakshina": ["Dhanishtha", "Shravana", "Uttara Ashadha"], "sammukha": ["Krittika"]}, "Purva Bhadrapada": {"vama": ["Uttara Bhadrapada", "Revati", "Ashwini", "Bharani"], "dakshina": ["Shatabhisha", "Dhanishtha", "Shravana"], "sammukha": ["Rohini"]}, "Uttara Bhadrapada": {"vama": ["Revati", "Ashwini", "Bharani", "Krittika"], "dakshina": ["Purva Bhadrapada", "Shatabhisha", "Dhanishtha"], "sammukha": ["Mrigashira"]}, "Revati": {"vama": ["Ashwini", "Bharani", "Krittika", "Rohini"], "dakshina": ["Uttara Bhadrapada", "Purva Bhadrapada", "Shatabhisha"], "sammukha": ["Ardra"]}}};
+
+const MALEFICS = new Set(["Sun", "Mars", "Saturn", "Rahu", "Ketu"]);
+const PLANET_COLORS = {
+    Sun: "#e67e22", Moon: "#3498db", Mars: "#e74c3c", Mercury: "#2ecc71",
+    Jupiter: "#f1c40f", Venus: "#e91e9e", Saturn: "#34495e", Rahu: "#8e44ad", Ketu: "#9b59b6",
+    Ascendant: "#2980b9"
+};
+
+const CELL_SIZE = 90;
+const grid = DATA.grid;
+
+// ─── Render Grid ───
+function renderGrid() {
+    const container = document.getElementById("sbcGrid");
+    container.innerHTML = "";
+
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            const cell = grid[r][c];
+            const div = document.createElement("div");
+            div.className = "cell " + cell.type;
+            div.dataset.row = r;
+            div.dataset.col = c;
+
+            // Add tithi group class for vara cells
+            if (cell.type === "vara" && cell.tithi_group) {
+                div.classList.add(cell.tithi_group.toLowerCase());
+            }
+
+            let html = "";
+
+            if (cell.type === "nakshatra") {
+                // Short name
+                let shortName = cell.label;
+                if (shortName.length > 10) {
+                    const parts = shortName.split(" ");
+                    shortName = parts.length > 1 ? parts[0][0] + "." + parts[1].slice(0,6) : shortName.slice(0,10);
+                }
+                html += '<div class="nak-name">' + shortName + '</div>';
+
+                // Pada sounds
+                if (cell.pada_sounds && cell.pada_sounds.length > 0 && document.getElementById("togglePada").checked) {
+                    html += '<div class="pada-row">';
+                    cell.pada_sounds.forEach((s, i) => {
+                        html += '<div class="pada-cell">' + s + '</div>';
+                    });
+                    html += '</div>';
+                    html += '<div class="pada-num">';
+                    for (let i = 1; i <= 4; i++) html += '<span>' + i + '</span>';
+                    html += '</div>';
+                }
+            }
+            else if (cell.type === "corner") {
+                html += '<div class="hindi">' + (cell.label_hi || cell.label) + '</div>';
+                if (cell.label_hi) html += '<div style="font-size:7px;color:#666;">' + cell.label + '</div>';
+            }
+            else if (cell.type === "svara") {
+                html += '<div class="hindi">' + cell.label_hi + '</div>';
+            }
+            else if (cell.type === "consonant") {
+                html += '<div class="hindi">' + cell.label_hi + '</div>';
+            }
+            else if (cell.type === "rashi") {
+                html += '<div class="rashi-label">' + cell.label + '</div>';
+                if (cell.label_hi) html += '<div style="font-size:9px;color:#555;">' + cell.label_hi + '</div>';
+            }
+            else if (cell.type === "vara") {
+                html += '<div class="vara-label">' + cell.label.replace(", ", "\n") + '</div>';
+                if (cell.tithi_group) html += '<div class="tithi-label">' + cell.tithi_group + '</div>';
+            }
+
+            div.innerHTML = html;
+
+            // Planet markers
+            if (cell.planets && cell.planets.length > 0 && document.getElementById("togglePlanets").checked) {
+                cell.planets.forEach((abbr, idx) => {
+                    const marker = document.createElement("div");
+                    marker.className = "planet-marker";
+                    // Find full planet name
+                    let fullName = "";
+                    for (const [pn, pi] of Object.entries(DATA.planets)) {
+                        if (pi.abbr === abbr) { fullName = pn; break; }
+                    }
+                    if (MALEFICS.has(fullName)) marker.classList.add("malefic");
+                    else if (fullName === "Ascendant") marker.classList.add("asc");
+                    else if (fullName === "Rahu" || fullName === "Ketu") marker.classList.add("node");
+                    else marker.classList.add("benefic");
+
+                    marker.textContent = abbr;
+                    marker.style.top = (4 + idx * 14) + "px";
+                    marker.style.right = "3px";
+                    div.appendChild(marker);
+                });
+            }
+
+            // Tooltip on hover
+            div.addEventListener("mouseenter", (e) => {
+                showTooltip(e, cell);
+            });
+            div.addEventListener("mouseleave", () => {
+                document.getElementById("tooltip").style.display = "none";
+            });
+
+            container.appendChild(div);
+        }
+    }
+}
+
+// ─── Render Vedha Lines ───
+function renderVedhaLines() {
+    const svg = document.getElementById("vedhaOverlay");
+    svg.innerHTML = "";
+
+    if (!document.getElementById("toggleVedha").checked) return;
+
+    const selectedPlanet = document.getElementById("highlightPlanet").value;
+    const half = CELL_SIZE / 2;
+
+    for (const [planet, data] of Object.entries(DATA.vedha_lines)) {
+        if (selectedPlanet !== "all" && selectedPlanet !== planet) continue;
+
+        const color = PLANET_COLORS[planet] || "#999";
+        const opacity = selectedPlanet === "all" ? 0.35 : 0.7;
+        const strokeWidth = selectedPlanet === "all" ? 1.5 : 2.5;
+
+        data.lines.forEach(line => {
+            const x1 = line.from[1] * CELL_SIZE + half;
+            const y1 = line.from[0] * CELL_SIZE + half;
+            const x2 = line.to[1] * CELL_SIZE + half;
+            const y2 = line.to[0] * CELL_SIZE + half;
+
+            const svgLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            svgLine.setAttribute("x1", x1);
+            svgLine.setAttribute("y1", y1);
+            svgLine.setAttribute("x2", x2);
+            svgLine.setAttribute("y2", y2);
+            svgLine.setAttribute("stroke", color);
+            svgLine.setAttribute("stroke-width", strokeWidth);
+            svgLine.setAttribute("stroke-opacity", opacity);
+            if (line.type.includes("diagonal")) {
+                svgLine.setAttribute("stroke-dasharray", "6,3");
+            }
+            svg.appendChild(svgLine);
+        });
+
+        // Origin marker circle
+        const cx = data.origin[1] * CELL_SIZE + half;
+        const cy = data.origin[0] * CELL_SIZE + half;
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", cx);
+        circle.setAttribute("cy", cy);
+        circle.setAttribute("r", 4);
+        circle.setAttribute("fill", color);
+        circle.setAttribute("fill-opacity", 0.6);
+        svg.appendChild(circle);
+    }
+}
+
+// ─── Tooltip ───
+function showTooltip(e, cell) {
+    const tip = document.getElementById("tooltip");
+    let text = "";
+    if (cell.type === "nakshatra") {
+        text = cell.label;
+        if (cell.pada_sounds.length) text += "\nPada: " + cell.pada_sounds.join(", ");
+        // Show vedha targets
+        const vedha = DATA.traditional_vedha[cell.label];
+        if (vedha) {
+            if (vedha.vama.length) text += "\nVama: " + vedha.vama.join(", ");
+            if (vedha.dakshina.length) text += "\nDakshina: " + vedha.dakshina.join(", ");
+            if (vedha.sammukha.length) text += "\nSammukha: " + vedha.sammukha.join(", ");
+        }
+    } else if (cell.type === "rashi") {
+        text = cell.label + (cell.label_hi ? " (" + cell.label_hi + ")" : "");
+    } else if (cell.type === "vara") {
+        text = cell.label + (cell.tithi_group ? "\n" + cell.tithi_group : "");
+    } else if (cell.label_hi) {
+        text = cell.label_hi + (cell.label ? " (" + cell.label + ")" : "");
+    }
+    if (cell.planets.length) text += "\nPlanets: " + cell.planets.join(", ");
+    if (!text) return;
+
+    tip.textContent = text;
+    tip.style.display = "block";
+    const rect = e.target.closest(".cell").getBoundingClientRect();
+    const wrap = document.querySelector(".sbc-wrapper").getBoundingClientRect();
+    tip.style.left = (rect.left - wrap.left + 45) + "px";
+    tip.style.top = (rect.top - wrap.top - 10) + "px";
+}
+
+// ─── Planet Info Table ───
+function renderPlanetTable() {
+    const tbody = document.getElementById("planetTable");
+    tbody.innerHTML = "";
+
+    const planets = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn","Rahu","Ketu"];
+    planets.forEach(p => {
+        const info = DATA.transit_info[p];
+        if (!info) return;
+        const vedha = DATA.traditional_vedha[info.nak] || {};
+        const isMalefic = MALEFICS.has(p);
+        const cls = isMalefic ? "papa" : "shubha";
+
+        const traditionalPairs = {
+            "Ashwini":"Jyeshtha","Bharani":"Anuradha","Krittika":"Vishakha",
+            "Rohini":"Swati","Mrigashira":"Chitra","Ardra":"Shravana",
+            "Punarvasu":"Uttara Ashadha","Pushya":"Purva Ashadha",
+            "Ashlesha":"Mula","Magha":"Revati","Purva Phalguni":"Uttara Bhadrapada",
+            "Uttara Phalguni":"Purva Bhadrapada","Hasta":"Shatabhisha",
+            "Jyeshtha":"Ashwini","Anuradha":"Bharani","Vishakha":"Krittika",
+            "Swati":"Rohini","Chitra":"Mrigashira","Shravana":"Ardra",
+            "Uttara Ashadha":"Punarvasu","Purva Ashadha":"Pushya",
+            "Mula":"Ashlesha","Revati":"Magha","Uttara Bhadrapada":"Purva Phalguni",
+            "Purva Bhadrapada":"Uttara Phalguni","Shatabhisha":"Hasta",
+        };
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td class="' + cls + '">' + p + '</td>' +
+            '<td class="' + cls + '">' + (isMalefic ? "Papa" : "Shubha") + '</td>' +
+            '<td>' + info.nak + '</td>' +
+            '<td>' + info.pada + '</td>' +
+            '<td>' + (DATA.vedha_lines[p] ? DATA.vedha_lines[p].vedha_type : "-") + '</td>' +
+            '<td style="font-size:9px;">' + (vedha.vama || []).join(", ") + '</td>' +
+            '<td style="font-size:9px;">' + (vedha.dakshina || []).join(", ") + '</td>' +
+            '<td style="font-size:9px;">' + (vedha.sammukha || []).join(", ") + '</td>' +
+            '<td>' + (traditionalPairs[info.nak] || "-") + '</td>';
+        tbody.appendChild(tr);
+    });
+}
+
+// ─── Vedha Detail Table ───
+function renderVedhaDetail() {
+    const tbody = document.getElementById("vedhaTable");
+    tbody.innerHTML = "";
+
+    const planets = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn","Rahu","Ketu"];
+    
+    const nakRashi = {};
+    const nakLord = {};
+    // Simple mappings
+    const nrMap = {"Ashwini": "Aries", "Bharani": "Aries", "Krittika": "Aries", "Rohini": "Taurus", "Mrigashira": "Taurus", "Ardra": "Gemini", "Punarvasu": "Gemini", "Pushya": "Cancer", "Ashlesha": "Cancer", "Magha": "Leo", "Purva Phalguni": "Leo", "Uttara Phalguni": "Virgo", "Hasta": "Virgo", "Chitra": "Libra", "Swati": "Libra", "Vishakha": "Scorpio", "Anuradha": "Scorpio", "Jyeshtha": "Scorpio", "Mula": "Sagittarius", "Purva Ashadha": "Sagittarius", "Uttara Ashadha": "Capricorn", "Abhijit": "Capricorn", "Shravana": "Capricorn", "Dhanishtha": "Aquarius", "Shatabhisha": "Aquarius", "Purva Bhadrapada": "Pisces", "Uttara Bhadrapada": "Pisces", "Revati": "Pisces"};
+    const nlMap = {"Ashwini": "Ketu", "Bharani": "Venus", "Krittika": "Sun", "Rohini": "Moon", "Mrigashira": "Mars", "Ardra": "Rahu", "Punarvasu": "Jupiter", "Pushya": "Saturn", "Ashlesha": "Mercury", "Magha": "Ketu", "Purva Phalguni": "Venus", "Uttara Phalguni": "Sun", "Hasta": "Moon", "Chitra": "Mars", "Swati": "Rahu", "Vishakha": "Jupiter", "Anuradha": "Saturn", "Jyeshtha": "Mercury", "Mula": "Ketu", "Purva Ashadha": "Venus", "Uttara Ashadha": "Sun", "Abhijit": "Mercury", "Shravana": "Moon", "Dhanishtha": "Mars", "Shatabhisha": "Rahu", "Purva Bhadrapada": "Jupiter", "Uttara Bhadrapada": "Saturn", "Revati": "Mercury"};
+
+    planets.forEach(p => {
+        const info = DATA.transit_info[p];
+        if (!info) return;
+        const vedha = DATA.traditional_vedha[info.nak] || {};
+        const isMalefic = MALEFICS.has(p);
+        const cls = isMalefic ? "papa-row" : "shubha-row";
+        const nature = isMalefic ? "Papa" : "Shubha";
+
+        const dirs = {"vama":"Vama (Left)","dakshina":"Dakshina (Right)","sammukha":"Sammukha (Front)"};
+        for (const [dk, dl] of Object.entries(dirs)) {
+            (vedha[dk] || []).forEach(target => {
+                const tr = document.createElement("tr");
+                tr.className = cls;
+                tr.innerHTML = '<td style="font-weight:bold;">' + p + '</td>' +
+                    '<td>' + nature + '</td>' +
+                    '<td>' + info.nak + '</td>' +
+                    '<td>' + dl + '</td>' +
+                    '<td>' + target + '</td>' +
+                    '<td>' + (nrMap[target] || "-") + '</td>' +
+                    '<td>' + (nlMap[target] || "-") + '</td>';
+                tbody.appendChild(tr);
+            });
+        }
+    });
+}
+
+// ─── Init & Events ───
+function refresh() {
+    renderGrid();
+    renderVedhaLines();
+    renderPlanetTable();
+    renderVedhaDetail();
+}
+
+document.getElementById("toggleVedha").addEventListener("change", refresh);
+document.getElementById("togglePlanets").addEventListener("change", refresh);
+document.getElementById("togglePada").addEventListener("change", refresh);
+document.getElementById("highlightPlanet").addEventListener("change", refresh);
+
+refresh();
+</script>
+</body>
+</html>

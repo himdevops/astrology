@@ -31,6 +31,13 @@ from app.sbc_analysis import (
     calc_six_bindus,
     calc_latta_for_planet,
 )
+from app.vedha_list import (
+    get_planet_vedha_report,
+    get_lagna_vedha_report,
+    PLANETS_9,
+    MALEFICS,
+    TRADITIONAL_VEDHA_PARTNER,
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -187,13 +194,14 @@ def calculate_sarvatobhadra(payload) -> dict:
     t_jd_ut    = to_julian_day_utc(t_dt, t_resolved.timezone_offset_minutes)
     t_planets  = calculate_planets(t_jd_ut, payload.ayanamsa)
 
-    # Enrich transit planets with nakshatra + speed info
+    # Enrich transit planets with nakshatra + speed + pada info
     transit_with_nak: List[Dict] = []
     for tp in t_planets:
         nak_info = get_nakshatra(tp["longitude"])
         transit_with_nak.append({
             "planet":     tp["planet"],
             "nakshatra":  _normalize_nak(nak_info["nakshatra"]),
+            "pada":       nak_info.get("pada", 1),
             "sign":       tp["sign"],
             "longitude":  tp["longitude"],
             "retrograde": tp.get("retrograde", False),
@@ -207,6 +215,59 @@ def calculate_sarvatobhadra(payload) -> dict:
         transit_planets=transit_with_nak,
         nak_position_map=nak_pos_map,
     )
+
+    # ── Vedha List for all 9 planets + Lagna ──────────────────
+    # Build natal planet → nakshatra map for cross-reference
+    natal_nak_map = {}
+    for p in planets:
+        p_nak = get_nakshatra(p["longitude"])
+        natal_nak_map[p["planet"]] = _normalize_nak(p_nak["nakshatra"])
+
+    vedha_list_reports = {}
+    vedha_flat_list = []
+    for tp in transit_with_nak:
+        planet = tp["planet"]
+        nak = tp["nakshatra"]
+        speed = tp.get("speed", 0.0)
+        report = get_planet_vedha_report(
+            planet=planet,
+            transit_nakshatra=nak,
+            planet_speed=speed,
+            natal_planet_positions=natal_nak_map,
+        )
+        vedha_list_reports[planet] = report
+
+        is_malefic = planet in MALEFICS
+        for entry in report["traditional_vedha"]["detail"]:
+            vedha_flat_list.append({
+                "transit_planet": planet,
+                "nature": "Papa" if is_malefic else "Shubha",
+                "from_nakshatra": report["transit_nakshatra"],
+                "direction": entry["direction"],
+                "direction_key": entry["direction_key"],
+                "target_nakshatra": entry["nakshatra"],
+                "target_rashi": entry["rashi"],
+                "target_nak_lord": entry["nak_lord"],
+                "vedha_type": entry["vedha_type"],
+                "strength": entry["strength"],
+                "strength_multiplier": entry["strength_multiplier"],
+                "affected_natal_planets": entry["affected_natal_planets"],
+                "traditional_pair": TRADITIONAL_VEDHA_PARTNER.get(nak, ""),
+            })
+
+    # Lagna vedha
+    lagna_vedha = None
+    asc_nak_info = get_nakshatra(ascendant["longitude"]) if ascendant else None
+    if asc_nak_info:
+        lagna_nak = _normalize_nak(asc_nak_info["nakshatra"])
+        transit_nak_map_for_lagna = {tp["planet"]: tp["nakshatra"] for tp in transit_with_nak}
+        lagna_vedha = get_lagna_vedha_report(
+            lagna_nakshatra=lagna_nak,
+            natal_planet_positions=transit_nak_map_for_lagna,
+        )
+
+    papa_count = sum(1 for v in vedha_flat_list if v["nature"] == "Papa")
+    shubha_count = sum(1 for v in vedha_flat_list if v["nature"] == "Shubha")
 
     return {
         "type":           "sarvatobhadra_chakra",
@@ -227,4 +288,23 @@ def calculate_sarvatobhadra(payload) -> dict:
         "transit_planets":  transit_with_nak,
         # ── Advanced analysis ──────────────────────────────
         "sbc_analysis":   sbc_analysis,
+        # ── Vedha List (all 9 planets + Lagna) ─────────────
+        "vedha_list": {
+            "planet_reports": vedha_list_reports,
+            "lagna_report": lagna_vedha,
+            "flat_list": vedha_flat_list,
+            "summary": {
+                "total": len(vedha_flat_list),
+                "papa_vedhas": papa_count,
+                "shubha_vedhas": shubha_count,
+                "net_score": shubha_count - papa_count,
+                "balance": (
+                    "Strongly Negative" if (shubha_count - papa_count) < -10 else
+                    "Negative" if (shubha_count - papa_count) < -3 else
+                    "Neutral" if abs(shubha_count - papa_count) <= 3 else
+                    "Positive" if (shubha_count - papa_count) <= 10 else
+                    "Strongly Positive"
+                ),
+            },
+        },
     }

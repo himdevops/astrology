@@ -231,6 +231,22 @@ VARA_TITHI_GROUP: Dict[Tuple[int,int], Dict[str, str]] = {
 
 CENTER_CELL = (4, 4)
 
+# Tithi group expansion: SBC places tithis by 5 groups.
+# Each numbered tithi is registered as its own EntityType.TITHI so vedha can
+# report exact tithi hits instead of only weekday/group metadata.
+TITHI_GROUP_MEMBERS: Dict[str, List[str]] = {
+    "Nanda":  ["Shukla Pratipada", "Shukla Shashthi", "Shukla Ekadashi",
+               "Krishna Pratipada", "Krishna Shashthi", "Krishna Ekadashi"],
+    "Bhadra": ["Shukla Dwitiya", "Shukla Saptami", "Shukla Dwadashi",
+               "Krishna Dwitiya", "Krishna Saptami", "Krishna Dwadashi"],
+    "Jaya":   ["Shukla Tritiya", "Shukla Ashtami", "Shukla Trayodashi",
+               "Krishna Tritiya", "Krishna Ashtami", "Krishna Trayodashi"],
+    "Rikta":  ["Shukla Chaturthi", "Shukla Navami", "Shukla Chaturdashi",
+               "Krishna Chaturthi", "Krishna Navami", "Krishna Chaturdashi"],
+    "Poorna": ["Shukla Panchami", "Shukla Dashami", "Purnima",
+               "Krishna Panchami", "Krishna Dashami", "Amavasya"],
+}
+
 
 # ─────────────────────────────────────────────────────────────
 # Data Models
@@ -369,25 +385,42 @@ class SarvatobhadraChakra:
     def _place_varas(self) -> None:
         for (r, c), days in VARA_CELL_MAP.items():
             tithi_info = VARA_TITHI_GROUP.get((r, c), {})
-            for day in days:
-                entity = ChakraEntity(name=day, entity_type=EntityType.VARA,
-                                      meta={"tithi_group": tithi_info.get("name", ""),
-                                            "tithi_numbers": tithi_info.get("tithis", "")})
-                self._register_entity(r, c, entity)
-            # Label: "Sun,Tue" or single day
-            day_abbrs = ",".join(d[:3] for d in days)
             group_name = tithi_info.get("name", "")
             group_tithis = tithi_info.get("tithis", "")
+            for day in days:
+                entity = ChakraEntity(name=day, entity_type=EntityType.VARA,
+                                      meta={"tithi_group": group_name,
+                                            "tithi_numbers": group_tithis})
+                self._register_entity(r, c, entity)
+
+            # Register every tithi belonging to this group.  This fixes vedha
+            # reporting for tithi-level targets.
+            for idx, tithi_name in enumerate(TITHI_GROUP_MEMBERS.get(group_name, []), start=1):
+                tithi_entity = ChakraEntity(
+                    name=tithi_name,
+                    entity_type=EntityType.TITHI,
+                    meta={"tithi_group": group_name, "group_tithis": group_tithis, "group_index": idx},
+                )
+                self._register_entity(r, c, tithi_entity)
+
+            # Label: "Sun,Tue" or single day
+            day_abbrs = ",".join(d[:3] for d in days)
             self.grid[r][c].label = day_abbrs
-            # Store tithi group info in cell meta for frontend
-            self.grid[r][c].entities[-1].meta["display_label"] = day_abbrs
-            self.grid[r][c].entities[-1].meta["group_label"] = f"{group_name} {group_tithis}"
+            if self.grid[r][c].entities:
+                self.grid[r][c].entities[-1].meta["display_label"] = day_abbrs
+                self.grid[r][c].entities[-1].meta["group_label"] = f"{group_name} {group_tithis}"
 
     def _place_center(self) -> None:
         r, c = CENTER_CELL
         entity = ChakraEntity(name="Brahma", entity_type=EntityType.SPECIAL,
                                meta={"description": "Central Brahma cell — Poorna → Saturday"})
         self._register_entity(r, c, entity)
+        # Center belongs to Poorna group / Saturday; register Saturday and all Poorna tithis.
+        self._register_entity(r, c, ChakraEntity(name="Saturday", entity_type=EntityType.VARA,
+                                                 meta={"tithi_group": "Poorna", "tithi_numbers": "5,10,15/30"}))
+        for idx, tithi_name in enumerate(TITHI_GROUP_MEMBERS.get("Poorna", []), start=1):
+            self._register_entity(r, c, ChakraEntity(name=tithi_name, entity_type=EntityType.TITHI,
+                                                     meta={"tithi_group": "Poorna", "group_tithis": "5,10,15/30", "group_index": idx}))
         self.grid[r][c].label = "Sat"
 
     def _place_svaras(self) -> None:

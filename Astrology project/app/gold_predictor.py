@@ -234,12 +234,12 @@ SIGN_GOLD_EFFECT = {
 # ─────────────────────────────────────────────────────────────
 
 RETRO_GOLD_EFFECT = {
-    "Jupiter": {"retro_effect": 0.5,  "reason": "Jupiter retro = banking stress = gold safe haven rise",
+    "Jupiter": {"retro_effect": 0.15,  "reason": "Jupiter retro = banking stress = gold safe haven rise",
                 "shloka": "337: शुभग्रह वक्रगति में दृष्टिफल अति शुभ"},
-    "Venus":   {"retro_effect": 0.4,  "reason": "Venus retro = luxury re-evaluation = gold demand shift"},
-    "Saturn":  {"retro_effect": 0.6,  "reason": "Saturn retro = chronic market fear = gold rises sharply"},
-    "Mercury": {"retro_effect": 0.3,  "reason": "Mercury retro = trade disruption = mild gold support"},
-    "Mars":    {"retro_effect": 0.4,  "reason": "Mars retro = military tension review = gold volatility"},
+    "Venus":   {"retro_effect": 0.12,  "reason": "Venus retro = luxury re-evaluation = gold demand shift"},
+    "Saturn":  {"retro_effect": 0.18,  "reason": "Saturn retro = chronic market fear = gold rises sharply"},
+    "Mercury": {"retro_effect": 0.08,  "reason": "Mercury retro = trade disruption = mild gold support"},
+    "Mars":    {"retro_effect": 0.12,  "reason": "Mars retro = military tension review = gold volatility"},
 }
 
 
@@ -262,16 +262,19 @@ METAL_NAKSHATRAS: Set[str] = {
 
 # All-planet nakshatra weights for gold scoring
 # How important is each planet sitting in a gold nakshatra?
+# NOTE: These are SMALL because multiple planets will always be in
+# gold/metal nakshatras. Only Moon changes daily; slow planets are
+# background context, not daily signals.
 PLANET_NAK_GOLD_WEIGHT: Dict[str, float] = {
-    "Sun":     1.5,   # Primary gold ruler — highest weight
-    "Jupiter": 1.2,   # Secondary ruler — banking/prosperity
-    "Mars":    0.8,   # Dhatu lord — metals/conflict
-    "Saturn":  0.7,   # Dhatu lord — pressure/fear
-    "Moon":    0.6,   # Sentiment — daily trigger
-    "Venus":   0.5,   # Luxury/jewelry demand
-    "Rahu":    0.5,   # Foreign/volatile influence
-    "Mercury": 0.3,   # Trade — indirect
-    "Ketu":    0.3,   # Reversal — indirect
+    "Sun":     0.25,  # Primary gold ruler — but monthly transit
+    "Jupiter": 0.15,  # Secondary ruler — yearly transit (background)
+    "Mars":    0.12,  # Dhatu lord — ~45 day transit
+    "Saturn":  0.08,  # Dhatu lord — 2.5 year transit (very slow)
+    "Moon":    0.40,  # Sentiment — DAILY trigger (most important)
+    "Venus":   0.10,  # Luxury/jewelry demand — monthly
+    "Rahu":    0.06,  # Foreign/volatile — 1.5 year transit
+    "Mercury": 0.08,  # Trade — monthly
+    "Ketu":    0.04,  # Reversal — 1.5 year transit
 }
 
 
@@ -393,6 +396,13 @@ def _score_sbc_vedha(positions: Dict[str, Dict], transit_planets_list: List[Dict
         gbala = calc_graha_bala(pname, longitude, speed, sign)
         bala_factor = gbala.get("graha_bala", 0.5)
 
+        # Moon vedha discount — Moon changes nakshatra daily, so its vedha
+        # is transient and should NOT accumulate as much as slow planets.
+        # Slow planets (Saturn/Jupiter/Rahu) hold position for months/years,
+        # their vedha is persistent and meaningful. Moon's is fleeting.
+        moon_discount = 0.25 if pname == "Moon" else 1.0
+        bala_factor *= moon_discount
+
         # Get vedha cells from this planet's position
         vedha = get_vedha_cells(
             row=planet_pos[0], col=planet_pos[1],
@@ -401,11 +411,13 @@ def _score_sbc_vedha(positions: Dict[str, Dict], transit_planets_list: List[Dict
         all_vedha_cells = set(vedha.get("all", []))
 
         # ── Check A: Vedha on gold nakshatra cells ──
+        # Score is small per-hit because multiple planets ALWAYS vedha
+        # gold nakshatras. Net direction (papa vs shubha) is what matters.
         for gcell, gnak_name in gold_nak_cells.items():
             if gcell in all_vedha_cells:
                 if is_malefic:
                     # Papa vedha on gold nakshatra = gold RISES (Shloka 245)
-                    effect = 0.6 * bala_factor
+                    effect = 0.12 * bala_factor
                     total_score += effect
                     vedha_hits.append({
                         "vedha_planet": pname,
@@ -421,7 +433,7 @@ def _score_sbc_vedha(positions: Dict[str, Dict], transit_planets_list: List[Dict
                     })
                 else:
                     # Shubha vedha on gold nakshatra = gold FALLS (Shloka 246)
-                    effect = -0.4 * bala_factor
+                    effect = -0.15 * bala_factor
                     total_score += effect
                     vedha_hits.append({
                         "vedha_planet": pname,
@@ -443,8 +455,8 @@ def _score_sbc_vedha(positions: Dict[str, Dict], transit_planets_list: List[Dict
                 if pname == rinfo["planet"]:
                     continue
                 if is_malefic:
-                    # Papa vedha on Sun/Jupiter's nakshatra = strong gold signal
-                    effect = 0.8 * bala_factor
+                    # Papa vedha on Sun/Jupiter's nakshatra = gold signal
+                    effect = 0.15 * bala_factor
                     total_score += effect
                     vedha_hits.append({
                         "vedha_planet": pname,
@@ -452,15 +464,15 @@ def _score_sbc_vedha(positions: Dict[str, Dict], transit_planets_list: List[Dict
                         "target": f"{rinfo['planet']} in {rinfo['nakshatra']}",
                         "target_type": "gold_ruler",
                         "score": round(effect, 2),
-                        "direction": "strongly bullish",
+                        "direction": "bullish",
                         "shloka": "245-246",
-                        "detail": f"Papa ({pname}) vedha on {rinfo['planet']}'s nakshatra {rinfo['nakshatra']} → gold rises sharply",
+                        "detail": f"Papa ({pname}) vedha on {rinfo['planet']}'s nakshatra {rinfo['nakshatra']} → gold rises",
                         "graha_bala": round(bala_factor, 2),
                         "vedha_mode": vedha.get("vedha_mode", ""),
                     })
                 else:
-                    # Shubha vedha on gold ruler = mild stabilization
-                    effect = -0.3 * bala_factor
+                    # Shubha vedha on gold ruler = stabilization
+                    effect = -0.12 * bala_factor
                     total_score += effect
                     vedha_hits.append({
                         "vedha_planet": pname,
@@ -468,7 +480,7 @@ def _score_sbc_vedha(positions: Dict[str, Dict], transit_planets_list: List[Dict
                         "target": f"{rinfo['planet']} in {rinfo['nakshatra']}",
                         "target_type": "gold_ruler",
                         "score": round(effect, 2),
-                        "direction": "mildly bearish",
+                        "direction": "bearish",
                         "shloka": "246",
                         "detail": f"Shubha ({pname}) vedha on {rinfo['planet']}'s nakshatra → gold stabilizes",
                         "graha_bala": round(bala_factor, 2),
@@ -486,7 +498,7 @@ def _score_sbc_vedha(positions: Dict[str, Dict], transit_planets_list: List[Dict
 
     for gnak, planets in papa_vedha_on_gold.items():
         if len(planets) >= 2:
-            ubhayato_score = 1.5
+            ubhayato_score = 0.3
             total_score += ubhayato_score
             ubhayato_hits.append({
                 "target": gnak,
@@ -632,7 +644,7 @@ def _score_day(positions: Dict[str, Dict], date: datetime) -> Dict:
     sun_sign = sun.get("sign", "")
     sun_bala = sun.get("kshetra_bala", 0.5)
     sign_effect = SIGN_GOLD_EFFECT.get(sun_sign, {}).get("gold_effect", 0)
-    sun_score = sign_effect * sun_bala * 1.5  # Sun is primary
+    sun_score = sign_effect * sun_bala * 0.8  # Sun is primary but monthly transit
     score += sun_score
     breakdown["sun_sign"] = {
         "score": round(sun_score, 2),
@@ -651,7 +663,7 @@ def _score_day(positions: Dict[str, Dict], date: datetime) -> Dict:
     jup_sign = jup.get("sign", "")
     jup_bala = jup.get("kshetra_bala", 0.5)
     jup_sign_effect = SIGN_GOLD_EFFECT.get(jup_sign, {}).get("gold_effect", 0)
-    jup_score = jup_sign_effect * jup_bala * 1.0
+    jup_score = jup_sign_effect * jup_bala * 0.5  # Jupiter is yearly transit
     score += jup_score
     breakdown["jupiter_sign"] = {
         "score": round(jup_score, 2),
@@ -673,29 +685,29 @@ def _score_day(positions: Dict[str, Dict], date: datetime) -> Dict:
     # But also: very bullish market nakshatras like Pushya are ALSO bullish gold
     nak_gold_rule = NAKSHATRA_GOLD_RULES.get(moon_nak, {})
     if nak_gold_rule.get("gold", False):
-        # Direct gold nakshatra — strong bullish signal
-        moon_gold_score = 1.2
+        # Direct gold nakshatra — bullish signal (Moon changes daily, this is meaningful)
+        moon_gold_score = 0.5
         reasons.append(f"Moon in {moon_nak} — GOLD NAKSHATRA ({nak_gold_rule.get('shloka', '')})")
         active_rules.append({"rule": f"Gold Nakshatra: {moon_nak}", "shloka": nak_gold_rule.get("shloka", ""),
-                             "effect": "strongly bullish",
+                             "effect": "bullish",
                              "detail": nak_gold_rule.get("detail", ""),
-                             "score": 1.2})
+                             "score": 0.5})
     elif nak_score_raw < -0.3:
         # Bearish market nakshatra = gold safe haven
-        moon_gold_score = abs(nak_score_raw) * 0.8
+        moon_gold_score = abs(nak_score_raw) * 0.3
         reasons.append(f"Moon in {moon_nak} (bearish market → gold hedge, +{moon_gold_score:.2f})")
         active_rules.append({"rule": f"Safe Haven: {moon_nak}", "shloka": "245-246",
                              "effect": "bullish (hedge)",
                              "score": round(moon_gold_score, 2)})
     elif nak_score_raw > 0.6:
-        # Strong bull market nakshatra = gold also benefits from prosperity
-        moon_gold_score = nak_score_raw * 0.4
-        reasons.append(f"Moon in {moon_nak} (prosperity → gold demand, +{moon_gold_score:.2f})")
-        active_rules.append({"rule": f"Prosperity Demand: {moon_nak}", "shloka": "246",
-                             "effect": "mildly bullish",
+        # Strong bull market nakshatra = equities up = gold may dip
+        moon_gold_score = nak_score_raw * -0.15
+        reasons.append(f"Moon in {moon_nak} (bull market → equities favored, {moon_gold_score:.2f})")
+        active_rules.append({"rule": f"Equity Preference: {moon_nak}", "shloka": "246",
+                             "effect": "mildly bearish",
                              "score": round(moon_gold_score, 2)})
     else:
-        moon_gold_score = nak_score_raw * 0.2  # mild effect
+        moon_gold_score = nak_score_raw * 0.1  # mild effect
     score += moon_gold_score
     breakdown["moon_nakshatra"] = {
         "score": round(moon_gold_score, 2),
@@ -731,7 +743,7 @@ def _score_day(positions: Dict[str, Dict], date: datetime) -> Dict:
         p = positions.get(pname, {})
         bala = p.get("kshetra_bala", 0.5)
         if bala >= 0.75:
-            malefic_strength += 0.3
+            malefic_strength += 0.10
     if malefic_strength > 0:
         reasons.append(f"Strong malefics = scarcity pressure (+{malefic_strength:.2f})")
         active_rules.append({"rule": "Strong Malefics (Papa Graha)", "shloka": "245",
@@ -747,7 +759,7 @@ def _score_day(positions: Dict[str, Dict], date: datetime) -> Dict:
         p = positions.get(pname, {})
         bala = p.get("kshetra_bala", 0.5)
         if bala >= 0.75 and not p.get("retrograde", False):
-            benefic_strength -= 0.2  # Strong benefic direct = markets good = less gold fear
+            benefic_strength -= 0.10  # Strong benefic direct = markets good = less gold fear
     if benefic_strength < 0:
         reasons.append(f"Strong benefics direct = market confidence ({benefic_strength:.2f})")
         active_rules.append({"rule": "Strong Benefics (Shubha Graha)", "shloka": "246",
@@ -766,7 +778,7 @@ def _score_day(positions: Dict[str, Dict], date: datetime) -> Dict:
     if sun_moon_diff > 180:
         sun_moon_diff = 360 - sun_moon_diff
     if sun_moon_diff < 36:  # Near new moon — ksheena
-        ksheena_score = 0.4
+        ksheena_score = 0.15
         score += ksheena_score
         reasons.append(f"Ksheena Chandra (waning near new moon) → fear → gold demand (+{ksheena_score})")
         active_rules.append({"rule": "Ksheena Chandra", "shloka": "Moon malefic when waning",
@@ -905,6 +917,53 @@ def _detect_gold_events(
 
     jd = jd_start
     prev_positions = _compute_planet_positions(jd, ayanamsa_key)
+
+    # ── Initial vedha snapshot: detect planets ALREADY vedha-ing gold nakshatras at start ──
+    dt_start = _jd_to_dt(jd_start, tz_offset)
+    for pname in ALL_PLANETS:
+        pdata = prev_positions.get(pname, {})
+        cur_nak = pdata.get("nakshatra", "")
+        cur_pos = NAK_TO_GRID.get(cur_nak)
+        if not cur_pos:
+            continue
+        cur_speed = pdata.get("speed", 0.0)
+        vedha = get_vedha_cells(
+            row=cur_pos[0], col=cur_pos[1],
+            grid_size=9, planet=pname, speed=cur_speed,
+        )
+        vedha_all = set(vedha.get("all", []))
+        for gnak in GOLD_NAKSHATRAS:
+            gpos = NAK_TO_GRID.get(gnak)
+            if gpos and gpos in vedha_all:
+                nature = PLANET_NATURE.get(pname, "neutral")
+                if nature == "malefic":
+                    events.append({
+                        "date": dt_start.strftime("%Y-%m-%d"),
+                        "planet": pname,
+                        "event_type": "vedha_gold_nak",
+                        "nakshatra": gnak,
+                        "from_nak": cur_nak,
+                        "gold_effect": 0.6,
+                        "impact": f"Papa {pname} in {cur_nak} ALREADY VEDHA-ing gold nakshatra {gnak} at start → gold expensive (Shloka 245)",
+                        "importance": "high",
+                        "shloka": "245",
+                        "vedha_mode": vedha.get("vedha_mode", ""),
+                        "color": PLANET_COLORS.get(pname, "#888"),
+                    })
+                elif nature == "benefic":
+                    events.append({
+                        "date": dt_start.strftime("%Y-%m-%d"),
+                        "planet": pname,
+                        "event_type": "vedha_gold_nak",
+                        "nakshatra": gnak,
+                        "from_nak": cur_nak,
+                        "gold_effect": -0.4,
+                        "impact": f"Shubha {pname} in {cur_nak} ALREADY VEDHA-ing gold nakshatra {gnak} at start → gold cheap (Shloka 246)",
+                        "importance": "medium",
+                        "shloka": "246",
+                        "vedha_mode": vedha.get("vedha_mode", ""),
+                        "color": PLANET_COLORS.get(pname, "#888"),
+                    })
 
     while jd < jd_end:
         jd_next = min(jd + step, jd_end)
@@ -1179,7 +1238,7 @@ def predict_gold(
         {"id": 8, "name": "Ksheena Chandra", "shloka": "55",
          "description": "Waning Moon (Sun-Moon < 36°) = malefic nature = fear = gold demand rises"},
         {"id": 9, "name": "All-Planet Nakshatra Gold Scoring", "shloka": "379-406",
-         "description": "When ANY planet sits in a gold nakshatra (Punarvasu/Pushya/Chitra/Dhanishtha), gold signal generated. Weight by planet importance: Sun=1.5, Jupiter=1.2, Mars=0.8, etc."},
+         "description": "When ANY planet sits in a gold nakshatra (Punarvasu/Pushya/Chitra/Dhanishtha), gold signal generated. Weight by planet importance: Moon=0.40, Sun=0.25, Jupiter=0.15, Mars=0.12, etc."},
         {"id": 10, "name": "SBC Vedha on Gold Nakshatras", "shloka": "245-246",
          "description": "Using actual SBC vedha geometry: Papa planet vedha on gold nakshatra cell = gold RISES. Shubha vedha = gold FALLS. Also checks vedha on Sun/Jupiter's current nakshatra."},
         {"id": 11, "name": "Ubhayato Vedha", "shloka": "220",

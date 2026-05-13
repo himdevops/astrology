@@ -19,7 +19,7 @@ PLANETS = {
     "Mars": swe.MARS,
     "Jupiter": swe.JUPITER,
     "Saturn": swe.SATURN,
-    "Rahu": swe.TRUE_NODE,
+    "Rahu": swe.MEAN_NODE,   # KP system uses Mean Node (not True Node)
 }
 
 SIGNS = [

@@ -122,46 +122,48 @@ def classify_vedha_type(planet: str, speed: float) -> Dict:
     if speed < 0:
         return {
             "type":         "Right Vedha",
-            "description":  "Retrograde (वक्री) — दाहिनी vedha; full line rightward/downward",
+            "description":  "Retrograde (वक्री) — दाहिनी vedha; dviguna (2×) intensified",
             "vedha_side":   "right",
-            "vedha_mode":   "right",         # full half-lines, right/down
-            "strength":     "strong",
+            "vedha_mode":   "right",         # dakshina direction
+            "strength":     "intensified",
             "line_style":   "dashed",
-            "color_mod":    0.8,
-            "is_three_way": True,
+            "color_mod":    1.5,             # retrograde = dviguna per Shloka 166
+            "is_three_way": False,
         }
     if abs_speed > avg * LEFT_VEDHA_THRESHOLD:
         return {
             "type":         "Left Vedha",
-            "description":  "Atichar (शीघ्रगामी 25%+) — बाई vedha; full line leftward/upward",
+            "description":  "Fast (शीघ्रगामी) — बाई vedha; svabhavaja natural strength",
             "vedha_side":   "left",
-            "vedha_mode":   "left",          # full half-lines, left/up
-            "strength":     "intense",
-            "line_style":   "thick",
+            "vedha_mode":   "left",          # vama direction
+            "strength":     "normal",
+            "line_style":   "solid",
             "color_mod":    1.0,
-            "is_three_way": True,
+            "is_three_way": False,
         }
     # Front/Straight vedha — normal direct speed (madhya-gami)
     return {
         "type":         "Front Vedha",
-        "description":  "Normal speed (मध्यगामी) — सामने vedha; only nearest cell in each direction",
+        "description":  "Medium speed (मध्यगामी) — सामने vedha; only opposite nakshatra",
         "vedha_side":   "front",
-        "vedha_mode":   "front",         # nearest cell only
-        "strength":     "normal",
+        "vedha_mode":   "front",         # sammukha — only 1 nak opposite
+        "strength":     "limited",
         "line_style":   "dotted",
-        "color_mod":    0.9,
-        "is_three_way": True,
+        "color_mod":    0.8,
+        "is_three_way": False,
     }
 
 
 # Strength multipliers — affect scoring weight of vedha hits
+# Per Shloka 166: Vakri (retrograde) = dviguna (2x), Shighra = svabhavaja (1x)
+# Per Shloka 57: Krura+vakri = maha-krura, Saumya+vakri = maha-shubha
 VEDHA_STRENGTH_MULTIPLIER: Dict[str, float] = {
-    "Sthana Vedha":   1.5,   # Maximum — stationary = concentrated power
-    "3-Way Vedha":    1.3,   # Sun/Moon/Rahu/Ketu — always strong
-    "Left Vedha":     1.2,   # Intense — fast planet = sudden/disruptive
-    "Front Vedha":    1.0,   # Standard — nearest-only but all around
+    "Sthana Vedha":   2.0,   # Near-stationary = maximum concentrated power
+    "3-Way Vedha":    1.3,   # Sun/Moon/Rahu/Ketu — always strong (sada vedha)
+    "Right Vedha":    1.5,   # Retrograde (वक्री) — dviguna, intensified vedha
+    "Left Vedha":     1.0,   # Fast (शीघ्र) — svabhavaja, natural strength
+    "Front Vedha":    0.8,   # Medium (मध्यगामी) — only sammukha, limited reach
     "Standard Vedha": 1.0,   # Legacy fallback
-    "Right Vedha":    0.8,   # Weakened — retrograde = diminished reach
 }
 
 
@@ -1455,11 +1457,17 @@ def analyze_sbc_transits(
 
     bindu_naks = {v["nakshatra"]: k for k, v in six_bindus.items()}
 
-    # Build cell → entities lookup
-    cell_entities: Dict[Tuple[int,int], List[str]] = {}
+    # Build cell → entities lookup. Keep full entity details so vedha can
+    # distinguish nakshatra/rashi/tithi/vara/akshara instead of losing type.
+    cell_entities: Dict[Tuple[int,int], List[Dict]] = {}
+    entity_position_map: Dict[str, Tuple[int, int]] = {}
     for cell in natal_chakra_cells:
         key = (cell["row"], cell["col"])
-        cell_entities[key] = [e["name"] for e in cell.get("entities", [])]
+        cell_entities[key] = cell.get("entities", [])
+        for e in cell.get("entities", []):
+            nm = e.get("name")
+            if nm:
+                entity_position_map.setdefault(nm, key)
 
     # ── Extract Sun/Moon longitudes for dynamic nature classification ──
     sun_longitude = 0.0
@@ -1495,6 +1503,7 @@ def analyze_sbc_transits(
     for tp in transit_planets:
         pname   = tp["planet"]
         nak     = tp.get("nakshatra", "")
+        pada    = tp.get("pada", 1)
         retro   = tp.get("retrograde", False)
         speed   = tp.get("speed", 0.0)
         longitude = tp.get("longitude", 0.0)
@@ -1553,10 +1562,11 @@ def analyze_sbc_transits(
             tp.get("sign", ""))  # fallback to rashi cell
         vedha_hits: List[Dict] = []
         vedha_line_data: Optional[Dict] = None
+        combined_mult: float = 1.0
 
         if pos:
             row, col = pos
-            # ── Speed-filtered vedha cells ──────────────────────
+            # ── Speed-filtered vedha cells (geometric fallback) ──
             vedha_cells = get_vedha_cells(row, col, planet=pname, speed=speed)
 
             # Generate visual line data for the UI (also filtered)
@@ -1570,18 +1580,39 @@ def analyze_sbc_transits(
             # Planet's nakshatra index for temporal vedha
             planet_nak_idx = NAK_INDEX.get(nak, 0)
 
-            for (vr, vc) in vedha_cells["all"]:
+            # ── Build target cells: BOOK TARGETS take priority ────
+            # The book (Shlokas 19-47) gives exact nakshatra targets
+            # per direction. Map those target names → grid positions.
+            # Geometric cells are used ONLY as fallback when no book
+            # data exists (e.g., for Abhijit).
+            target_cells: List[Tuple[int, int]] = []
+            if nak_vedha_targets is not None:
+                # Use book-defined targets → find their grid positions
+                _seen_targets: Set[Tuple[int, int]] = set()
+                for target_name in nak_vedha_targets:
+                    tgt_pos = nak_position_map.get(target_name) or entity_position_map.get(target_name)
+                    if tgt_pos and tgt_pos not in _seen_targets:
+                        target_cells.append(tgt_pos)
+                        _seen_targets.add(tgt_pos)
+            else:
+                # Fallback to geometric vedha cells
+                target_cells = vedha_cells["all"]
+
+            for (vr, vc) in target_cells:
                 entities = cell_entities.get((vr, vc), [])
                 if not entities:
                     continue
-                for entity_name in entities:
+                for ent in entities:
+                    entity_name = ent.get("name", "") if isinstance(ent, dict) else str(ent)
+                    entity_type = ent.get("entity_type", ent.get("type", "unknown")) if isinstance(ent, dict) else "unknown"
                     bindu_hit = bindu_naks.get(entity_name)
                     tara_info = navatara.get(entity_name, {})
 
-                    # Check per-nakshatra vedha targets if available
+                    # When using book targets, entity must be in the
+                    # target list (cell may hold multiple entities).
                     if nak_vedha_targets is not None:
                         if entity_name not in nak_vedha_targets:
-                            continue  # Not a valid target per book
+                            continue
                     elif not bindu_hit and tara_info.get("quality") not in ("inauspicious",):
                         continue  # Fallback: only report significant hits
 
@@ -1602,8 +1633,12 @@ def analyze_sbc_transits(
                         "from_nak":      nak,
                         "from_pos":      list(pos),
                         "to_entity":     entity_name,
+                        "to_entity_type": entity_type,
                         "to_pos":        [vr, vc],
                         "bindu_type":    bindu_hit,
+                        "from_pada":     pada,
+                        "to_pada":       pada if entity_type == "nakshatra" else None,
+                        "pada_vedha":    (f"{nak} pada {pada} → {entity_name} pada {pada}" if entity_type == "nakshatra" else "not_applicable"),
                         "tara":          tara_info.get("tara",""),
                         "tara_quality":  tara_info.get("quality",""),
                         "vedha_direction": direction,
@@ -1635,9 +1670,59 @@ def analyze_sbc_transits(
                         base = 0.25 if severity == "CRITICAL" else 0.12
                         overall_score -= base * combined_mult * temporal_mod
 
+        # ── Corner Pada Vedha (Shloka 52) ──────────────────────
+        corner_vedha_info = check_corner_pada_vedha(nak, pada)
+        if corner_vedha_info:
+            svara_pos = corner_vedha_info["svara_pos"]
+            center_pos = corner_vedha_info["center_pos"]
+            corner_hit = {
+                "planet":        pname,
+                "from_nak":      nak,
+                "from_pada":     pada,
+                "corner":        corner_vedha_info["corner"],
+                "svara":         corner_vedha_info["svara"],
+                "svara_en":      corner_vedha_info["svara_en"],
+                "svara_pos":     list(svara_pos),
+                "center_pos":    list(center_pos),
+                "vedha_speed_type": vedha_type_info["type"],
+                "nature":        "shubha_vedha" if is_benefic else "papa_vedha",
+                "effect":        f"Corner {corner_vedha_info['corner']} svara vedha — "
+                                 f"{'auspicious' if is_benefic else 'inauspicious'} "
+                                 f"on {corner_vedha_info['svara_en']} svara + Purna tithi",
+                "retrograde":    retro,
+                "strength_multiplier": combined_mult if pos else 1.0,
+            }
+            # Add corner vedha as a special vedha hit
+            vedha_hits.append({
+                **corner_hit,
+                "to_entity":     corner_vedha_info["svara"],
+                "to_pos":        list(svara_pos),
+                "bindu_type":    None,
+                "tara":          "",
+                "tara_quality":  "",
+                "vedha_direction": corner_vedha_info["corner"],
+                "vedha_mode":    "corner_pada",
+                "active_directions": [corner_vedha_info["corner"]],
+                "severity":      "HIGH" if not is_benefic else "MODERATE",
+                "speed":         round(speed, 4),
+                "graha_bala":    graha_bala.get("graha_bala", 1.0) if isinstance(graha_bala, dict) else 1.0,
+                "temporal_state": {},
+                "commodity":     commodity_info,
+                "nse_impact":    fin["impact"],
+            })
+            all_vedha_hits.append(vedha_hits[-1])
+            # Score impact — corner vedha is significant
+            if is_benefic:
+                overall_score += 0.15 * (combined_mult if pos else 1.0)
+            else:
+                overall_score -= 0.15 * (combined_mult if pos else 1.0)
+        else:
+            corner_hit = None
+
         planet_analyses.append({
             "planet":          pname,
             "nakshatra":       nak,
+            "pada":            pada,
             "retrograde":      retro,
             "speed":           round(speed, 4),
             "longitude":       round(longitude, 4),
@@ -1657,6 +1742,7 @@ def analyze_sbc_transits(
             "latta_hits":      latta_hits,
             "vedha_hits":      vedha_hits,
             "vedha_count":     len(vedha_hits),
+            "corner_pada_vedha": corner_hit,
             "financial":       fin,
             "commodity":       commodity_info,
             "nak_vedha_targets": nak_vedha_targets,
@@ -1707,13 +1793,36 @@ def analyze_sbc_transits(
     )
     multiple_effect = VEDHA_MULTIPLE_EFFECTS.get(min(malefic_vedha_count, 4), "")
 
-    # Collect all vedha lines for rendering — include `nature` for UI coloring
+    # Geometric vedha lines for rendering — these show the PATH of
+    # vedha influence along diagonals/rows/columns.  Hit detection
+    # still uses book-based targets (Shlokas 19-47).
     vedha_lines_all = []
     for pa in planet_analyses:
         vl = pa.get("vedha_lines")
         if vl is not None:
             vl["nature"] = pa["nature"]   # inject benefic/malefic for UI
             vedha_lines_all.append(vl)
+
+    # ── Tatkalika Grahas (Shlokas 153-160) ───────────────────
+    moon_nak = ""
+    moon_speed = 0.0
+    for tp in transit_planets:
+        if tp["planet"] == "Moon":
+            moon_nak = tp.get("nakshatra", "")
+            moon_speed = tp.get("speed", 13.0)
+            break
+    tatkalika = calc_tatkalika_grahas(sun_nakshatra, moon_nak) if sun_nakshatra and moon_nak else {}
+
+    # ── Moon Daily Vedha ─────────────────────────────────────
+    moon_daily_vedha = {}
+    if moon_nak:
+        moon_daily_vedha = calc_moon_daily_vedha(
+            moon_nak, moon_speed, transit_planets,
+            planet_natures, nak_position_map, natal_chakra_cells,
+        )
+
+    # ── Enhanced Vedha Count Analysis (Shlokas 107-109, 122-124) ──
+    vedha_count_analysis = calc_vedha_count_analysis(all_vedha_hits)
 
     return {
         "janma_nakshatra":      janma_nak,
@@ -1737,6 +1846,10 @@ def analyze_sbc_transits(
         "ubhayato_vedha":       ubhayato_vedha,
         "upagrahas":            upagrahas,
         "upagraha_hits":        upagraha_hits,
+        # ── SBC v4.0 — Book-accurate enhancements ─────────
+        "tatkalika_grahas":     tatkalika,
+        "moon_daily_vedha":     moon_daily_vedha,
+        "vedha_count_analysis": vedha_count_analysis,
     }
 
 
@@ -1907,3 +2020,760 @@ def sbc_nse_daily_signal(
         "active_vedha_naks": active_vedha_naks,
         "market_signal":    _sbc_to_market_signal(score, [], active_lattas),
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# FULL ENTITY VEDHA TARGETS — Khemraj book Shlokas 19-47
+# Each nakshatra's vedha covers ALL 5 entity types per direction
+# ═══════════════════════════════════════════════════════════════
+
+# Linked akshara pairs (Shlokas 48-50) — vedha on one implies vedha on partner
+LINKED_AKSHARAS = {
+    "Ba": "Va", "Va": "Ba",
+    "Sha": "Sa", "Sa": "Sha",
+    "Sha2": "Kha", "Kha": "Sha2",
+    "Ka": ["Cha", "Nga", "Chha"],
+    "Pa": ["Sha2", "Na2", "Tha2"],
+    "Bha": ["Dha", "Pha", "Da2", "Dha2"],
+    "Da": ["Tha", "Jna", "Ja"],
+}
+
+# Linked svara pairs (Shloka 51) — vedha on one implies vedha on partner
+LINKED_SVARAS = {
+    "A": "Aa", "Aa": "A",
+    "I": "Ii", "Ii": "I",
+    "U": "Uu", "Uu": "U",
+    "Ri": "Rii", "Rii": "Ri",
+    "E": "Ai", "Ai": "E",
+    "O": "Au", "Au": "O",
+}
+
+
+# ═══════════════════════════════════════════════════════════════
+# CORNER SVARA VEDHA — Shloka 52
+# When planet is at corner junction padas, it vedhas the corner
+# svara AND the Purna tithi in the center.
+# ═══════════════════════════════════════════════════════════════
+
+# (nakshatra, pada) → corner svara vedha'd + center Purna tithi
+# Grid positions: Ishana=(0,0), Agni=(0,8), Nairitya=(8,8), Vayavya=(8,0), Center=(4,4)
+CORNER_PADA_VEDHA = {
+    # Ishana corner (NE) — 'अ' svara at (0,0)
+    ("Bharani", 4):    {"corner": "Ishana", "svara": "अ", "svara_en": "A",  "svara_pos": (0, 0), "center_pos": (4, 4)},
+    ("Krittika", 1):   {"corner": "Ishana", "svara": "अ", "svara_en": "A",  "svara_pos": (0, 0), "center_pos": (4, 4)},
+    # Agni corner (SE) — 'आ' svara at (0,8)
+    ("Ashlesha", 4):   {"corner": "Agni",   "svara": "आ", "svara_en": "Aa", "svara_pos": (0, 8), "center_pos": (4, 4)},
+    ("Magha", 1):      {"corner": "Agni",   "svara": "आ", "svara_en": "Aa", "svara_pos": (0, 8), "center_pos": (4, 4)},
+    # Nairitya corner (SW) — 'इ' svara at (8,8)
+    ("Vishakha", 4):   {"corner": "Nairitya","svara": "इ", "svara_en": "I",  "svara_pos": (8, 8), "center_pos": (4, 4)},
+    ("Anuradha", 1):   {"corner": "Nairitya","svara": "इ", "svara_en": "I",  "svara_pos": (8, 8), "center_pos": (4, 4)},
+    # Vayavya corner (NW) — 'ई' svara at (8,0)
+    ("Shravana", 4):   {"corner": "Vayavya","svara": "ई", "svara_en": "Ii", "svara_pos": (8, 0), "center_pos": (4, 4)},
+    ("Dhanishtha", 1): {"corner": "Vayavya","svara": "ई", "svara_en": "Ii", "svara_pos": (8, 0), "center_pos": (4, 4)},
+}
+
+
+def check_corner_pada_vedha(nakshatra: str, pada: int) -> Optional[Dict]:
+    """
+    Check if planet at this nakshatra+pada vedhas a corner svara (Shloka 52).
+    Returns corner info if applicable, None otherwise.
+    """
+    return CORNER_PADA_VEDHA.get((nakshatra, pada))
+
+
+# ═══════════════════════════════════════════════════════════════
+# VEDHA COUNT EFFECTS — Shlokas 107-109 (papa), 122-124 (shubha)
+# ═══════════════════════════════════════════════════════════════
+
+PAPA_VEDHA_COUNT_EFFECTS = {
+    1: {"effect": "Udvega (उद्वेग)", "meaning": "Anxiety and confusion", "severity": "LOW", "market": "Minor negative volatility"},
+    2: {"effect": "Bhaya (भय)", "meaning": "Fear and mental suffering", "severity": "MODERATE", "market": "Bearish pressure building"},
+    3: {"effect": "Hani (हानि)", "meaning": "Financial loss, multiple afflictions", "severity": "HIGH", "market": "Significant downward move expected"},
+    4: {"effect": "Roga (रोग)", "meaning": "Disease and serious danger", "severity": "CRITICAL", "market": "Sharp decline, circuit breaker possible"},
+    5: {"effect": "Mrityu (मृत्यु)", "meaning": "Death/destruction — most severe", "severity": "EXTREME", "market": "Market crash signal — extreme caution"},
+}
+
+SHUBHA_VEDHA_COUNT_EFFECTS = {
+    1: {"effect": "Saubhagya (सौभाग्य)", "meaning": "Good fortune", "severity": "LOW", "market": "Mild positive sentiment"},
+    2: {"effect": "Labha (लाभ)", "meaning": "Gain and profit", "severity": "MODERATE", "market": "Bullish momentum building"},
+    3: {"effect": "Vijaya (विजय)", "meaning": "Victory and triumph", "severity": "HIGH", "market": "Strong rally expected"},
+    4: {"effect": "Dhana-Sukha (धन-सुख)", "meaning": "Wealth and happiness", "severity": "VERY_HIGH", "market": "Major bull run, all-time-high possible"},
+}
+
+# Per-entity-type vedha effects (Shloka 109 papa, 123-124 shubha)
+ENTITY_TYPE_VEDHA = {
+    "papa": {
+        "nakshatra": {"effect": "Bhrama (भ्रम)", "meaning": "Confusion and disorientation"},
+        "akshara":   {"effect": "Hani (हानि)", "meaning": "Loss — financial or personal"},
+        "svara":     {"effect": "Vyadhi (व्याधि)", "meaning": "Disease or illness"},
+        "tithi":     {"effect": "Bhaya (भय)", "meaning": "Fear and dread"},
+        "rashi":     {"effect": "Maha-Vighna (महाविघ्न)", "meaning": "Great obstacle or hindrance"},
+    },
+    "shubha": {
+        "nakshatra": {"effect": "Deha-Vriddhi (देहवृद्धि)", "meaning": "Bodily health, fearlessness, success"},
+        "akshara":   {"effect": "Nirbhayata (निर्भयता)", "meaning": "Fearlessness and courage"},
+        "svara":     {"effect": "Saubhagya-Vriddhi (सौभाग्यवृद्धि)", "meaning": "Increase in fortune"},
+        "tithi":     {"effect": "Dravya-Labha (द्रव्यलाभ)", "meaning": "Material gain and wealth"},
+        "rashi":     {"effect": "Sukha (सुख)", "meaning": "Happiness and comfort"},
+    },
+}
+
+
+# ═══════════════════════════════════════════════════════════════
+# TATKALIKA GRAHAS — Instantaneous Planets (Shlokas 153-160)
+# ═══════════════════════════════════════════════════════════════
+
+# Paksha (fortnightly) grahas — counted from Sun's nakshatra
+# Start from Sun's nak → 12th=Ketu, from Ketu 17th=Mercury, etc.
+PAKSHA_GRAHA_OFFSETS = [
+    ("Ketu",    12),
+    ("Mercury", 17),
+    ("Venus",    4),
+    ("Rahu",    14),
+    ("Mars",    18),
+    ("Jupiter", 13),
+    ("Saturn",  10),
+    ("Moon",    15),
+]
+
+# Dina (daily) grahas — counted from Moon's nakshatra
+# Start from Moon's nak → 7th=Mars, from Mars 4th=Mercury, etc.
+DINA_GRAHA_OFFSETS = [
+    ("Mars",     7),
+    ("Mercury",  4),
+    ("Jupiter",  5),
+    ("Venus",    6),
+    ("Saturn",   7),
+    ("Sun",      9),
+    ("Rahu",     9),
+    ("Ketu",     9),
+]
+
+# Kshana (momentary) grahas — from Sun's nakshatra
+KSHANA_GRAHA_OFFSETS = [
+    ("Moon",     3),
+    ("Mars",     5),
+    ("Mercury",  7),
+    ("Jupiter",  8),
+    ("Venus",    8),
+    ("Saturn",  14),
+    ("Rahu",     8),
+    ("Ketu",     7),
+]
+
+
+def calc_tatkalika_grahas(sun_nakshatra: str, moon_nakshatra: str) -> Dict:
+    """
+    Calculate Tatkalika (temporal) grahas per Shlokas 153-160.
+
+    Paksha grahas: from Sun's nakshatra, cumulative offsets
+    Dina grahas: from Moon's nakshatra, cumulative offsets
+    Kshana grahas: from Sun's nakshatra, cumulative offsets
+
+    These temporal planets give vedha results within their time periods.
+    """
+    result = {"paksha": [], "dina": [], "kshana": []}
+
+    # Paksha grahas from Sun's nakshatra
+    current_nak = sun_nakshatra
+    for planet_name, offset in PAKSHA_GRAHA_OFFSETS:
+        target_nak = nak_at_offset(current_nak, offset - 1, "forward")
+        result["paksha"].append({
+            "planet": planet_name,
+            "nakshatra": target_nak,
+            "offset": offset,
+            "from_nak": current_nak,
+            "period": "Paksha (fortnightly)",
+        })
+        current_nak = target_nak
+
+    # Dina grahas from Moon's nakshatra
+    current_nak = moon_nakshatra
+    for planet_name, offset in DINA_GRAHA_OFFSETS:
+        target_nak = nak_at_offset(current_nak, offset - 1, "forward")
+        result["dina"].append({
+            "planet": planet_name,
+            "nakshatra": target_nak,
+            "offset": offset,
+            "from_nak": current_nak,
+            "period": "Dina (daily)",
+        })
+        current_nak = target_nak
+
+    # Kshana grahas from Sun's nakshatra
+    current_nak = sun_nakshatra
+    for planet_name, offset in KSHANA_GRAHA_OFFSETS:
+        target_nak = nak_at_offset(current_nak, offset - 1, "forward")
+        result["kshana"].append({
+            "planet": planet_name,
+            "nakshatra": target_nak,
+            "offset": offset,
+            "from_nak": current_nak,
+            "period": "Kshana (momentary)",
+        })
+        current_nak = target_nak
+
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# MOON DAILY VEDHA + PER-PLANET VEDHA ANALYSIS
+# ═══════════════════════════════════════════════════════════════
+
+def calc_moon_daily_vedha(
+    moon_nakshatra: str,
+    moon_speed: float,
+    all_transit_planets: List[Dict],
+    planet_natures: Dict[str, str],
+    nak_position_map: Dict[str, Tuple[int, int]],
+    natal_chakra_cells: List[Dict],
+) -> Dict:
+    """
+    Calculate Moon's daily vedha — what entities does Moon vedha today,
+    and which planets are casting vedha ON the Moon's current position.
+
+    Moon is always shighragami (fast) → vedha in ALL 3 directions.
+    Returns: Moon's vedha targets + planets vedhing Moon's position.
+    """
+    # Moon's vedha targets (Moon vedhas in all 3 directions)
+    moon_targets = PER_NAKSHATRA_VEDHA_TARGETS.get(moon_nakshatra, {})
+    all_targets = []
+    for direction in ["vama", "dakshina", "sammukha"]:
+        for target in moon_targets.get(direction, []):
+            all_targets.append({
+                "entity": target,
+                "direction": direction,
+                "direction_hindi": {"vama": "बाई (Left)", "dakshina": "दाहिनी (Right)", "sammukha": "सामने (Front)"}.get(direction, direction),
+            })
+
+    # Which planets vedha Moon's nakshatra?
+    planets_vedhing_moon = []
+    for tp in all_transit_planets:
+        if tp["planet"] == "Moon":
+            continue
+        pname = tp["planet"]
+        p_nak = tp.get("nakshatra", "")
+        p_speed = tp.get("speed", 0.0)
+
+        vedha_info = classify_vedha_type(pname, p_speed)
+        p_targets = get_per_nakshatra_vedha_targets(p_nak, vedha_info["vedha_mode"])
+
+        if p_targets and moon_nakshatra in p_targets:
+            p_nature = planet_natures.get(pname, "malefic")
+            planets_vedhing_moon.append({
+                "planet": pname,
+                "from_nakshatra": p_nak,
+                "vedha_type": vedha_info["type"],
+                "nature": p_nature,
+                "is_benefic": p_nature == "benefic",
+                "speed": round(p_speed, 4),
+                "retrograde": p_speed < 0,
+                "effect": "Shubha vedha — positive influence on mind/emotions" if p_nature == "benefic"
+                         else "Papa vedha — mental stress, emotional disturbance",
+            })
+
+    # Moon's rashi (from nakshatra)
+    NAK_TO_RASHI = {
+        "Ashwini": "Mesha", "Bharani": "Mesha", "Krittika": "Mesha/Vrishabha",
+        "Rohini": "Vrishabha", "Mrigashira": "Vrishabha/Mithuna", "Ardra": "Mithuna",
+        "Punarvasu": "Mithuna/Karka", "Pushya": "Karka", "Ashlesha": "Karka",
+        "Magha": "Simha", "Purva Phalguni": "Simha", "Uttara Phalguni": "Simha/Kanya",
+        "Hasta": "Kanya", "Chitra": "Kanya/Tula", "Swati": "Tula",
+        "Vishakha": "Tula/Vrishchika", "Anuradha": "Vrishchika", "Jyeshtha": "Vrishchika",
+        "Mula": "Dhanu", "Purva Ashadha": "Dhanu", "Uttara Ashadha": "Dhanu/Makara",
+        "Shravana": "Makara", "Dhanishtha": "Makara/Kumbha", "Shatabhisha": "Kumbha",
+        "Purva Bhadrapada": "Kumbha/Meena", "Uttara Bhadrapada": "Meena", "Revati": "Meena",
+    }
+
+    shubha_count = sum(1 for p in planets_vedhing_moon if p["is_benefic"])
+    papa_count = sum(1 for p in planets_vedhing_moon if not p["is_benefic"])
+
+    return {
+        "moon_nakshatra": moon_nakshatra,
+        "moon_rashi": NAK_TO_RASHI.get(moon_nakshatra, ""),
+        "moon_speed": round(moon_speed, 4),
+        "vedha_targets": all_targets,
+        "vedha_target_count": len(all_targets),
+        "planets_vedhing_moon": planets_vedhing_moon,
+        "shubha_vedha_on_moon": shubha_count,
+        "papa_vedha_on_moon": papa_count,
+        "moon_vedha_summary": (
+            f"Moon in {moon_nakshatra} — {len(all_targets)} entities vedha'd. "
+            f"{shubha_count} benefic + {papa_count} malefic planets vedhing Moon."
+        ),
+        "daily_outlook": (
+            "Positive — benefic planets dominate Moon's vedha" if shubha_count > papa_count
+            else "Negative — malefic planets dominate Moon's vedha" if papa_count > shubha_count
+            else "Mixed — balanced benefic/malefic vedha on Moon"
+        ),
+    }
+
+
+def calc_planet_vedha_detail(
+    planet_name: str,
+    transit_planets: List[Dict],
+    planet_natures: Dict[str, str],
+    nak_position_map: Dict[str, Tuple[int, int]],
+    natal_chakra_cells: List[Dict],
+    janma_nak: str,
+) -> Dict:
+    """
+    Detailed vedha analysis for a specific chosen planet.
+    Shows all entities this planet vedhas, categorized by type and direction.
+    For future Nifty implementation.
+    """
+    # Find the planet in transits
+    target_planet = None
+    for tp in transit_planets:
+        if tp["planet"] == planet_name:
+            target_planet = tp
+            break
+
+    if not target_planet:
+        return {"error": f"Planet {planet_name} not found in transits"}
+
+    nak = target_planet.get("nakshatra", "")
+    speed = target_planet.get("speed", 0.0)
+    retro = target_planet.get("retrograde", False)
+    sign = target_planet.get("sign", "")
+    longitude = target_planet.get("longitude", 0.0)
+
+    vedha_info = classify_vedha_type(planet_name, speed)
+    p_nature = planet_natures.get(planet_name, "malefic")
+    is_benefic = p_nature == "benefic"
+
+    # Get vedha targets per direction
+    nak_targets = PER_NAKSHATRA_VEDHA_TARGETS.get(nak, {})
+
+    # Build cell → entities lookup
+    cell_entities = {}
+    for cell in natal_chakra_cells:
+        key = (cell["row"], cell["col"])
+        cell_entities[key] = cell.get("entities", [])
+
+    # Get geometric vedha cells
+    pos = nak_position_map.get(nak)
+    if not pos:
+        return {"error": f"No grid position for nakshatra {nak}"}
+
+    row, col = pos
+    vedha_cells = get_vedha_cells(row, col, planet=planet_name, speed=speed)
+
+    # Categorize all vedha'd entities by type
+    vedha_by_type = {
+        "nakshatras": [],
+        "rashis": [],
+        "aksharas": [],
+        "svaras": [],
+        "tithis": [],
+        "varas": [],
+    }
+
+    vedha_by_direction = {
+        "vama": [],
+        "dakshina": [],
+        "sammukha": [],
+    }
+
+    for (vr, vc) in vedha_cells["all"]:
+        entities = cell_entities.get((vr, vc), [])
+        for ent in entities:
+            ent_name = ent.get("name", "") if isinstance(ent, dict) else str(ent)
+            ent_type = ent.get("type", "unknown") if isinstance(ent, dict) else "unknown"
+
+            direction = _vedha_direction(row, col, vr, vc)
+
+            entry = {
+                "entity": ent_name,
+                "type": ent_type,
+                "position": [vr, vc],
+                "direction": direction,
+                "nature": "shubha" if is_benefic else "papa",
+            }
+
+            # Categorize by entity type
+            type_key = ent_type + "s" if ent_type in ("nakshatra", "rashi", "akshara", "svara", "tithi", "vara") else "nakshatras"
+            if type_key in vedha_by_type:
+                vedha_by_type[type_key].append(entry)
+
+            # Categorize by direction
+            if "vama" in direction.lower() or "left" in direction.lower():
+                vedha_by_direction["vama"].append(entry)
+            elif "dakshina" in direction.lower() or "right" in direction.lower():
+                vedha_by_direction["dakshina"].append(entry)
+            else:
+                vedha_by_direction["sammukha"].append(entry)
+
+    # Graha bala
+    graha_bala = calc_graha_bala(planet_name, longitude, speed, sign)
+
+    return {
+        "planet": planet_name,
+        "nakshatra": nak,
+        "sign": sign,
+        "speed": round(speed, 4),
+        "retrograde": retro,
+        "longitude": round(longitude, 4),
+        "vedha_type": vedha_info["type"],
+        "vedha_mode": vedha_info["vedha_mode"],
+        "nature": p_nature,
+        "graha_bala": graha_bala,
+        "grid_position": list(pos),
+        "vedha_by_type": vedha_by_type,
+        "vedha_by_direction": vedha_by_direction,
+        "total_entities_vedha": sum(len(v) for v in vedha_by_type.values()),
+        "nak_vedha_targets_book": nak_targets,
+    }
+
+
+def calc_vedha_count_analysis(all_vedha_hits: List[Dict]) -> Dict:
+    """
+    Analyze vedha counts per Shlokas 107-109 (papa) and 122-124 (shubha).
+    Counts distinct planet vedhas on bindu nakshatras.
+    """
+    papa_on_bindus = set()
+    shubha_on_bindus = set()
+
+    entity_papa_counts = {}
+    entity_shubha_counts = {}
+
+    for vh in all_vedha_hits:
+        planet = vh.get("planet", "")
+        nature = vh.get("nature", "")
+        bindu = vh.get("bindu_type")
+        entity = vh.get("to_entity", "")
+
+        if nature == "papa_vedha":
+            if bindu:
+                papa_on_bindus.add(planet)
+            entity_papa_counts[entity] = entity_papa_counts.get(entity, 0) + 1
+        else:
+            if bindu:
+                shubha_on_bindus.add(planet)
+            entity_shubha_counts[entity] = entity_shubha_counts.get(entity, 0) + 1
+
+    papa_count = len(papa_on_bindus)
+    shubha_count = len(shubha_on_bindus)
+
+    papa_effect = PAPA_VEDHA_COUNT_EFFECTS.get(min(papa_count, 5), {})
+    shubha_effect = SHUBHA_VEDHA_COUNT_EFFECTS.get(min(shubha_count, 4), {})
+
+    # Net assessment
+    if papa_count >= 4:
+        net = "EXTREME_DANGER"
+        net_desc = "Extreme danger — 4+ malefic vedhas on bindus. Avoid all risky activities."
+    elif papa_count >= 3 and shubha_count < 2:
+        net = "HIGH_DANGER"
+        net_desc = "High danger — significant malefic vedha, inadequate benefic protection."
+    elif shubha_count >= 3 and papa_count <= 1:
+        net = "HIGHLY_FAVORABLE"
+        net_desc = "Highly favorable — strong benefic vedha dominance."
+    elif shubha_count > papa_count:
+        net = "FAVORABLE"
+        net_desc = "Favorable — benefic vedha outweighs malefic."
+    elif papa_count > shubha_count:
+        net = "UNFAVORABLE"
+        net_desc = "Unfavorable — malefic vedha dominates."
+    else:
+        net = "MIXED"
+        net_desc = "Mixed influences — balanced benefic and malefic vedha."
+
+    return {
+        "papa_vedha_count": papa_count,
+        "shubha_vedha_count": shubha_count,
+        "papa_effect": papa_effect,
+        "shubha_effect": shubha_effect,
+        "papa_planets": sorted(papa_on_bindus),
+        "shubha_planets": sorted(shubha_on_bindus),
+        "net_assessment": net,
+        "net_description": net_desc,
+        "entity_papa_counts": entity_papa_counts,
+        "entity_shubha_counts": entity_shubha_counts,
+    }
+
+
+# ═════════════════════════════════════════════════════════════
+# PATCH: SBC/BDC vedha correction layer
+# Added by ChatGPT for Himanshu: unified speed-based three-direction
+# vedha + pada metadata + all-entity targets (nakshatra/rashi/tithi/vara/akshara).
+# These definitions intentionally override earlier v3.5 helper definitions above.
+# ═════════════════════════════════════════════════════════════
+
+_CENTER_CELL = (4, 4)
+_EIGHT_DIRS = [(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1)]
+
+
+def _sign_delta(a: int, b: int) -> int:
+    return 1 if b > a else (-1 if b < a else 0)
+
+
+def _ray_cells(row: int, col: int, dr: int, dc: int, grid_size: int = 9) -> List[Tuple[int, int]]:
+    out: List[Tuple[int, int]] = []
+    r, c = row + dr, col + dc
+    while 0 <= r < grid_size and 0 <= c < grid_size:
+        out.append((r, c))
+        r += dr
+        c += dc
+    return out
+
+
+def _rotate_dir(dr: int, dc: int, steps: int) -> Tuple[int, int]:
+    """Rotate an 8-way direction by 45-degree steps."""
+    try:
+        idx = _EIGHT_DIRS.index((dr, dc))
+    except ValueError:
+        # Should not happen, but use north as safe fallback.
+        idx = 0
+    return _EIGHT_DIRS[(idx + steps) % len(_EIGHT_DIRS)]
+
+
+def _traditional_sbc_rays(row: int, col: int, grid_size: int = 9) -> Dict[str, List[Tuple[int, int]]]:
+    """
+    Traditional Sarvatobhadra outer-nakshatra rays.
+
+    For a planet on an outer nakshatra, vedha is drawn as THREE lines:
+      1) one straight line along the same side of the chakra
+      2) one inward diagonal
+      3) the other inward diagonal
+
+    This fixes the visible cases:
+      • Rahu in Mula includes the straight bottom-line vedha through Abhijit.
+      • Ketu in Magha includes the up-left diagonal vedha to Ashlesha.
+      • Sun in Bharani includes the up-right diagonal vedha to Krittika.
+
+    Direction labels are kept as vama/sammukha/dakshina for compatibility:
+      sammukha = straight side line
+      vama     = first diagonal
+      dakshina = second diagonal
+    """
+    last = grid_size - 1
+
+    def ray(dr: int, dc: int) -> List[Tuple[int, int]]:
+        return _ray_cells(row, col, dr, dc, grid_size)
+
+    def same_row() -> List[Tuple[int, int]]:
+        return [(row, c) for c in range(grid_size) if c != col]
+
+    def same_col() -> List[Tuple[int, int]]:
+        return [(r, col) for r in range(grid_size) if r != row]
+
+    # Top/East side nakshatras: straight horizontal + two inward diagonals
+    if row == 0 and 0 < col < last:
+        return {"sammukha": same_row(), "vama": ray(1, -1), "dakshina": ray(1, 1)}
+
+    # Right/North side nakshatras: straight vertical + two inward diagonals
+    if col == last and 0 < row < last:
+        return {"sammukha": same_col(), "vama": ray(-1, -1), "dakshina": ray(1, -1)}
+
+    # Bottom/West side nakshatras: straight horizontal + two inward diagonals
+    if row == last and 0 < col < last:
+        return {"sammukha": same_row(), "vama": ray(-1, -1), "dakshina": ray(-1, 1)}
+
+    # Left/South side nakshatras: straight vertical + two inward diagonals
+    if col == 0 and 0 < row < last:
+        return {"sammukha": same_col(), "vama": ray(-1, 1), "dakshina": ray(1, 1)}
+
+    # Fallback for non-outer cells: use center-facing front + adjacent rays.
+    dr = _sign_delta(row, _CENTER_CELL[0])
+    dc = _sign_delta(col, _CENTER_CELL[1])
+    if dr == 0 and dc == 0:
+        dr, dc = -1, 0
+    return {
+        "sammukha": ray(dr, dc),
+        "vama": ray(*_rotate_dir(dr, dc, -1)),
+        "dakshina": ray(*_rotate_dir(dr, dc, 1)),
+    }
+
+
+def _sbc_direction_vectors(row: int, col: int) -> Dict[str, Tuple[int, int]]:
+    """
+    Backward-compatible vector summary for UI labels.
+    Real hit/line calculation uses _traditional_sbc_rays() because the straight
+    side-line has two endpoints, not just one vector.
+    """
+    last = _GRID_SIZE - 1 if '_GRID_SIZE' in globals() else 8
+    if row == 0 and 0 < col < last:
+        return {"sammukha": (0, 1), "vama": (1, -1), "dakshina": (1, 1)}
+    if col == last and 0 < row < last:
+        return {"sammukha": (1, 0), "vama": (-1, -1), "dakshina": (1, -1)}
+    if row == last and 0 < col < last:
+        return {"sammukha": (0, -1), "vama": (-1, -1), "dakshina": (-1, 1)}
+    if col == 0 and 0 < row < last:
+        return {"sammukha": (-1, 0), "vama": (-1, 1), "dakshina": (1, 1)}
+    dr = _sign_delta(row, _CENTER_CELL[0])
+    dc = _sign_delta(col, _CENTER_CELL[1])
+    if dr == 0 and dc == 0:
+        dr, dc = -1, 0
+    return {"sammukha": (dr, dc), "vama": _rotate_dir(dr, dc, -1), "dakshina": _rotate_dir(dr, dc, 1)}
+
+
+def _directions_for_mode(vedha_mode: str) -> List[str]:
+    if vedha_mode in ("three_way", "sthana"):
+        return ["vama", "sammukha", "dakshina"]
+    if vedha_mode == "left":
+        return ["vama"]
+    if vedha_mode == "right":
+        return ["dakshina"]
+    if vedha_mode == "front":
+        return ["sammukha"]
+    return ["sammukha"]
+
+
+def get_vedha_cells(
+    row: int,
+    col: int,
+    grid_size: int = 9,
+    planet: str = "",
+    speed: float = 1.0,
+) -> Dict[str, List[Tuple[int, int]]]:
+    """
+    Sun, Moon, Rahu, Ketu always activate all three traditional rays.
+    Other planets activate based on speed:
+      stationary -> all 3 rays
+      retrograde -> dakshina ray
+      fast       -> vama ray
+      normal     -> sammukha/straight ray
+
+    For outer nakshatras the three rays are:
+      • one straight line along the side of the chakra
+      • two diagonals going inward across the chakra
+    """
+    vedha_info = classify_vedha_type(planet, speed)
+    vedha_mode = vedha_info["vedha_mode"]
+    rays = _traditional_sbc_rays(row, col, grid_size)
+    active = _directions_for_mode(vedha_mode)
+
+    by_dir: Dict[str, List[Tuple[int, int]]] = {}
+    all_cells: Set[Tuple[int, int]] = set()
+    for d in active:
+        cells = rays.get(d, [])
+        by_dir[d] = cells
+        all_cells.update(cells)
+
+    return {
+        "vama": by_dir.get("vama", []),
+        "dakshina": by_dir.get("dakshina", []),
+        "sammukha": by_dir.get("sammukha", []),
+        # backward-compatible keys expected by older frontend/tests
+        "horizontal": by_dir.get("sammukha", []) if row in (0, grid_size - 1) else [],
+        "vertical": by_dir.get("sammukha", []) if col in (0, grid_size - 1) else [],
+        "diagonal1": by_dir.get("vama", []),
+        "diagonal2": by_dir.get("dakshina", []),
+        "all": sorted(all_cells),
+        "vedha_type": vedha_info["type"],
+        "vedha_mode": vedha_mode,
+        "vedha_side": vedha_info["vedha_side"],
+        "is_three_way": vedha_mode in ("three_way", "sthana"),
+        "active_directions": active,
+    }
+
+
+def _line_endpoints_for_ray(row: int, col: int, direction: str, ray: List[Tuple[int, int]]) -> List[Dict]:
+    """Convert one logical ray into one or more UI line segments."""
+    if not ray:
+        return []
+    # The straight side-line is stored as all same-row/same-col cells. Draw it
+    # as a full edge-to-edge line through the source so Rahu in Mula visibly
+    # crosses Abhijit, and similar side-line cases render correctly.
+    same_r = all(r == row for r, _ in ray)
+    same_c = all(c == col for _, c in ray)
+    if direction == "sammukha" and same_r:
+        # Draw both halves from the planet cell. The UI then anchors x1/y1
+        # at the planet pada instead of starting from a corner cell.
+        lo = min(c for _, c in ray + [(row, col)])
+        hi = max(c for _, c in ray + [(row, col)])
+        out = []
+        if lo != col:
+            out.append({"type": direction, "from": [row, col], "to": [row, lo]})
+        if hi != col:
+            out.append({"type": direction, "from": [row, col], "to": [row, hi]})
+        return out
+    if direction == "sammukha" and same_c:
+        # Draw both halves from the planet cell so the line visually starts
+        # from the active pada inside that nakshatra box.
+        lo = min(r for r, _ in ray + [(row, col)])
+        hi = max(r for r, _ in ray + [(row, col)])
+        out = []
+        if lo != row:
+            out.append({"type": direction, "from": [row, col], "to": [lo, col]})
+        if hi != row:
+            out.append({"type": direction, "from": [row, col], "to": [hi, col]})
+        return out
+    end = ray[-1]
+    return [{"type": direction, "from": [row, col], "to": [end[0], end[1]]}]
+
+
+def get_vedha_lines(
+    planet_name: str,
+    row: int,
+    col: int,
+    speed: float,
+    grid_size: int = 9,
+) -> Dict:
+    """UI line data generated from the exact same rays used for hit detection."""
+    vedha_info = classify_vedha_type(planet_name, speed)
+    cells = get_vedha_cells(row, col, grid_size=grid_size, planet=planet_name, speed=speed)
+    vectors = _sbc_direction_vectors(row, col)
+    lines: List[Dict] = []
+    for d in cells["active_directions"]:
+        ray = cells.get(d, [])
+        for seg in _line_endpoints_for_ray(row, col, d, ray):
+            seg["vector"] = list(vectors.get(d, (0, 0)))
+            lines.append(seg)
+
+    return {
+        "planet": planet_name,
+        "position": [row, col],
+        "speed": round(speed, 4),
+        "vedha_type": vedha_info["type"],
+        "vedha_mode": vedha_info["vedha_mode"],
+        "vedha_side": vedha_info["vedha_side"],
+        "is_three_way": vedha_info["vedha_mode"] in ("three_way", "sthana"),
+        "strength": vedha_info["strength"],
+        "strength_multiplier": VEDHA_STRENGTH_MULTIPLIER.get(vedha_info["type"], 1.0),
+        "line_style": vedha_info["line_style"],
+        "description": vedha_info["description"],
+        "active_directions": cells["active_directions"],
+        "lines": lines,
+    }
+
+
+def get_per_nakshatra_vedha_targets(
+    planet_nakshatra: str,
+    vedha_mode: str,
+) -> Optional[List[str]]:
+    """
+    Corrected target lookup using the live traditional grid.
+
+    Earlier table contained only nakshatras and therefore missed the actual SBC
+    layers: akshara, rashi, tithi, vara, and special cells. This function now
+    derives targets from the same ray geometry used by get_vedha_cells(), so
+    backend hits and frontend lines stay synchronized.
+    """
+    try:
+        from app.himanshu_sarvatobhdra import SarvatobhadraChakra, EntityType
+    except Exception:
+        return None
+
+    chakra = SarvatobhadraChakra()
+    pos = chakra.find_entity(EntityType.NAKSHATRA, planet_nakshatra)
+    if not pos:
+        return None
+    row, col = pos
+
+    # Use dummy planet names/speeds to reuse mode classification shape without
+    # altering the caller's already-classified mode.
+    vectors = _sbc_direction_vectors(row, col)
+    active = _directions_for_mode(vedha_mode)
+    names: List[str] = []
+    seen: Set[str] = set()
+    for d in active:
+        dr, dc = vectors[d]
+        for r, c in _ray_cells(row, col, dr, dc, chakra.GRID_SIZE):
+            for ent in chakra.grid[r][c].entities:
+                # skip empty/special-only artifacts only if they are not useful;
+                # keep Brahma because center hits matter in some SBC traditions.
+                if ent.name not in seen:
+                    names.append(ent.name)
+                    seen.add(ent.name)
+    return names
