@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kundali — Birth Chart | Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); }
+  .header h1 { font-size:1.6rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1400px; margin:0 auto; padding:20px; }
+
+  /* Birth form */
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .form-field input[type="text"] { min-width:140px; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+
+  .loc-note { font-size:0.75rem; color:#888; margin-top:4px; }
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+
+  /* Ascendant banner */
+  .asc-banner { background:#fff3cd; border:2px solid var(--gold); border-radius:8px; padding:16px 24px; margin-bottom:24px; display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+  .asc-banner .asc-title { font-size:1.2rem; font-weight:700; color:var(--accent); }
+  .asc-banner .asc-item { text-align:center; }
+  .asc-banner .asc-label { font-size:0.75rem; color:#888; text-transform:uppercase; }
+  .asc-banner .asc-value { font-size:1rem; font-weight:700; color:var(--accent); }
+
+  /* Chart area */
+  .chart-section { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .chart-section h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+
+  /* Varga tabs */
+  .varga-tabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:20px; }
+  .varga-tab { padding:8px 14px; background:#fff; border:1px solid var(--border); border-radius:4px; cursor:pointer; font-size:0.85rem; font-weight:600; transition:all 0.2s; text-align:center; min-width:110px; }
+  .varga-tab:hover { background:#ffe4b5; }
+  .varga-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+
+  /* Chart container */
+  .chart-container { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .chart-svg-wrap { flex:0 0 420px; }
+  .chart-details { flex:1; min-width:300px; }
+
+  /* Planet table */
+  table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  th { background:var(--table-header); color:#fff; padding:10px 12px; text-align:left; font-weight:600; }
+  td { padding:8px 12px; border-bottom:1px solid #ddd; }
+  tr:nth-child(even) td { background:var(--table-alt); }
+  tr:hover td { background:#ffe4b5; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:600; }
+  .badge-retro { background:#ff6b6b; color:#fff; }
+  .badge-direct { background:#51cf66; color:#fff; }
+
+  /* Deity cards */
+  .deity-section { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .deity-section h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .deity-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; }
+  .deity-card { background:#fff; border:1px solid var(--border); border-radius:8px; overflow:hidden; box-shadow:0 1px 4px var(--shadow); }
+  .deity-card-header { background:var(--header-bg); color:#fff; padding:10px 14px; font-weight:700; font-size:0.95rem; display:flex; justify-content:space-between; align-items:center; }
+  .deity-card-header .varga-badge { background:var(--gold); color:#333; padding:2px 10px; border-radius:10px; font-size:0.8rem; font-weight:700; }
+  .deity-card-body { padding:12px 14px; }
+  .deity-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #f0e0c0; font-size:0.85rem; }
+  .deity-row:last-child { border-bottom:none; }
+  .deity-planet { font-weight:600; color:var(--accent); min-width:80px; }
+  .deity-sign { color:#666; min-width:70px; text-align:center; }
+  .deity-name { font-weight:700; color:#8B4513; text-align:right; }
+  .deity-part { font-size:0.75rem; color:#999; margin-left:4px; }
+
+  /* Navtara table */
+  .navtara-section { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .navtara-section h2 { color:var(--accent); margin-bottom:6px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .navtara-legend { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:14px; font-size:0.8rem; }
+  .navtara-legend span { padding:3px 10px; border-radius:4px; font-weight:600; }
+  .navtara-wrap { overflow-x:auto; }
+  .navtara-table { width:100%; border-collapse:collapse; font-size:0.75rem; white-space:nowrap; }
+  .navtara-table th { background:var(--table-header); color:#fff; padding:6px 8px; text-align:center; font-weight:600; position:sticky; top:0; z-index:2; }
+  .navtara-table th:first-child { text-align:left; min-width:120px; position:sticky; left:0; z-index:3; }
+  .navtara-table td { padding:5px 6px; text-align:center; border:1px solid #e0d0b0; font-weight:600; }
+  .navtara-table td:first-child { text-align:left; font-weight:700; color:var(--accent); background:#fff !important; position:sticky; left:0; z-index:1; border-right:2px solid var(--border); }
+  .navtara-table tr:hover td { opacity:0.9; }
+  .tara-good { background:#c8f7c5; color:#1a5e1a; }
+  .tara-bad { background:#ffd6d6; color:#8b0000; }
+  .tara-janma1 { background:#4caf50 !important; color:#fff !important; font-weight:800; box-shadow:inset 0 0 0 2px #2e7d32; }
+  .tara-janma2 { background:#81c784; color:#fff; }
+  .tara-janma3 { background:#a5d6a7; color:#1a5e1a; }
+  .tara-score { font-weight:700; font-size:0.85rem; }
+  .tara-top { background:#fffacd; border:2px solid var(--gold) !important; }
+  .navtara-summary { margin-top:16px; padding:14px; background:#fff; border:1px solid var(--border); border-radius:8px; }
+  .navtara-summary h3 { color:var(--accent); font-size:1rem; margin-bottom:10px; }
+  .top-nak-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .top-nak-chip { padding:5px 12px; border-radius:16px; font-size:0.8rem; font-weight:600; border:1px solid; }
+  .top-nak-chip.excellent { background:#c8f7c5; color:#1a5e1a; border-color:#4caf50; }
+  .top-nak-chip.good { background:#e8f5e9; color:#2e7d32; border-color:#81c784; }
+
+  .loading { text-align:center; padding:40px; font-size:1.1rem; color:var(--accent); }
+  .loading::after { content:''; display:inline-block; width:20px; height:20px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:10px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .footer { text-align:center; padding:16px; color:#fff; font-size:0.8rem; background:var(--header-bg); margin-top:40px; }
+
+  @media (max-width:768px) {
+    .header { flex-direction:column; gap:8px; }
+    .form-row { flex-direction:column; }
+    .chart-container { flex-direction:column; }
+    .chart-svg-wrap { flex:1; width:100%; }
+    .varga-tabs { gap:2px; }
+    .varga-tab { padding:6px 8px; font-size:0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>&#9788;</span> Kundali — Birth Chart</h1>
+  <div class="nav-links">
+    <a href="/">Daily Panchang</a>
+    <a href="/kundali" class="active">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas">Special Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth Data Form -->
+  <div class="birth-form">
+    <h2>Enter Birth Details</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="dobInput" placeholder="DD-MM-YYYY" maxlength="10" value="23-09-1992" />
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="tobInput" placeholder="HH:MM" maxlength="5" value="23:10" />
+      </div>
+      <div class="form-field">
+        <label>Birth Place</label>
+        <div class="loc-auto">
+          <input type="text" id="placeInput" placeholder="City, village, or place..." autocomplete="off" value="Ujjain" style="width:260px;" />
+          <div id="placeSuggestions" class="loc-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Latitude</label>
+        <input type="text" id="latInput" value="23.1765" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>Longitude</label>
+        <input type="text" id="lonInput" value="75.7885" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>TZ (UTC±)</label>
+        <input type="text" id="tzKundali" value="5.5" style="width:60px;" />
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanKundali">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">KP</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Language</label>
+        <select id="langSelect" onchange="switchLanguage()">
+          <option value="en" selected>English</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <button class="btn" id="generateBtn" onclick="generateKundali()">Generate Kundali</button>
+      <span id="genStatus" style="margin-left:16px;color:var(--accent);font-size:0.9rem;"></span>
+    </div>
+    <div class="loc-note">Enter any place name (city, town, village). If found in database, lat/lon/tz auto-fill. Otherwise enter coordinates manually.</div>
+  </div>
+
+  <!-- Ascendant Banner -->
+  <div id="ascBanner" class="asc-banner" style="display:none;"></div>
+
+  <!-- Chart Section -->
+  <div class="chart-section" id="chartSection" style="display:none;">
+    <h2 id="chartTitle">D1 — Rashi Chart</h2>
+    <div class="varga-tabs" id="vargaTabs"></div>
+    <div class="chart-container">
+      <div class="chart-svg-wrap" id="chartSvg"></div>
+      <div class="chart-details" id="chartPlanets"></div>
+    </div>
+  </div>
+
+  <!-- Full Planet Details -->
+  <div class="chart-section" id="planetSection" style="display:none;">
+    <h2>Planet Positions — Full Nakshatra Details</h2>
+    <div id="planetTable"></div>
+  </div>
+
+  <!-- Shodashvarga Deity Section -->
+  <div class="deity-section" id="deitySection" style="display:none;">
+    <h2 id="deitySectionTitle">Shodashvarga Deities — Divisional Chart Deities</h2>
+    <div class="deity-grid" id="deityGrid"></div>
+  </div>
+
+  <!-- Navtara Nakshatra Section -->
+  <div class="navtara-section" id="navtaraSection" style="display:none;">
+    <h2 id="navtaraTitle">Navtara — Nakshatra Compatibility Table</h2>
+    <div id="navtaraLegend" class="navtara-legend"></div>
+    <div class="navtara-wrap">
+      <div id="navtaraTable"></div>
+    </div>
+    <div id="navtaraSummary" class="navtara-summary" style="display:none;"></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Kundali Module &middot; Shodashvarga Charts
+</div>
+
+<script>
+const API = '';
+let kundaliData = null;
+let activeVarga = 'D1';
+let placeTimer = null;
+
+// ─── Centralised Birth Defaults ───────────────
+// All modules should read from this object.
+// On page load we fetch from /api/v1/birth-defaults so every page
+// stays in sync with config/settings.py.  If the API is unreachable
+// we fall back to the inline defaults below.
+const BIRTH_DEFAULTS = {
+  date: '23-09-1992',
+  time: '23:10',
+  place: 'Ujjain',
+  latitude: 23.1765,
+  longitude: 75.7885,
+  tz_offset: 5.5,
+  ayanamsa: 'lahiri',
+};
+
+// Fetch central defaults and fill the form
+(async function loadBirthDefaults() {
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) {
+      const d = await res.json();
+      Object.assign(BIRTH_DEFAULTS, d);
+    }
+  } catch (_) { /* use inline defaults */ }
+  // Apply to form
+  document.getElementById('dobInput').value   = BIRTH_DEFAULTS.date;
+  document.getElementById('tobInput').value   = BIRTH_DEFAULTS.time;
+  document.getElementById('placeInput').value = BIRTH_DEFAULTS.place;
+  document.getElementById('latInput').value   = BIRTH_DEFAULTS.latitude;
+  document.getElementById('lonInput').value   = BIRTH_DEFAULTS.longitude;
+  document.getElementById('tzKundali').value  = BIRTH_DEFAULTS.tz_offset;
+  document.getElementById('ayanKundali').value = BIRTH_DEFAULTS.ayanamsa;
+})();
+
+// ─── Language / Translation Data ──────────────
+let currentLang = 'en';
+
+const LANG = {
+  en: {
+    planets: {Sun:'Su',Moon:'Mo',Mars:'Ma',Mercury:'Me',Jupiter:'Ju',Venus:'Ve',Saturn:'Sa',Rahu:'Ra',Ketu:'Ke'},
+    planetFull: {Sun:'Sun',Moon:'Moon',Mars:'Mars',Mercury:'Mercury',Jupiter:'Jupiter',Venus:'Venus',Saturn:'Saturn',Rahu:'Rahu',Ketu:'Ketu'},
+    signs: ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'],
+    signShort: ['Ar','Ta','Ge','Cn','Le','Vi','Li','Sc','Sg','Cp','Aq','Pi'],
+    asc: 'Asc', retro: 'R', direct: 'D',
+    chartTitle: (v, name) => `${v} — ${name} Chart`,
+    headers: {planet:'Planet',sign:'Sign',lord:'Lord',house:'House',status:'Status',degree:'Degree',
+              nakshatra:'Nakshatra',pada:'Pada',nakLord:'Nak Lord',subLord:'Sub Lord',deity:'Deity',speed:'Speed'},
+  },
+  hi: {
+    planets: {Sun:'सू',Moon:'चं',Mars:'मं',Mercury:'बु',Jupiter:'गु',Venus:'शु',Saturn:'श',Rahu:'रा',Ketu:'के'},
+    planetFull: {Sun:'सूर्य',Moon:'चन्द्र',Mars:'मंगल',Mercury:'बुध',Jupiter:'गुरु',Venus:'शुक्र',Saturn:'शनि',Rahu:'राहु',Ketu:'केतु'},
+    signs: ['मेष','वृषभ','मिथुन','कर्क','सिंह','कन्या','तुला','वृश्चिक','धनु','मकर','कुम्भ','मीन'],
+    signShort: ['मे','वृ','मि','क','सिं','कन','तु','वृश','ध','मक','कु','मी'],
+    asc: 'लग्न', retro: 'वक्री', direct: 'मा',
+    chartTitle: (v, name) => `${v} — ${name} कुंडली`,
+    headers: {planet:'ग्रह',sign:'राशि',lord:'स्वामी',house:'भाव',status:'स्थिति',degree:'अंश',
+              nakshatra:'नक्षत्र',pada:'पद',nakLord:'नक्ष. स्वामी',subLord:'उप स्वामी',deity:'देवता',speed:'गति'},
+  },
+};
+
+function switchLanguage() {
+  currentLang = document.getElementById('langSelect').value;
+  if (kundaliData) {
+    renderAscendant();
+    renderChart(activeVarga);
+    renderPlanetTable();
+    renderDeityCards();
+    renderNavtara();
+  }
+}
+
+// ─── Place autocomplete ────────────────
+const placeInput = document.getElementById('placeInput');
+const placeDropdown = document.getElementById('placeSuggestions');
+
+placeInput.addEventListener('input', () => {
+  clearTimeout(placeTimer);
+  const q = placeInput.value.trim();
+  if (q.length < 2) { placeDropdown.style.display = 'none'; return; }
+  placeTimer = setTimeout(() => fetchPlaces(q), 250);
+});
+placeInput.addEventListener('focus', () => {
+  if (placeInput.value.trim().length >= 2) fetchPlaces(placeInput.value.trim());
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#placeInput') && !e.target.closest('#placeSuggestions'))
+    placeDropdown.style.display = 'none';
+});
+
+async function fetchPlaces(q) {
+  try {
+    // Try local DB first
+    const localRes = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+    const localData = await localRes.json();
+    if (localData.results && localData.results.length > 0) {
+      renderPlaceResults(localData.results.map(c => ({
+        display: c.display, name: c.name, lat: c.latitude, lon: c.longitude, tz: c.tz_offset,
+      })));
+      return;
+    }
+    // Fallback to Nominatim (OpenStreetMap) for global coverage
+    const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`);
+    const nData = await nRes.json();
+    if (nData && nData.length > 0) {
+      const results = nData.map(r => {
+        const parts = [];
+        if (r.address) {
+          if (r.address.city || r.address.town || r.address.village || r.address.hamlet) parts.push(r.address.city || r.address.town || r.address.village || r.address.hamlet);
+          if (r.address.state) parts.push(r.address.state);
+          if (r.address.country) parts.push(r.address.country);
+        }
+        const display = parts.length > 0 ? parts.join(', ') : r.display_name.split(',').slice(0,3).join(',');
+        return { display, name: parts[0] || r.display_name.split(',')[0], lat: parseFloat(r.lat), lon: parseFloat(r.lon), tz: null };
+      });
+      renderPlaceResults(results);
+    } else {
+      placeDropdown.innerHTML = '<div style="padding:8px 12px;color:#888;font-size:0.85rem;">No results found</div>';
+      placeDropdown.style.display = 'block';
+    }
+  } catch(e) { placeDropdown.style.display = 'none'; }
+}
+
+window._placeResults = [];
+function renderPlaceResults(results) {
+  window._placeResults = results;
+  placeDropdown.innerHTML = results.map((c, i) => {
+    const tzStr = c.tz !== null ? `UTC${c.tz>=0?'+':''}${c.tz}` : '';
+    return `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.9rem;"
+         onmouseover="this.style.background='#ffe4b5'" onmouseout="this.style.background='#fff'"
+         onclick="pickPlace(${i})">
+      <strong>${c.display}</strong>
+      ${tzStr ? `<span style="color:#888;font-size:0.8rem;margin-left:8px;">${tzStr}</span>` : '<span style="color:#aaa;font-size:0.75rem;margin-left:8px;">via OpenStreetMap</span>'}
+    </div>`;
+  }).join('');
+  placeDropdown.style.display = 'block';
+}
+
+function pickPlace(idx) {
+  const c = window._placeResults[idx];
+  placeInput.value = c.name;
+  document.getElementById('latInput').value = c.lat;
+  document.getElementById('lonInput').value = c.lon;
+  if (c.tz !== null) {
+    document.getElementById('tzKundali').value = c.tz;
+  } else {
+    document.getElementById('tzKundali').value = Math.round(c.lon / 15 * 2) / 2;
+  }
+  placeDropdown.style.display = 'none';
+}
+
+// ─── Generate Kundali ──────────────────
+async function generateKundali() {
+  const btn = document.getElementById('generateBtn');
+  const status = document.getElementById('genStatus');
+  btn.disabled = true;
+  status.innerHTML = '<span class="loading" style="padding:0;">Calculating...</span>';
+
+  try {
+    const body = {
+      date: document.getElementById('dobInput').value,
+      time: document.getElementById('tobInput').value,
+      latitude: parseFloat(document.getElementById('latInput').value),
+      longitude: parseFloat(document.getElementById('lonInput').value),
+      tz_offset: parseFloat(document.getElementById('tzKundali').value),
+      ayanamsa: document.getElementById('ayanKundali').value,
+    };
+
+    const res = await fetch(`${API}/api/v1/kundali`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    kundaliData = await res.json();
+
+    renderAscendant();
+    renderVargaTabs();
+    renderChart('D1');
+    renderPlanetTable();
+
+    renderDeityCards();
+    renderNavtara();
+
+    document.getElementById('ascBanner').style.display = 'flex';
+    document.getElementById('chartSection').style.display = 'block';
+    document.getElementById('planetSection').style.display = 'block';
+    document.getElementById('deitySection').style.display = 'block';
+    document.getElementById('navtaraSection').style.display = 'block';
+
+    status.textContent = 'Done!';
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Ascendant Banner ──────────────────
+function renderAscendant() {
+  const a = kundaliData.ascendant;
+  const L = LANG[currentLang];
+  const H_ = L.headers;
+  const signIdx = LANG.en.signs.indexOf(a.sign);
+  const signName = signIdx >= 0 ? L.signs[signIdx] : a.sign;
+  const title = currentLang === 'hi' ? '⬆ लग्न' : '⬆ Lagna (Ascendant)';
+
+  document.getElementById('ascBanner').innerHTML = `
+    <div class="asc-title">${title}</div>
+    <div class="asc-item"><div class="asc-label">${H_.sign}</div><div class="asc-value">${signName}</div></div>
+    <div class="asc-item"><div class="asc-label">${H_.lord}</div><div class="asc-value">${a.sign_lord}</div></div>
+    <div class="asc-item"><div class="asc-label">${H_.degree}</div><div class="asc-value">${a.degree_display}</div></div>
+    <div class="asc-item"><div class="asc-label">${H_.nakshatra}</div><div class="asc-value">${a.nakshatra} (${H_.pada} ${a.nakshatra_pada})</div></div>
+    <div class="asc-item"><div class="asc-label">${H_.nakLord}</div><div class="asc-value">${a.nakshatra_lord}</div></div>
+    <div class="asc-item"><div class="asc-label">${H_.subLord}</div><div class="asc-value">${a.sub_lord}</div></div>
+    <div class="asc-item"><div class="asc-label">${H_.deity}</div><div class="asc-value">${a.nakshatra_deity}</div></div>
+  `;
+}
+
+// ─── Varga Tabs ────────────────────────
+const VARGA_LIST = ['D1','D2','D3','D4','D7','D9','D10','D12','D16','D20','D24','D27','D30','D40','D45','D60'];
+const VARGA_LABEL = {
+  D1:'Rashi',D2:'Hora',D3:'Drekkana',D4:'Chaturthamsha',D7:'Saptamsha',D9:'Navamsha',
+  D10:'Dashamsha',D12:'Dwadashamsha',D16:'Shodashamsha',D20:'Vimshamsha',
+  D24:'Chaturvimshamsha',D27:'Bhamsha',D30:'Trimshamsha',D40:'Khavedamsha',
+  D45:'Akshavedamsha',D60:'Shashtiamsha'
+};
+
+const VARGA_PURPOSE = {
+  en: {
+    D1:  'General Life & Body',
+    D2:  'Wealth & Finance',
+    D3:  'Siblings & Courage',
+    D4:  'Fortune & Property',
+    D7:  'Children & Progeny',
+    D9:  'Spouse & Marriage',
+    D10: 'Career & Profession',
+    D12: 'Parents & Ancestry',
+    D16: 'Vehicles & Comforts',
+    D20: 'Spiritual Progress',
+    D24: 'Education & Learning',
+    D27: 'Strength & Weakness',
+    D30: 'Misfortunes & Evils',
+    D40: 'Maternal Legacy',
+    D45: 'Paternal Legacy',
+    D60: 'Past Life Karma',
+  },
+  hi: {
+    D1:  'सामान्य जीवन व शरीर',
+    D2:  'धन व वित्त',
+    D3:  'भाई-बहन व साहस',
+    D4:  'भाग्य व सम्पत्ति',
+    D7:  'सन्तान',
+    D9:  'विवाह व जीवनसाथी',
+    D10: 'कर्म व व्यवसाय',
+    D12: 'माता-पिता व वंश',
+    D16: 'वाहन व सुख',
+    D20: 'आध्यात्मिक उन्नति',
+    D24: 'शिक्षा व विद्या',
+    D27: 'बल व दुर्बलता',
+    D30: 'अनिष्ट व कष्ट',
+    D40: 'मातृ विरासत',
+    D45: 'पितृ विरासत',
+    D60: 'पूर्वजन्म कर्म',
+  },
+};
+
+function renderVargaTabs() {
+  const purpose = VARGA_PURPOSE[currentLang];
+  document.getElementById('vargaTabs').innerHTML = VARGA_LIST.map(v =>
+    `<div class="varga-tab ${v===activeVarga?'active':''}" onclick="renderChart('${v}')" title="${purpose[v]}">
+      ${v}<br><span style="font-size:0.7rem;font-weight:400;">${VARGA_LABEL[v]}</span>
+      <br><span style="font-size:0.65rem;font-weight:400;opacity:0.8;font-style:italic;">${purpose[v]}</span>
+    </div>`
+  ).join('');
+}
+
+// ─── North Indian Diamond Chart SVG ────────────
+function renderChart(varga) {
+  activeVarga = varga;
+  renderVargaTabs();
+
+  const chart = kundaliData.charts[varga];
+  const L = LANG[currentLang];
+  document.getElementById('chartTitle').textContent = L.chartTitle(varga, chart.name);
+
+  const asc_idx = chart.ascendant_sign_index;
+  document.getElementById('chartSvg').innerHTML = drawNorthIndianChart(400, 400, chart, asc_idx);
+
+  // Planet list table for this varga
+  const H_ = L.headers;
+  let pHtml = `<table><tr><th>${H_.planet}</th><th>${H_.sign}</th><th>${H_.lord}</th><th>${H_.house}</th><th>${H_.status}</th></tr>`;
+
+  const ascSignName = currentLang === 'hi' ? L.signs[chart.ascendant_sign_index] : chart.ascendant_sign;
+  pHtml += `<tr style="background:#fff3cd;font-weight:600;">
+    <td>⬆ ${L.asc}</td><td>${ascSignName}</td><td>${chart.ascendant_lord}</td><td>1</td><td>—</td>
+  </tr>`;
+
+  chart.planets.forEach(p => {
+    const pName = L.planetFull[p.planet] || p.planet;
+    const signIdx = LANG.en.signs.indexOf(p.sign);
+    const signName = signIdx >= 0 ? L.signs[signIdx] : p.sign;
+    const retLabel = currentLang === 'hi' ? L.retro : 'R';
+    const dirLabel = currentLang === 'hi' ? L.direct : 'D';
+    const badge = p.retrograde
+      ? `<span class="badge badge-retro">${retLabel}</span>`
+      : `<span class="badge badge-direct">${dirLabel}</span>`;
+    pHtml += `<tr>
+      <td><strong>${pName}</strong></td>
+      <td>${signName}</td>
+      <td>${p.sign_lord}</td>
+      <td>${p.house}</td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+  pHtml += '</table>';
+  document.getElementById('chartPlanets').innerHTML = pHtml;
+}
+
+function drawNorthIndianChart(W, H, chart, ascIdx) {
+  const lang = LANG[currentLang];
+  const planetAbbr = lang.planets;
+
+  const m = 8;
+  const s = W - 2 * m;
+
+  // ── Key geometry points ──
+  // Outer square corners
+  const TL = [m, m], TR = [m+s, m], BR = [m+s, m+s], BL = [m, m+s];
+  // Diamond vertices (midpoints of outer square sides)
+  const T = [m+s/2, m], R = [m+s, m+s/2], B = [m+s/2, m+s], L = [m, m+s/2];
+  // Center
+  const C = [m+s/2, m+s/2];
+  // Diagonal–diamond intersection points (midpoints of diamond edges)
+  const P1 = [m+s/4, m+s/4];       // on L→T edge
+  const P2 = [m+3*s/4, m+s/4];     // on T→R edge
+  const P3 = [m+3*s/4, m+3*s/4];   // on R→B edge
+  const P4 = [m+s/4, m+3*s/4];     // on B→L edge
+
+  // ── 12 house regions ──
+  // Index 0 = House 1 (top, Ascendant), COUNTER-CLOCKWISE (standard North Indian)
+  // tx/ty = text anchor (centroid area of region)
+  const houses = [
+    // H1  – top center diamond (Ascendant)
+    { tx: C[0],        ty: m + s*0.18 },
+    // H2  – top-LEFT upper triangle
+    { tx: m + s*0.24,  ty: m + s*0.08 },
+    // H3  – top-LEFT lower triangle (left-upper)
+    { tx: m + s*0.08,  ty: m + s*0.24 },
+    // H4  – LEFT center diamond
+    { tx: m + s*0.18,  ty: C[1] },
+    // H5  – bottom-LEFT upper triangle (left-lower)
+    { tx: m + s*0.08,  ty: m + s*0.76 },
+    // H6  – bottom-LEFT lower triangle
+    { tx: m + s*0.24,  ty: m + s*0.92 },
+    // H7  – bottom center diamond
+    { tx: C[0],        ty: m + s*0.82 },
+    // H8  – bottom-RIGHT lower triangle
+    { tx: m + s*0.76,  ty: m + s*0.92 },
+    // H9  – bottom-RIGHT upper triangle (right-lower)
+    { tx: m + s*0.92,  ty: m + s*0.76 },
+    // H10 – RIGHT center diamond
+    { tx: m + s*0.82,  ty: C[1] },
+    // H11 – top-RIGHT lower triangle (right-upper)
+    { tx: m + s*0.92,  ty: m + s*0.24 },
+    // H12 – top-RIGHT upper triangle
+    { tx: m + s*0.76,  ty: m + s*0.08 },
+  ];
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:420px;">`;
+
+  // Background
+  svg += `<rect x="${m}" y="${m}" width="${s}" height="${s}" fill="#FFF8F0" stroke="#8B4513" stroke-width="2.5" rx="2"/>`;
+
+  // Inner diamond (connecting midpoints of outer sides)
+  svg += `<polygon points="${T} ${R} ${B} ${L}" fill="none" stroke="#8B4513" stroke-width="1.5"/>`;
+
+  // Two corner-to-corner diagonals (create 12 houses)
+  svg += `<line x1="${TL[0]}" y1="${TL[1]}" x2="${BR[0]}" y2="${BR[1]}" stroke="#8B4513" stroke-width="1.5"/>`;
+  svg += `<line x1="${TR[0]}" y1="${TR[1]}" x2="${BL[0]}" y2="${BL[1]}" stroke="#8B4513" stroke-width="1.5"/>`;
+
+  // ── Populate each house ──
+  for (let h = 0; h < 12; h++) {
+    const signIdx = (ascIdx + h) % 12;
+    const houseNum = h + 1;
+    const hp = houses[h];
+    const isCorner = [1, 2, 4, 5, 7, 8, 10, 11].includes(h);
+
+    // Sign label — number in English, short name in Hindi
+    const signLabel = currentLang === 'hi' ? lang.signShort[signIdx] : (signIdx + 1);
+    const sf = isCorner ? 9 : 10;
+    svg += `<text x="${hp.tx}" y="${hp.ty}" text-anchor="middle" font-size="${sf}" fill="#8B4513" font-weight="600">${signLabel}</text>`;
+
+    // Planets in this house
+    const planetsHere = chart.planets.filter(p => p.house === houseNum);
+    if (planetsHere.length > 0) {
+      const names = planetsHere.map(p => {
+        const abbr = planetAbbr[p.planet] || p.planet.substring(0, 2);
+        return p.retrograde ? abbr + 'ᴿ' : abbr;   // superscript R
+      });
+
+      if (isCorner && names.length > 2) {
+        // Tight corner — split into two rows
+        const r1 = names.slice(0, 2).join(' ');
+        const r2 = names.slice(2).join(' ');
+        svg += `<text x="${hp.tx}" y="${hp.ty+12}" text-anchor="middle" font-size="8.5" fill="#222" font-weight="600">${r1}</text>`;
+        svg += `<text x="${hp.tx}" y="${hp.ty+22}" text-anchor="middle" font-size="8.5" fill="#222" font-weight="600">${r2}</text>`;
+      } else if (isCorner) {
+        svg += `<text x="${hp.tx}" y="${hp.ty+12}" text-anchor="middle" font-size="9" fill="#222" font-weight="600">${names.join(' ')}</text>`;
+      } else {
+        // Larger diamond houses — stack vertically
+        names.forEach((n, i) => {
+          svg += `<text x="${hp.tx}" y="${hp.ty + 14 + i * 14}" text-anchor="middle" font-size="11" fill="#222" font-weight="600">${n}</text>`;
+        });
+      }
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ─── Planet Detail Table ───────────────
+function renderPlanetTable() {
+  const planets = kundaliData.planets;
+  const asc = kundaliData.ascendant;
+  const L = LANG[currentLang];
+  const H_ = L.headers;
+
+  const trSign = (eng) => {
+    const idx = LANG.en.signs.indexOf(eng);
+    return idx >= 0 ? L.signs[idx] : eng;
+  };
+  const trPlanet = (eng) => L.planetFull[eng] || eng;
+
+  let html = `<table>
+    <tr>
+      <th>${H_.planet}</th>
+      <th>${H_.sign}</th>
+      <th>${H_.degree}</th>
+      <th>${H_.house}</th>
+      <th>${H_.nakshatra}</th>
+      <th>${H_.pada}</th>
+      <th>${H_.nakLord}</th>
+      <th>${H_.subLord}</th>
+      <th>${H_.deity}</th>
+      <th>${H_.speed}</th>
+      <th>${H_.status}</th>
+    </tr>`;
+
+  // Ascendant row
+  html += `<tr style="background:#fff3cd;font-weight:600;">
+    <td>⬆ ${L.asc}</td>
+    <td>${trSign(asc.sign)} (${asc.sign_lord})</td>
+    <td>${asc.degree_display}</td>
+    <td>1</td>
+    <td>${asc.nakshatra}</td>
+    <td>${asc.nakshatra_pada}</td>
+    <td>${asc.nakshatra_lord}</td>
+    <td>${asc.sub_lord}</td>
+    <td>${asc.nakshatra_deity}</td>
+    <td>—</td>
+    <td><span class="badge" style="background:var(--gold);color:#333;">${L.asc}</span></td>
+  </tr>`;
+
+  planets.forEach(p => {
+    const retLabel = currentLang === 'hi' ? L.retro : 'R';
+    const dirLabel = currentLang === 'hi' ? L.direct : 'D';
+    const badge = p.retrograde
+      ? `<span class="badge badge-retro">${retLabel}</span>`
+      : `<span class="badge badge-direct">${dirLabel}</span>`;
+    html += `<tr>
+      <td><strong>${trPlanet(p.planet)}</strong></td>
+      <td>${trSign(p.sign)} (${p.sign_lord})</td>
+      <td>${p.degree_display}</td>
+      <td>${p.house}</td>
+      <td>${p.nakshatra}</td>
+      <td>${p.nakshatra_pada}</td>
+      <td>${p.nakshatra_lord}</td>
+      <td>${p.sub_lord}</td>
+      <td>${p.nakshatra_deity}</td>
+      <td>${p.speed.toFixed(4)}°/d</td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+
+  html += '</table>';
+  document.getElementById('planetTable').innerHTML = html;
+}
+
+// ─── Shodashvarga Deity Cards ─────────
+function renderDeityCards() {
+  const charts = kundaliData.charts;
+  const L = LANG[currentLang];
+
+  // Section title
+  document.getElementById('deitySectionTitle').textContent =
+    currentLang === 'hi'
+      ? 'षोडशवर्ग देवता — विभागीय कुंडली देवता'
+      : 'Shodashvarga Deities — Divisional Chart Deities';
+
+  const trSign = (eng) => {
+    const idx = LANG.en.signs.indexOf(eng);
+    return idx >= 0 ? L.signs[idx] : eng;
+  };
+  const trPlanet = (eng) => L.planetFull[eng] || eng;
+
+  let html = '';
+
+  VARGA_LIST.forEach(v => {
+    const chart = charts[v];
+    // Skip D1 (no subdivision deities)
+    const hasDeity = chart.ascendant_deity || chart.planets.some(p => p.deity);
+    if (!hasDeity) return;
+
+    const cardTitle = currentLang === 'hi'
+      ? `${v} — ${chart.name}`
+      : `${v} — ${chart.name}`;
+
+    html += `<div class="deity-card">`;
+    html += `<div class="deity-card-header"><span>${cardTitle}</span><span class="varga-badge">${v}</span></div>`;
+    html += `<div class="deity-card-body">`;
+
+    // Ascendant deity
+    if (chart.ascendant_deity) {
+      const ascLabel = currentLang === 'hi' ? '⬆ लग्न' : '⬆ Lagna';
+      const ascSign = trSign(chart.ascendant_sign);
+      html += `<div class="deity-row">
+        <span class="deity-planet">${ascLabel}</span>
+        <span class="deity-sign">${ascSign}</span>
+        <span class="deity-name">${chart.ascendant_deity}<span class="deity-part"> (#${chart.ascendant_deity_part})</span></span>
+      </div>`;
+    }
+
+    // Planet deities
+    chart.planets.forEach(p => {
+      if (!p.deity) return;
+      const pName = trPlanet(p.planet);
+      const signName = trSign(p.sign);
+      const retMark = p.retrograde ? (currentLang === 'hi' ? ' (वक्री)' : ' (R)') : '';
+      html += `<div class="deity-row">
+        <span class="deity-planet">${pName}${retMark}</span>
+        <span class="deity-sign">${signName}</span>
+        <span class="deity-name">${p.deity}<span class="deity-part"> (#${p.deity_part})</span></span>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('deityGrid').innerHTML = html;
+}
+
+// ─── Navtara Nakshatra Table ──────────
+const NAKSHATRAS_27 = [
+  'Ashwini','Bharani','Krittika','Rohini','Mrigashira',
+  'Ardra','Punarvasu','Pushya','Ashlesha',
+  'Magha','Purva Phalguni','Uttara Phalguni','Hasta',
+  'Chitra','Swati','Vishakha','Anuradha','Jyeshtha',
+  'Mula','Purva Ashadha','Uttara Ashadha',
+  'Shravana','Dhanishtha','Shatabhisha',
+  'Purva Bhadrapada','Uttara Bhadrapada','Revati',
+];
+
+const NAKSHATRAS_HI = [
+  'अश्विनी','भरणी','कृत्तिका','रोहिणी','मृगशिरा',
+  'आर्द्रा','पुनर्वसु','पुष्य','आश्लेषा',
+  'मघा','पू.फाल्गुनी','उ.फाल्गुनी','हस्त',
+  'चित्रा','स्वाति','विशाखा','अनुराधा','ज्येष्ठा',
+  'मूल','पू.आषाढ़ा','उ.आषाढ़ा',
+  'श्रवण','धनिष्ठा','शतभिषा',
+  'पू.भाद्रपद','उ.भाद्रपद','रेवती',
+];
+
+const TARA_NAMES = {
+  en: ['','Janma','Sampat','Vipat','Kshema','Pratyari','Sadhaka','Vadha','Mitra','Ati Mitra'],
+  hi: ['','जन्म','सम्पत्','विपत्','क्षेम','प्रत्यरि','साधक','वध','मित्र','अति मित्र'],
+};
+
+// Good taras: 1(Janma), 2(Sampat), 4(Kshema), 6(Sadhaka), 8(Mitra), 9(Ati Mitra)
+const GOOD_TARAS = new Set([1, 2, 4, 6, 8, 9]);
+
+function calcTara(refNakIdx, targetNakIdx) {
+  const offset = ((targetNakIdx - refNakIdx) + 27) % 27;
+  const tara = (offset % 9) + 1;
+  const cycle = Math.floor(offset / 9) + 1;  // 1st, 2nd, or 3rd cycle
+  return { tara, cycle };
+}
+
+function getNakIndex(nakName) {
+  return NAKSHATRAS_27.indexOf(nakName);
+}
+
+function renderNavtara() {
+  const L = LANG[currentLang];
+  const taraNames = TARA_NAMES[currentLang];
+  const nakNames = currentLang === 'hi' ? NAKSHATRAS_HI : NAKSHATRAS_27;
+
+  // Title
+  document.getElementById('navtaraTitle').textContent =
+    currentLang === 'hi'
+      ? 'नवतारा — नक्षत्र अनुकूलता तालिका'
+      : 'Navtara — Nakshatra Compatibility Table';
+
+  // Legend
+  const goodLabel = currentLang === 'hi' ? 'शुभ' : 'Favorable';
+  const badLabel = currentLang === 'hi' ? 'अशुभ' : 'Unfavorable';
+  const j1Label = currentLang === 'hi' ? 'जन्म 1st' : 'Janma 1st cycle';
+  const j2Label = currentLang === 'hi' ? 'जन्म 2nd' : 'Janma 2nd cycle';
+  const j3Label = currentLang === 'hi' ? 'जन्म 3rd' : 'Janma 3rd cycle';
+  document.getElementById('navtaraLegend').innerHTML = `
+    <span class="tara-janma1">${j1Label}</span>
+    <span class="tara-janma2">${j2Label}</span>
+    <span class="tara-janma3">${j3Label}</span>
+    <span class="tara-good">${goodLabel} (2,4,6,8,9)</span>
+    <span class="tara-bad">${badLabel} (3,5,7)</span>
+  `;
+
+  // Build reference points: Ascendant + 9 planets
+  const refs = [];
+
+  // Ascendant
+  const ascNak = kundaliData.ascendant.nakshatra;
+  const ascNakIdx = getNakIndex(ascNak);
+  refs.push({
+    name: currentLang === 'hi' ? 'लग्न' : 'Asc',
+    nakIdx: ascNakIdx,
+    fullName: currentLang === 'hi' ? 'लग्न' : 'Ascendant',
+  });
+
+  // Planets
+  const planetOrder = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+  planetOrder.forEach(pName => {
+    const p = kundaliData.planets.find(pp => pp.planet === pName);
+    if (p) {
+      const pNakIdx = getNakIndex(p.nakshatra);
+      refs.push({
+        name: L.planets[pName] || pName.substring(0, 2),
+        nakIdx: pNakIdx,
+        fullName: L.planetFull[pName] || pName,
+      });
+    }
+  });
+
+  // Build table
+  let html = '<table class="navtara-table">';
+
+  // Header row
+  html += '<tr><th>' + (currentLang === 'hi' ? 'नक्षत्र' : 'Nakshatra') + '</th>';
+  refs.forEach(r => {
+    html += `<th title="${r.fullName}">${r.name}</th>`;
+  });
+  html += '<th>' + (currentLang === 'hi' ? 'स्कोर' : 'Score') + '</th></tr>';
+
+  // Data rows — one per nakshatra
+  const scores = [];
+  for (let n = 0; n < 27; n++) {
+    let goodCount = 0;
+    const taras = [];
+
+    refs.forEach(r => {
+      if (r.nakIdx < 0) {
+        taras.push({ tara: 0, cycle: 0, isGood: false });
+        return;
+      }
+      const { tara, cycle } = calcTara(r.nakIdx, n);
+      const isGood = GOOD_TARAS.has(tara);
+      if (isGood) goodCount++;
+      taras.push({ tara, cycle, isGood });
+    });
+
+    scores.push({ nakIdx: n, goodCount, total: refs.length });
+
+    const isTop = goodCount >= 8;
+
+    html += `<tr class="${isTop ? 'tara-top' : ''}">`;
+    html += `<td>${nakNames[n]}</td>`;
+
+    taras.forEach(t => {
+      if (t.tara === 0) {
+        html += '<td>—</td>';
+      } else {
+        // Special Janma highlighting by cycle
+        let cls;
+        let cycleTag = '';
+        if (t.tara === 1) {
+          // Janma tara — highlight by cycle
+          cls = `tara-janma${t.cycle}`;
+          const cycleLabel = currentLang === 'hi'
+            ? ['','①','②','③'][t.cycle]
+            : ['','①','②','③'][t.cycle];
+          cycleTag = ` ${cycleLabel}`;
+        } else {
+          cls = t.isGood ? 'tara-good' : 'tara-bad';
+        }
+        const taraLabel = taraNames[t.tara];
+        const shortLabel = t.tara + ' ' + taraLabel + cycleTag;
+        html += `<td class="${cls}" title="${taraLabel}${t.tara === 1 ? ' (Cycle ' + t.cycle + ')' : ''}">${shortLabel}</td>`;
+      }
+    });
+
+    // Score column
+    const scoreCls = goodCount >= 8 ? 'tara-good' : (goodCount >= 6 ? '' : 'tara-bad');
+    html += `<td class="tara-score ${scoreCls}">${goodCount}/${refs.length}</td>`;
+    html += '</tr>';
+  }
+
+  html += '</table>';
+  document.getElementById('navtaraTable').innerHTML = html;
+
+  // Summary: top nakshatras
+  scores.sort((a, b) => b.goodCount - a.goodCount);
+  const topNaks = scores.filter(s => s.goodCount >= 7);
+
+  if (topNaks.length > 0) {
+    const summaryTitle = currentLang === 'hi'
+      ? 'सर्वश्रेष्ठ नक्षत्र (अधिकांश ग्रहों से शुभ)'
+      : 'Top Nakshatras (Favorable from most planets)';
+
+    let summaryHtml = `<h3>${summaryTitle}</h3><div class="top-nak-chips">`;
+    topNaks.forEach(s => {
+      const chipCls = s.goodCount >= 9 ? 'excellent' : 'good';
+      const nakLabel = nakNames[s.nakIdx];
+      summaryHtml += `<span class="top-nak-chip ${chipCls}">${nakLabel} (${s.goodCount}/${s.total})</span>`;
+    });
+    summaryHtml += '</div>';
+
+    document.getElementById('navtaraSummary').innerHTML = summaryHtml;
+    document.getElementById('navtaraSummary').style.display = 'block';
+  } else {
+    document.getElementById('navtaraSummary').style.display = 'none';
+  }
+}
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.dob) document.getElementById('dobInput').value = p.dob;
+    if (p.time) document.getElementById('tobInput').value = p.time;
+    if (p.place) document.getElementById('placeInput').value = p.place;
+    if (p.lat) document.getElementById('latInput').value = p.lat;
+    if (p.lon) document.getElementById('lonInput').value = p.lon;
+    if (p.tz !== undefined) document.getElementById('tzKundali').value = p.tz;
+    if (p.ayanamsa) document.getElementById('ayanKundali').value = p.ayanamsa;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

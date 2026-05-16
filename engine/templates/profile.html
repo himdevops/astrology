@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Birth Profile — Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --shadow: rgba(0,0,0,0.2);
+    --green: #2e7d32;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); flex-wrap:wrap; gap:10px; }
+  .header h1 { font-size:1.5rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; flex-wrap:wrap; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:800px; margin:0 auto; padding:30px 20px; }
+
+  .profile-card {
+    background:var(--card-bg); border:2px solid var(--border); border-radius:12px;
+    padding:30px; box-shadow:0 4px 16px var(--shadow);
+  }
+  .profile-card h2 { color:var(--accent); font-size:1.4rem; margin-bottom:6px; }
+  .profile-card .subtitle { color:#666; font-size:0.95rem; margin-bottom:24px; border-bottom:2px solid var(--border); padding-bottom:12px; }
+
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .form-field { display:flex; flex-direction:column; gap:5px; }
+  .form-field.full { grid-column:1/-1; }
+  .form-field label { font-size:0.8rem; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:10px 14px; border:1px solid var(--border); border-radius:6px; font-size:1rem; background:#fff; }
+  .form-field input:focus, .form-field select:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px rgba(139,0,0,0.15); }
+
+  .place-wrap { position:relative; }
+  .place-drop { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 6px 6px; max-height:200px; overflow-y:auto; z-index:100; display:none; }
+  .place-drop div { padding:8px 14px; cursor:pointer; font-size:0.9rem; border-bottom:1px solid #eee; }
+  .place-drop div:hover { background:#faebd7; }
+
+  .btn-row { display:flex; gap:14px; margin-top:24px; justify-content:center; flex-wrap:wrap; }
+  .btn {
+    padding:12px 36px; background:var(--header-bg); color:#fff; border:none; border-radius:6px;
+    cursor:pointer; font-weight:700; font-size:1.05rem; transition:background 0.2s; letter-spacing:0.5px;
+  }
+  .btn:hover { background:#a00; }
+  .btn-clear { background:#666; }
+  .btn-clear:hover { background:#555; }
+
+  .status-msg {
+    text-align:center; margin-top:18px; padding:12px; border-radius:6px;
+    font-weight:600; font-size:1rem; display:none;
+  }
+  .status-msg.success { display:block; background:#e8f5e9; color:var(--green); border:1px solid #a5d6a7; }
+  .status-msg.cleared { display:block; background:#fff3e0; color:#e65100; border:1px solid #ffcc80; }
+
+  .current-profile {
+    margin-top:24px; background:#fff; border:1px solid var(--border); border-radius:8px; padding:16px;
+  }
+  .current-profile h3 { color:var(--accent); font-size:1rem; margin-bottom:10px; }
+  .profile-info { display:grid; grid-template-columns:1fr 1fr; gap:6px 20px; font-size:0.9rem; }
+  .profile-info .label { color:#888; font-weight:600; }
+  .profile-info .value { color:#333; }
+  .no-profile { color:#999; font-style:italic; }
+
+  .pages-list { margin-top:24px; }
+  .pages-list h3 { color:var(--accent); font-size:1rem; margin-bottom:10px; }
+  .pages-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px; }
+  .page-link {
+    display:block; padding:12px; background:var(--card-bg); border:2px solid var(--border);
+    border-radius:8px; text-align:center; text-decoration:none; color:var(--accent);
+    font-weight:600; font-size:0.9rem; transition:all 0.2s;
+  }
+  .page-link:hover { background:#fff; border-color:var(--accent); transform:translateY(-2px); box-shadow:0 4px 12px var(--shadow); }
+
+  @media(max-width:600px) {
+    .form-grid { grid-template-columns:1fr; }
+    .profile-info { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Birth <span>Profile</span></h1>
+  <div class="nav-links">
+    <a href="/" >Home</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas">Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/profile" class="active">Profile</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="profile-card">
+    <h2>Global Birth Profile</h2>
+    <div class="subtitle">Enter birth details once — automatically applied to all analysis pages. Each page can still override locally.</div>
+
+    <div class="form-grid">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="profDob" placeholder="DD-MM-YYYY" value="23-09-1992">
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="profTime" placeholder="HH:MM" value="23:10">
+      </div>
+      <div class="form-field full place-wrap">
+        <label>Place of Birth</label>
+        <input type="text" id="profPlace" placeholder="Type city name..." autocomplete="off" value="Ujjain">
+        <div class="place-drop" id="placeDrop"></div>
+      </div>
+      <div class="form-field">
+        <label>Latitude</label>
+        <input type="number" step="0.0001" id="profLat" value="23.1765">
+      </div>
+      <div class="form-field">
+        <label>Longitude</label>
+        <input type="number" step="0.0001" id="profLon" value="75.7885">
+      </div>
+      <div class="form-field">
+        <label>Timezone (UTC offset)</label>
+        <input type="number" step="0.5" id="profTz" value="5.5">
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="profAyan">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="kp">Krishnamurti (KP)</option>
+          <option value="raman">Raman</option>
+          <option value="true_citra">True Chitrapaksha</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" onclick="saveProfile()">Save Profile</button>
+      <button class="btn btn-clear" onclick="clearProfile()">Clear Profile</button>
+    </div>
+
+    <div class="status-msg" id="statusMsg"></div>
+
+    <div class="current-profile" id="currentProfile"></div>
+  </div>
+
+  <div class="pages-list">
+    <h3>Quick Navigation — Analysis Pages</h3>
+    <div class="pages-grid">
+      <a href="/kundali" class="page-link">Kundali</a>
+      <a href="/dasha" class="page-link">Dasha</a>
+      <a href="/ashtakavarga" class="page-link">Ashtakavarga</a>
+      <a href="/special-lagnas" class="page-link">Special Lagnas</a>
+      <a href="/nakshatra" class="page-link">Nakshatra</a>
+      <a href="/hora" class="page-link">Hora</a>
+      <a href="/sbc" class="page-link">SBC Chakra</a>
+      <a href="/market" class="page-link">Market</a>
+      <a href="/bhrigu" class="page-link">Bhrigu Samhita</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = window.location.origin;
+const PROFILE_KEY = 'vedic_astro_profile';
+
+// ─── Place autocomplete ───
+let placeTimer = null;
+document.getElementById('profPlace').addEventListener('input', function() {
+  clearTimeout(placeTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('placeDrop').style.display = 'none'; return; }
+  placeTimer = setTimeout(() => {
+    fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(cities => {
+        const drop = document.getElementById('placeDrop');
+        if (!cities.length) { drop.style.display = 'none'; return; }
+        drop.innerHTML = cities.map(c =>
+          `<div onclick="pickCity('${c.name.replace(/'/g,"\\'")}',${c.latitude},${c.longitude},${c.tz_offset})">${c.name}, ${c.region||''} ${c.country||''}</div>`
+        ).join('');
+        drop.style.display = 'block';
+      }).catch(() => {});
+  }, 300);
+});
+
+function pickCity(name, lat, lon, tz) {
+  document.getElementById('profPlace').value = name;
+  document.getElementById('profLat').value = lat;
+  document.getElementById('profLon').value = lon;
+  document.getElementById('profTz').value = tz;
+  document.getElementById('placeDrop').style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.place-wrap')) document.getElementById('placeDrop').style.display = 'none';
+});
+
+// ─── Save / Load / Clear ───
+function saveProfile() {
+  const profile = {
+    dob: document.getElementById('profDob').value.trim(),
+    time: document.getElementById('profTime').value.trim(),
+    place: document.getElementById('profPlace').value.trim(),
+    lat: parseFloat(document.getElementById('profLat').value),
+    lon: parseFloat(document.getElementById('profLon').value),
+    tz: parseFloat(document.getElementById('profTz').value),
+    ayanamsa: document.getElementById('profAyan').value,
+    savedAt: new Date().toISOString(),
+  };
+
+  if (!profile.dob || !profile.time) {
+    showStatus('Please enter at least DOB and Time', 'cleared');
+    return;
+  }
+
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  showStatus('Profile saved! All pages will use these details.', 'success');
+  renderCurrentProfile();
+}
+
+function clearProfile() {
+  localStorage.removeItem(PROFILE_KEY);
+  showStatus('Profile cleared. Pages will use their own defaults.', 'cleared');
+  renderCurrentProfile();
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status-msg ' + type;
+  setTimeout(() => { el.className = 'status-msg'; }, 4000);
+}
+
+function renderCurrentProfile() {
+  const el = document.getElementById('currentProfile');
+  const raw = localStorage.getItem(PROFILE_KEY);
+  if (!raw) {
+    el.innerHTML = '<h3>Current Saved Profile</h3><div class="no-profile">No profile saved yet.</div>';
+    return;
+  }
+  const p = JSON.parse(raw);
+  el.innerHTML = `
+    <h3>Current Saved Profile</h3>
+    <div class="profile-info">
+      <span class="label">DOB:</span><span class="value">${p.dob}</span>
+      <span class="label">Time:</span><span class="value">${p.time}</span>
+      <span class="label">Place:</span><span class="value">${p.place || '—'}</span>
+      <span class="label">Latitude:</span><span class="value">${p.lat}</span>
+      <span class="label">Longitude:</span><span class="value">${p.lon}</span>
+      <span class="label">Timezone:</span><span class="value">UTC ${p.tz >= 0 ? '+' : ''}${p.tz}</span>
+      <span class="label">Ayanamsa:</span><span class="value">${p.ayanamsa}</span>
+      <span class="label">Saved:</span><span class="value">${new Date(p.savedAt).toLocaleString()}</span>
+    </div>
+  `;
+}
+
+// ─── On load: fill form from saved profile ───
+function loadFormFromProfile() {
+  const raw = localStorage.getItem(PROFILE_KEY);
+  if (!raw) return;
+  const p = JSON.parse(raw);
+  if (p.dob) document.getElementById('profDob').value = p.dob;
+  if (p.time) document.getElementById('profTime').value = p.time;
+  if (p.place) document.getElementById('profPlace').value = p.place;
+  if (p.lat) document.getElementById('profLat').value = p.lat;
+  if (p.lon) document.getElementById('profLon').value = p.lon;
+  if (p.tz !== undefined) document.getElementById('profTz').value = p.tz;
+  if (p.ayanamsa) document.getElementById('profAyan').value = p.ayanamsa;
+}
+
+loadFormFromProfile();
+renderCurrentProfile();
+</script>
+</body>
+</html>

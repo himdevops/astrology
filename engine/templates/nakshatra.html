@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nakshatra Analysis — Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+    --good: #2e7d32;
+    --neutral: #ed6c02;
+    --bad: #c62828;
+    --excellent: #1b5e20;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); }
+  .header h1 { font-size:1.5rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; flex-wrap:wrap; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1500px; margin:0 auto; padding:20px; }
+
+  /* Birth form */
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+
+  /* Place autocomplete */
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+
+  /* Tabs */
+  .section-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+  .section-tab { padding:10px 18px; background:#fff; border:2px solid var(--border); border-radius:6px; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.2s; }
+  .section-tab:hover { background:#ffe4b5; }
+  .section-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  /* Card */
+  .card { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .card h2 { color:var(--accent); margin-bottom:16px; font-size:1.15rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+
+  /* Planet nakshatra cards */
+  .planet-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(420px, 1fr)); gap:20px; }
+  .nak-card { background:#fff; border:2px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 2px 8px var(--shadow); transition:transform 0.15s; }
+  .nak-card:hover { transform:translateY(-2px); box-shadow:0 4px 16px var(--shadow); }
+  .nak-card-header { padding:14px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #ddd; }
+  .nak-card-header .planet-name { font-size:1.1rem; font-weight:700; }
+  .nak-card-header .nak-name { font-size:0.95rem; color:#555; }
+  .nak-card-header .pada-badge { background:var(--gold); color:#333; padding:2px 10px; border-radius:12px; font-size:0.8rem; font-weight:700; }
+  .color-swatch { width:22px; height:22px; border-radius:50%; border:2px solid #333; flex-shrink:0; }
+  .nak-card-body { padding:16px 18px; }
+  .prop-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; font-size:0.82rem; margin-bottom:12px; }
+  .prop-item { display:flex; gap:4px; padding:2px 0; border-bottom:1px solid #f0e0c0; }
+  .prop-label { font-weight:600; color:var(--accent); min-width:90px; flex-shrink:0; }
+  .prop-value { color:#333; }
+  .extra-props { font-size:0.82rem; margin-bottom:12px; padding:8px; background:#fff8e7; border-radius:6px; }
+  .extra-props span { margin-right:16px; }
+  .extra-props .elabel { font-weight:600; color:var(--accent); }
+  .shakti-box { background:linear-gradient(135deg, #fff3cd, #ffecd2); border:1px solid var(--gold); border-radius:6px; padding:10px 14px; margin-bottom:10px; font-size:0.85rem; }
+  .shakti-box strong { color:var(--accent); }
+  .pada-highlight { background:#fff3cd; border:1px solid var(--gold); border-radius:6px; padding:10px 14px; margin-bottom:10px; font-size:0.85rem; }
+  .pada-highlight .ph-title { font-weight:700; color:var(--accent); margin-bottom:4px; }
+  .nak-desc { font-size:0.83rem; color:#555; line-height:1.5; padding:8px 0; border-top:1px solid #eee; }
+  .nak-card-footer { height:6px; }
+
+  /* Pada details tab */
+  .pada-section { margin-bottom:24px; }
+  .pada-section h3 { color:var(--accent); margin-bottom:10px; font-size:1rem; }
+  .pada-table { width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:8px; }
+  .pada-table th { background:var(--table-header); color:#fff; padding:8px 12px; text-align:center; font-weight:600; border:2px solid #333; }
+  .pada-table td { padding:8px 12px; text-align:center; border:2px solid #333; background:#fff; }
+  .pada-table tr:nth-child(even) td { background:var(--table-alt); }
+  .pada-table tr.current-pada td { background:#fff3cd; font-weight:700; border:2px solid var(--gold); }
+  .syllable-box { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .syllable { display:inline-block; padding:6px 14px; border-radius:6px; background:var(--card-bg); border:1px solid var(--border); font-size:1rem; font-weight:700; color:var(--accent); }
+  .syllable.active { background:var(--gold); color:#333; border-color:#333; }
+
+  /* Navtara grid */
+  .navtara-wrap { overflow-x:auto; }
+  .navtara-table { border-collapse:collapse; font-size:0.78rem; width:100%; min-width:900px; }
+  .navtara-table th { background:var(--table-header); color:#fff; padding:6px 8px; text-align:center; font-weight:700; font-size:0.8rem; border:2px solid #333; position:sticky; top:0; z-index:10; }
+  .navtara-table td { padding:5px 6px; text-align:center; border:2px solid #333; font-weight:600; }
+  .navtara-table .nak-col { text-align:left; background:#fff3cd; font-weight:700; color:var(--accent); min-width:100px; white-space:nowrap; padding-left:10px; }
+  .navtara-table .lord-col { text-align:center; background:#fff8e7; font-size:0.75rem; color:#555; min-width:50px; }
+  .tara-good { background:#c8e6c9; color:var(--good); }
+  .tara-bad { background:#ffcdd2; color:var(--bad); }
+  .tara-janma { background:#a5d6a7; color:#1b5e20; font-weight:800; font-size:0.85rem; }
+  .count-col { background:#fff; font-weight:700; min-width:60px; }
+  .count-bar { display:inline-block; height:12px; border-radius:3px; vertical-align:middle; }
+
+  /* Legend */
+  .tara-legend { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; padding:12px; background:#fff; border:1px solid var(--border); border-radius:6px; font-size:0.82rem; }
+  .tara-legend-item { display:flex; align-items:center; gap:6px; }
+  .tara-legend-swatch { width:20px; height:14px; border-radius:3px; border:1px solid #999; }
+
+  /* Best/Worst summary */
+  .bw-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+  .bw-card { background:#fff; border:1px solid var(--border); border-radius:8px; padding:16px; }
+  .bw-card h4 { color:var(--accent); margin-bottom:10px; font-size:0.95rem; border-bottom:1px solid #ddd; padding-bottom:6px; }
+  .bw-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #f0f0f0; font-size:0.85rem; }
+  .bw-row:last-child { border-bottom:none; }
+
+  /* Remedies tab */
+  .remedy-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(450px, 1fr)); gap:20px; }
+  .remedy-card { background:#fff; border:2px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 2px 8px var(--shadow); }
+  .remedy-card-header { padding:14px 18px; display:flex; align-items:center; gap:12px; }
+  .remedy-card-header .planet-name { font-size:1rem; font-weight:700; }
+  .remedy-card-header .nak-name { font-size:0.9rem; color:#555; }
+  .remedy-card-body { padding:16px 18px; }
+  .activation-box { background:linear-gradient(135deg, #e8f5e9, #f1f8e9); border:1px solid #a5d6a7; border-radius:8px; padding:14px; margin-bottom:14px; font-size:0.85rem; line-height:1.6; }
+  .activation-box strong { color:var(--accent); display:block; margin-bottom:4px; }
+  .remedy-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  .remedy-table th { background:var(--table-header); color:#fff; padding:8px 12px; text-align:left; font-weight:600; border:2px solid #333; width:140px; }
+  .remedy-table td { padding:8px 12px; border:2px solid #333; background:#fff; line-height:1.5; }
+  .remedy-table tr:nth-child(even) td { background:var(--table-alt); }
+  .mantra-box { background:#fff8e7; border:1px solid var(--gold); border-radius:6px; padding:10px 14px; font-family:'Courier New',monospace; font-size:0.9rem; color:var(--accent); word-break:break-word; cursor:pointer; position:relative; }
+  .mantra-box:hover::after { content:'Click to copy'; position:absolute; top:-24px; right:0; background:#333; color:#fff; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-family:'Segoe UI',sans-serif; }
+
+  /* Transit Navtara */
+  .transit-form { background:#fff; border:2px solid var(--border); border-radius:8px; padding:16px 20px; margin-bottom:20px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+  .transit-form .form-field input { width:140px; }
+  .transit-planet-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; margin-top:16px; }
+  .transit-planet-card { background:#fff; border:2px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 2px 8px var(--shadow); }
+  .transit-planet-card.tara-good-card { border-left:6px solid var(--good); }
+  .transit-planet-card.tara-bad-card { border-left:6px solid var(--bad); }
+  .transit-card-header { padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #eee; }
+  .transit-card-header .planet-name { font-size:1rem; font-weight:700; }
+  .transit-tara-badge { padding:4px 14px; border-radius:16px; font-size:0.85rem; font-weight:700; }
+  .transit-tara-badge.good { background:#c8e6c9; color:var(--good); }
+  .transit-tara-badge.bad { background:#ffcdd2; color:var(--bad); }
+  .transit-card-body { padding:12px 16px; font-size:0.85rem; }
+  .transit-card-body .prop-item { display:flex; gap:6px; padding:3px 0; border-bottom:1px solid #f0e0c0; }
+  .transit-summary-bar { display:flex; gap:20px; padding:16px 20px; background:#fff; border:2px solid var(--border); border-radius:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .transit-summary-stat { text-align:center; }
+  .transit-summary-stat .stat-num { font-size:1.6rem; font-weight:800; }
+  .transit-summary-stat .stat-label { font-size:0.8rem; color:#888; text-transform:uppercase; }
+  .transit-tara-group { margin-bottom:20px; }
+  .transit-tara-group h3 { font-size:1rem; margin-bottom:10px; padding:8px 14px; border-radius:6px; }
+  .transit-tara-group h3.group-good { background:#c8e6c9; color:var(--good); }
+  .transit-tara-group h3.group-bad { background:#ffcdd2; color:var(--bad); }
+
+  .loading { text-align:center; padding:40px; font-size:1.1rem; color:var(--accent); }
+  .loading::after { content:''; display:inline-block; width:20px; height:20px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:10px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .footer { text-align:center; padding:16px; color:#fff; font-size:0.8rem; background:var(--header-bg); margin-top:40px; }
+
+  @media (max-width:768px) {
+    .header { flex-direction:column; gap:8px; }
+    .nav-links { justify-content:center; }
+    .form-row { flex-direction:column; }
+    .section-tabs { gap:4px; }
+    .section-tab { padding:8px 12px; font-size:0.8rem; }
+    .planet-grid { grid-template-columns:1fr; }
+    .remedy-grid { grid-template-columns:1fr; }
+    .bw-grid { grid-template-columns:1fr; }
+    .prop-grid { grid-template-columns:1fr; }
+    .navtara-table { min-width:700px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>&#9733; Vedic <span>Astrology</span> Engine</h1>
+  <div class="nav-links">
+    <a href="/">Daily Panchang</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas">Special Lagnas</a>
+    <a href="/nakshatra" class="active">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth Data Form -->
+  <div class="birth-form">
+    <h2 id="formTitle">Enter Birth Details</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="dobInput" placeholder="DD-MM-YYYY" maxlength="10" value="23-09-1992" />
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="tobInput" placeholder="HH:MM" maxlength="5" value="23:10" />
+      </div>
+      <div class="form-field">
+        <label>Birth Place</label>
+        <div class="loc-auto">
+          <input type="text" id="placeInput" placeholder="Search city or village..." autocomplete="off" value="Ujjain" style="width:280px;" />
+          <div id="placeSuggestions" class="loc-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Latitude</label>
+        <input type="text" id="latInput" value="23.1765" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>Longitude</label>
+        <input type="text" id="lonInput" value="75.7885" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>TZ (UTC+/-)</label>
+        <input type="text" id="tzInput" value="5.5" style="width:60px;" />
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanInput">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">KP</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Language</label>
+        <select id="langSelect" onchange="switchLanguage()">
+          <option value="en" selected>English</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <button class="btn" id="generateBtn" onclick="analyzeNakshatras()">Analyze Nakshatras</button>
+      <span id="genStatus" style="margin-left:16px;color:var(--accent);font-size:0.9rem;"></span>
+    </div>
+  </div>
+
+  <!-- Section Tabs -->
+  <div id="sectionTabsWrap" style="display:none;">
+    <div class="section-tabs" id="sectionTabs">
+      <div class="section-tab active" onclick="switchTab('planetNak')" id="tabPlanetNak">Planet Nakshatras</div>
+      <div class="section-tab" onclick="switchTab('padaDetails')" id="tabPadaDetails">Pada Details</div>
+      <div class="section-tab" onclick="switchTab('navtara')" id="tabNavtara">Navtara Grid</div>
+      <div class="section-tab" onclick="switchTab('remedies')" id="tabRemedies">Remedies &amp; Activation</div>
+      <div class="section-tab" onclick="switchTab('transitNavtara')" id="tabTransitNavtara">Transit Navtara</div>
+    </div>
+  </div>
+
+  <!-- Tab 1: Planet Nakshatras -->
+  <div class="tab-content active" id="planetNakSection">
+    <div id="planetNakContent"></div>
+  </div>
+
+  <!-- Tab 2: Pada Details -->
+  <div class="tab-content" id="padaDetailsSection">
+    <div id="padaDetailsContent"></div>
+  </div>
+
+  <!-- Tab 3: Navtara Grid -->
+  <div class="tab-content" id="navtaraSection">
+    <div id="navtaraContent"></div>
+  </div>
+
+  <!-- Tab 4: Remedies & Activation -->
+  <div class="tab-content" id="remediesSection">
+    <div id="remediesContent"></div>
+  </div>
+
+  <!-- Tab 5: Transit Navtara -->
+  <div class="tab-content" id="transitNavtaraSection">
+    <div class="card">
+      <h2 id="transitTitle">Transit Navtara — Check Any Date</h2>
+      <p style="font-size:0.85rem;color:#555;margin-bottom:14px;" id="transitDesc">
+        See which Navtara (Janma, Sampat, Vipat, etc.) each planet is transiting on any date, relative to your birth Moon's Nakshatra.
+      </p>
+      <div class="transit-form">
+        <div class="form-field">
+          <label>Transit Date</label>
+          <input type="text" id="transitDateInput" placeholder="DD-MM-YYYY" maxlength="10" />
+        </div>
+        <div class="form-field">
+          <label>Transit Time</label>
+          <input type="text" id="transitTimeInput" placeholder="HH:MM" maxlength="5" value="12:00" />
+        </div>
+        <button class="btn" id="transitBtn" onclick="fetchTransitNavtara()">Check Transit</button>
+        <span id="transitStatus" style="color:var(--accent);font-size:0.9rem;"></span>
+      </div>
+      <div id="transitNavtaraContent"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Nakshatra Analysis Module &middot; 27 Nakshatras &middot; Navtara
+</div>
+
+<script>
+const API = '';
+let nakData = null;
+let currentLang = 'en';
+let placeTimer = null;
+
+const PLANETS_EN = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+const PLANETS_HI = {Sun:'सूर्य',Moon:'चंद्र',Mars:'मंगल',Mercury:'बुध',Jupiter:'गुरु',Venus:'शुक्र',Saturn:'शनि',Rahu:'राहु',Ketu:'केतु',Ascendant:'लग्न'};
+const PLANET_ABBR = {Sun:'Su',Moon:'Mo',Mars:'Ma',Mercury:'Me',Jupiter:'Ju',Venus:'Ve',Saturn:'Sa',Rahu:'Ra',Ketu:'Ke',Ascendant:'As'};
+const SIGNS_EN = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const SIGNS_HI = ['मेष','वृषभ','मिथुन','कर्क','सिंह','कन्या','तुला','वृश्चिक','धनु','मकर','कुंभ','मीन'];
+const PLANET_ORDER = ['Ascendant','Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+
+const COLOR_MAP = {
+  'Red':'#e53935','Blue':'#1e88e5','White':'#f5f5f5','Yellow':'#fdd835','Green':'#43a047',
+  'Black':'#333','Golden':'#DAA520','Cream':'#FFFDD0','Silver':'#c0c0c0','Grey':'#9e9e9e',
+  'Variegated':'linear-gradient(135deg,#e53935,#fdd835,#43a047,#1e88e5)','Bright White':'#fff',
+  'Blood Red':'#b71c1c','Dark Red':'#8B0000','Copper':'#b87333','Smoky':'#696969',
+  'Honey':'#EB9605','Tawny':'#CD853F','Brown':'#8B4513','Reddish Brown':'#A0522D',
+  'Blackish Red':'#660000','Dark':'#222','Bright':'#FFD700','Pink':'#e91e63','Orange':'#ff9800',
+};
+
+const LANG = {
+  en: {
+    formTitle: 'Enter Birth Details',
+    calcBtn: 'Analyze Nakshatras',
+    tabPlanetNak: 'Planet Nakshatras',
+    tabPadaDetails: 'Pada Details',
+    tabNavtara: 'Navtara Grid',
+    tabRemedies: 'Remedies & Activation',
+    pada: 'Pada',
+    deity: 'Deity',
+    lord: 'Lord',
+    symbol: 'Symbol',
+    animal: 'Animal (Yoni)',
+    gana: 'Gana',
+    guna: 'Guna',
+    tattva: 'Tattva',
+    nadi: 'Nadi',
+    motivation: 'Motivation',
+    temperament: 'Temperament',
+    direction: 'Direction',
+    gender: 'Gender',
+    caste: 'Caste',
+    bodyPart: 'Body Part',
+    bird: 'Bird',
+    tree: 'Tree',
+    color: 'Color',
+    specialPower: 'Special Power (Shakti)',
+    currentPada: 'Current Pada',
+    syllable: 'Syllable',
+    navamsaSign: 'Navamsa Sign',
+    navamsaPlanet: 'Navamsa Planet',
+    quality: 'Quality',
+    padaSyllables: 'Pada Syllables (for naming)',
+    bestNakshatras: 'Best Nakshatras',
+    worstNakshatras: 'Worst Nakshatras',
+    goodCount: 'Good',
+    badCount: 'Bad',
+    legend: 'Tara Legend',
+    activation: 'Activation',
+    remedy: 'Remedies',
+    deityWorship: 'Deity Worship',
+    mantra: 'Mantra',
+    gemstone: 'Gemstone',
+    donation: 'Donation',
+    fasting: 'Fasting Day',
+    colorTherapy: 'Color Therapy',
+    plantRemedy: 'Plant Remedy',
+    clickToCopy: 'Click to copy',
+    copied: 'Copied!',
+    nakshatra: 'Nakshatra',
+    tabTransitNavtara: 'Transit Navtara',
+    transitTitle: 'Transit Navtara — Check Any Date',
+    transitDesc: 'See which Navtara (Janma, Sampat, Vipat, etc.) each planet is transiting on any date, relative to your birth Moon\'s Nakshatra.',
+    transitBtn: 'Check Transit',
+    birthMoonNak: 'Birth Moon Nakshatra',
+    transitDate: 'Transit Date',
+    transitTime: 'Transit Time',
+    favorable: 'Favorable',
+    unfavorable: 'Unfavorable',
+    cycle: 'Cycle',
+  },
+  hi: {
+    formTitle: 'जन्म विवरण दर्ज करें',
+    calcBtn: 'नक्षत्र विश्लेषण करें',
+    tabPlanetNak: 'ग्रह नक्षत्र',
+    tabPadaDetails: 'पाद विवरण',
+    tabNavtara: 'नवतारा चक्र',
+    tabRemedies: 'उपाय एवं सक्रियण',
+    pada: 'पाद',
+    deity: 'देवता',
+    lord: 'स्वामी',
+    symbol: 'प्रतीक',
+    animal: 'योनि',
+    gana: 'गण',
+    guna: 'गुण',
+    tattva: 'तत्व',
+    nadi: 'नाड़ी',
+    motivation: 'प्रेरणा',
+    temperament: 'स्वभाव',
+    direction: 'दिशा',
+    gender: 'लिंग',
+    caste: 'वर्ण',
+    bodyPart: 'शरीर अंग',
+    bird: 'पक्षी',
+    tree: 'वृक्ष',
+    color: 'रंग',
+    specialPower: 'विशेष शक्ति',
+    currentPada: 'वर्तमान पाद',
+    syllable: 'अक्षर',
+    navamsaSign: 'नवांश राशि',
+    navamsaPlanet: 'नवांश ग्रह',
+    quality: 'गुणवत्ता',
+    padaSyllables: 'पाद अक्षर (नामकरण हेतु)',
+    bestNakshatras: 'श्रेष्ठ नक्षत्र',
+    worstNakshatras: 'अशुभ नक्षत्र',
+    goodCount: 'शुभ',
+    badCount: 'अशुभ',
+    legend: 'तारा सूची',
+    activation: 'सक्रियण',
+    remedy: 'उपाय',
+    deityWorship: 'देवता पूजा',
+    mantra: 'मंत्र',
+    gemstone: 'रत्न',
+    donation: 'दान',
+    fasting: 'उपवास दिवस',
+    colorTherapy: 'रंग चिकित्सा',
+    plantRemedy: 'वनस्पति उपचार',
+    clickToCopy: 'कॉपी करें',
+    copied: 'कॉपी हो गया!',
+    nakshatra: 'नक्षत्र',
+    tabTransitNavtara: 'गोचर नवतारा',
+    transitTitle: 'गोचर नवतारा — किसी भी तिथि को देखें',
+    transitDesc: 'देखें कि किसी भी तिथि पर कौन सा ग्रह किस नवतारा (जन्म, सम्पत्, विपत् आदि) में गोचर कर रहा है, जन्म चंद्र नक्षत्र के आधार पर।',
+    transitBtn: 'गोचर देखें',
+    birthMoonNak: 'जन्म चंद्र नक्षत्र',
+    transitDate: 'गोचर तिथि',
+    transitTime: 'गोचर समय',
+    favorable: 'शुभ',
+    unfavorable: 'अशुभ',
+    cycle: 'चक्र',
+  },
+};
+
+function L() { return LANG[currentLang]; }
+function planetName(p) { return currentLang === 'hi' ? (PLANETS_HI[p] || p) : p; }
+function signName(s) {
+  if (!s) return '';
+  const idx = SIGNS_EN.indexOf(s);
+  if (currentLang === 'hi' && idx >= 0) return SIGNS_HI[idx];
+  return s;
+}
+
+// ─── Language toggle ─────────────────
+function switchLanguage() {
+  currentLang = document.getElementById('langSelect').value;
+  const l = L();
+  document.getElementById('formTitle').textContent = l.formTitle;
+  document.getElementById('generateBtn').textContent = l.calcBtn;
+  document.getElementById('tabPlanetNak').textContent = l.tabPlanetNak;
+  document.getElementById('tabPadaDetails').textContent = l.tabPadaDetails;
+  document.getElementById('tabNavtara').textContent = l.tabNavtara;
+  document.getElementById('tabRemedies').textContent = l.tabRemedies;
+  document.getElementById('tabTransitNavtara').textContent = l.tabTransitNavtara;
+  document.getElementById('transitTitle').textContent = l.transitTitle;
+  document.getElementById('transitDesc').textContent = l.transitDesc;
+  document.getElementById('transitBtn').textContent = l.transitBtn;
+  if (nakData) {
+    renderPlanetNakshatras();
+    renderPadaDetails();
+    renderNavtara();
+    renderRemedies();
+  }
+}
+
+// ─── Tab switching ───────────────────
+const TAB_MAP = {
+  planetNak: 'planetNakSection',
+  padaDetails: 'padaDetailsSection',
+  navtara: 'navtaraSection',
+  remedies: 'remediesSection',
+  transitNavtara: 'transitNavtaraSection',
+};
+const TAB_BTN_MAP = {
+  planetNak: 'tabPlanetNak',
+  padaDetails: 'tabPadaDetails',
+  navtara: 'tabNavtara',
+  remedies: 'tabRemedies',
+  transitNavtara: 'tabTransitNavtara',
+};
+
+function switchTab(tab) {
+  Object.keys(TAB_MAP).forEach(k => {
+    document.getElementById(TAB_MAP[k]).classList.toggle('active', k === tab);
+    document.getElementById(TAB_BTN_MAP[k]).classList.toggle('active', k === tab);
+  });
+}
+
+// ─── Birth defaults ──────────────────
+(async function loadBirthDefaults() {
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) {
+      const d = await res.json();
+      document.getElementById('dobInput').value = d.date;
+      document.getElementById('tobInput').value = d.time;
+      document.getElementById('placeInput').value = d.place;
+      document.getElementById('latInput').value = d.latitude;
+      document.getElementById('lonInput').value = d.longitude;
+      document.getElementById('tzInput').value = d.tz_offset;
+      document.getElementById('ayanInput').value = d.ayanamsa;
+    }
+  } catch (_) {}
+})();
+
+// ─── Place autocomplete ─────────────
+const placeInput = document.getElementById('placeInput');
+const placeDropdown = document.getElementById('placeSuggestions');
+
+placeInput.addEventListener('input', () => {
+  clearTimeout(placeTimer);
+  const q = placeInput.value.trim();
+  if (q.length < 2) { placeDropdown.style.display = 'none'; return; }
+  placeTimer = setTimeout(() => fetchPlaces(q), 250);
+});
+placeInput.addEventListener('focus', () => {
+  if (placeInput.value.trim().length >= 2) fetchPlaces(placeInput.value.trim());
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#placeInput') && !e.target.closest('#placeSuggestions'))
+    placeDropdown.style.display = 'none';
+});
+
+async function fetchPlaces(q) {
+  try {
+    const localRes = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+    const localData = await localRes.json();
+    if (localData.results && localData.results.length > 0) {
+      renderPlaceResults(localData.results.map(c => ({
+        display: c.display, name: c.name, lat: c.latitude, lon: c.longitude, tz: c.tz_offset,
+      })));
+      return;
+    }
+    const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`);
+    const nData = await nRes.json();
+    if (nData && nData.length > 0) {
+      const results = nData.map(r => {
+        const parts = [];
+        if (r.address) {
+          if (r.address.city || r.address.town || r.address.village || r.address.hamlet) parts.push(r.address.city || r.address.town || r.address.village || r.address.hamlet);
+          if (r.address.state) parts.push(r.address.state);
+          if (r.address.country) parts.push(r.address.country);
+        }
+        const display = parts.length > 0 ? parts.join(', ') : r.display_name.split(',').slice(0,3).join(',');
+        return { display, name: parts[0] || r.display_name.split(',')[0], lat: parseFloat(r.lat), lon: parseFloat(r.lon), tz: null };
+      });
+      renderPlaceResults(results);
+    } else {
+      placeDropdown.innerHTML = '<div style="padding:8px 12px;color:#888;font-size:0.85rem;">No results found</div>';
+      placeDropdown.style.display = 'block';
+    }
+  } catch(e) { placeDropdown.style.display = 'none'; }
+}
+
+window._placeResults = [];
+function renderPlaceResults(results) {
+  window._placeResults = results;
+  placeDropdown.innerHTML = results.map((c, i) => {
+    const tzStr = c.tz !== null ? `UTC${c.tz>=0?'+':''}${c.tz}` : '';
+    return `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.9rem;"
+         onmouseover="this.style.background='#ffe4b5'" onmouseout="this.style.background='#fff'"
+         onclick="pickPlace(${i})">
+      <strong>${c.display}</strong>
+      ${tzStr ? `<span style="color:#888;font-size:0.8rem;margin-left:8px;">${tzStr}</span>` : '<span style="color:#aaa;font-size:0.75rem;margin-left:8px;">via OpenStreetMap</span>'}
+    </div>`;
+  }).join('');
+  placeDropdown.style.display = 'block';
+}
+
+function pickPlace(idx) {
+  const c = window._placeResults[idx];
+  placeInput.value = c.name;
+  document.getElementById('latInput').value = c.lat;
+  document.getElementById('lonInput').value = c.lon;
+  if (c.tz !== null) {
+    document.getElementById('tzInput').value = c.tz;
+  } else {
+    document.getElementById('tzInput').value = Math.round(c.lon / 15 * 2) / 2;
+  }
+  placeDropdown.style.display = 'none';
+}
+
+// ─── API Call ────────────────────────
+async function analyzeNakshatras() {
+  const btn = document.getElementById('generateBtn');
+  const status = document.getElementById('genStatus');
+  btn.disabled = true;
+  status.innerHTML = '<span class="loading" style="padding:0;">Analyzing...</span>';
+
+  try {
+    const body = {
+      date: document.getElementById('dobInput').value,
+      time: document.getElementById('tobInput').value,
+      city: document.getElementById('placeInput').value,
+      latitude: parseFloat(document.getElementById('latInput').value),
+      longitude: parseFloat(document.getElementById('lonInput').value),
+      tz_offset: parseFloat(document.getElementById('tzInput').value),
+      ayanamsa: document.getElementById('ayanInput').value,
+    };
+
+    const res = await fetch(`${API}/api/v1/nakshatra`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`API error ${res.status}: ${errBody}`);
+    }
+    nakData = await res.json();
+
+    document.getElementById('sectionTabsWrap').style.display = 'block';
+    renderPlanetNakshatras();
+    renderPadaDetails();
+    renderNavtara();
+    renderRemedies();
+
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Helpers ─────────────────────────
+function getColorStyle(colorName) {
+  if (!colorName) return '#ccc';
+  const c = COLOR_MAP[colorName];
+  if (c) return c;
+  // Try lowercase match
+  for (const [k, v] of Object.entries(COLOR_MAP)) {
+    if (k.toLowerCase() === colorName.toLowerCase()) return v;
+  }
+  return '#ccc';
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Tab 1: Planet Nakshatras ────────
+function renderPlanetNakshatras() {
+  const pn = nakData.planet_nakshatras;
+  const l = L();
+  let html = '<div class="planet-grid">';
+
+  PLANET_ORDER.forEach(planet => {
+    if (!pn[planet]) return;
+    const d = pn[planet];
+    const det = d.detail || {};
+    const colorStyle = getColorStyle(det.color);
+    const isGradient = colorStyle.includes('gradient');
+    const deityDisplay = currentLang === 'hi' ? (det.deity_hi || det.deity) : det.deity;
+    const symbolDisplay = currentLang === 'hi' ? (det.symbol_hi || det.symbol) : det.symbol;
+    const animalDisplay = currentLang === 'hi' ? (det.animal_yoni_hi || det.animal_yoni) : det.animal_yoni;
+    const descDisplay = currentLang === 'hi' ? (det.description_hi || det.description) : det.description;
+
+    // Current pada info
+    const padaIdx = d.pada - 1;
+    const padaDet = det.pada_details && det.pada_details[padaIdx] ? det.pada_details[padaIdx] : null;
+    const syllables = det.pada_syllables || [];
+
+    html += `<div class="nak-card">
+      <div class="nak-card-header" style="background:linear-gradient(135deg, #fff8e7, #fff);">
+        <div class="color-swatch" style="background:${colorStyle};"></div>
+        <div>
+          <span class="planet-name" style="color:var(--accent);">${escHtml(planetName(planet))}</span>
+          <span class="nak-name"> &mdash; ${escHtml(d.nakshatra)}</span>
+        </div>
+        <span class="pada-badge">${l.pada} ${d.pada}</span>
+        <span style="margin-left:auto;font-size:0.8rem;color:#888;">${escHtml(d.longitude_dms)}</span>
+      </div>
+      <div class="nak-card-body">
+        <div class="prop-grid">
+          <div class="prop-item"><span class="prop-label">${l.deity}</span><span class="prop-value">${escHtml(deityDisplay)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.lord}</span><span class="prop-value">${escHtml(det.lord)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.symbol}</span><span class="prop-value">${escHtml(symbolDisplay)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.animal}</span><span class="prop-value">${escHtml(animalDisplay)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.gana}</span><span class="prop-value">${escHtml(det.gana)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.guna}</span><span class="prop-value">${escHtml(det.guna)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.tattva}</span><span class="prop-value">${escHtml(det.tattva)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.nadi}</span><span class="prop-value">${escHtml(det.nadi)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.motivation}</span><span class="prop-value">${escHtml(det.motivation)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.temperament}</span><span class="prop-value">${escHtml(det.temperament)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.direction}</span><span class="prop-value">${escHtml(det.direction)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.gender}</span><span class="prop-value">${escHtml(det.gender)}</span></div>
+          <div class="prop-item"><span class="prop-label">${l.caste}</span><span class="prop-value">${escHtml(det.caste)}</span></div>
+        </div>
+        <div class="extra-props">
+          <span><span class="elabel">${l.bodyPart}:</span> ${escHtml(det.body_part)}</span>
+          <span><span class="elabel">${l.bird}:</span> ${escHtml(det.bird)}</span>
+          <span><span class="elabel">${l.tree}:</span> ${escHtml(det.tree)} ${det.tree_botanical ? '<em style="color:#888;">(' + escHtml(det.tree_botanical) + ')</em>' : ''}</span>
+          <span><span class="elabel">${l.color}:</span> ${escHtml(det.color)}</span>
+        </div>`;
+
+    if (det.special_power) {
+      html += `<div class="shakti-box"><strong>${l.specialPower}</strong>${escHtml(det.special_power)}</div>`;
+    }
+
+    if (padaDet) {
+      html += `<div class="pada-highlight">
+        <div class="ph-title">${l.currentPada} ${d.pada}: ${escHtml(syllables[padaIdx] || '')}</div>
+        <div style="font-size:0.83rem;margin-top:4px;">
+          <strong>${l.navamsaSign}:</strong> ${escHtml(signName(padaDet.navamsa_sign))} &nbsp;|&nbsp;
+          <strong>${l.navamsaPlanet}:</strong> ${escHtml(planetName(padaDet.planet))} &nbsp;|&nbsp;
+          <strong>${l.quality}:</strong> ${escHtml(padaDet.quality)}
+        </div>
+      </div>`;
+    }
+
+    if (descDisplay) {
+      html += `<div class="nak-desc">${escHtml(descDisplay)}</div>`;
+    }
+
+    html += `</div>
+      <div class="nak-card-footer" style="background:${colorStyle};"></div>
+    </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('planetNakContent').innerHTML = html;
+}
+
+// ─── Tab 2: Pada Details ─────────────
+function renderPadaDetails() {
+  const pn = nakData.planet_nakshatras;
+  const l = L();
+  let html = '';
+
+  PLANET_ORDER.forEach(planet => {
+    if (!pn[planet]) return;
+    const d = pn[planet];
+    const det = d.detail || {};
+    const syllables = det.pada_syllables || [];
+    const padaDets = det.pada_details || [];
+
+    html += `<div class="card pada-section">
+      <h2>${escHtml(planetName(planet))} &mdash; ${escHtml(d.nakshatra)}</h2>
+      <div style="margin-bottom:12px;">
+        <strong>${l.padaSyllables}:</strong>
+        <div class="syllable-box" style="margin-top:6px;">
+          ${syllables.map((s, i) => `<span class="syllable ${i === d.pada - 1 ? 'active' : ''}">${escHtml(s)}</span>`).join('')}
+        </div>
+      </div>
+      <table class="pada-table">
+        <thead>
+          <tr>
+            <th>${l.pada}</th>
+            <th>${l.syllable}</th>
+            <th>${l.navamsaSign}</th>
+            <th>${l.navamsaPlanet}</th>
+            <th>${l.quality}</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    padaDets.forEach((pd, i) => {
+      const isCurrent = (i + 1) === d.pada;
+      html += `<tr class="${isCurrent ? 'current-pada' : ''}">
+        <td>${pd.pada}</td>
+        <td style="font-size:1.1rem;font-weight:700;">${escHtml(syllables[i] || '')}</td>
+        <td>${escHtml(signName(pd.navamsa_sign))}</td>
+        <td>${escHtml(planetName(pd.planet))}</td>
+        <td style="text-align:left;font-size:0.82rem;">${escHtml(pd.quality)}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+  });
+
+  document.getElementById('padaDetailsContent').innerHTML = html;
+}
+
+// ─── Tab 3: Navtara Grid ─────────────
+function renderNavtara() {
+  const l = L();
+  const navtara = nakData.navtara || [];
+  const taraNames = currentLang === 'hi' ? (nakData.tara_names_hi || nakData.tara_names) : nakData.tara_names;
+  const goodTaras = nakData.good_taras || [1,2,4,6,8,9];
+  const totalBodies = nakData.navtara_summary ? nakData.navtara_summary.total_bodies : 10;
+
+  // Legend
+  let html = `<div class="card">
+    <h2>${l.tabNavtara}</h2>
+    <div class="tara-legend">
+      <strong style="margin-right:8px;">${l.legend}:</strong>`;
+  if (taraNames) {
+    taraNames.forEach((name, i) => {
+      const num = i + 1;
+      const isGood = goodTaras.includes(num);
+      html += `<div class="tara-legend-item">
+        <div class="tara-legend-swatch" style="background:${isGood ? '#c8e6c9' : '#ffcdd2'};"></div>
+        <span>${num}. ${escHtml(name)} (${isGood ? l.goodCount : l.badCount})</span>
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  // Build columns: which planets are present
+  const colPlanets = PLANET_ORDER.filter(p => nakData.planet_nakshatras && nakData.planet_nakshatras[p]);
+
+  html += `<div class="navtara-wrap"><table class="navtara-table"><thead><tr>
+    <th>#</th>
+    <th>${l.nakshatra}</th>
+    <th>${l.lord}</th>`;
+  colPlanets.forEach(p => {
+    html += `<th>${PLANET_ABBR[p] || p.substring(0,2)}</th>`;
+  });
+  html += `<th>${l.goodCount}/${totalBodies}</th></tr></thead><tbody>`;
+
+  navtara.forEach((row, idx) => {
+    html += `<tr>
+      <td class="nak-col" style="text-align:center;min-width:30px;padding-left:6px;">${idx + 1}</td>
+      <td class="nak-col">${escHtml(row.nakshatra)}</td>
+      <td class="lord-col">${escHtml(row.lord)}</td>`;
+
+    colPlanets.forEach(p => {
+      const t = row.taras && row.taras[p] ? row.taras[p] : null;
+      if (t) {
+        const isGood = goodTaras.includes(t.tara);
+        const isJanma = t.tara === 1;
+        const cls = isJanma ? 'tara-janma' : (isGood ? 'tara-good' : 'tara-bad');
+        const taraLabel = currentLang === 'hi' ? (t.tara_name_hi || t.tara_name) : t.tara_name;
+        html += `<td class="${cls}" title="${escHtml(taraLabel)} (C${t.cycle})">${t.tara}</td>`;
+      } else {
+        html += '<td>-</td>';
+      }
+    });
+
+    // Good count bar
+    const good = row.good_count || 0;
+    const bad = row.bad_count || 0;
+    const total = good + bad;
+    const pct = total > 0 ? Math.round(good / total * 100) : 0;
+    const barColor = pct >= 70 ? 'var(--good)' : (pct >= 50 ? 'var(--neutral)' : 'var(--bad)');
+    html += `<td class="count-col">
+      <span>${good}/${total}</span>
+      <div style="width:100%;background:#eee;height:12px;border-radius:3px;margin-top:2px;">
+        <div class="count-bar" style="width:${pct}%;background:${barColor};"></div>
+      </div>
+    </td></tr>`;
+  });
+
+  html += '</tbody></table></div>';
+
+  // Best / Worst Nakshatras
+  const summary = nakData.navtara_summary;
+  if (summary) {
+    html += `<div class="bw-grid">
+      <div class="bw-card">
+        <h4 style="color:var(--good);">${l.bestNakshatras}</h4>`;
+    (summary.best_nakshatras || []).forEach(n => {
+      html += `<div class="bw-row">
+        <span>${escHtml(n.nakshatra)}</span>
+        <span style="color:var(--good);font-weight:700;">${n.good_count} ${l.goodCount} / ${n.bad_count} ${l.badCount}</span>
+      </div>`;
+    });
+    html += `</div><div class="bw-card">
+        <h4 style="color:var(--bad);">${l.worstNakshatras}</h4>`;
+    (summary.worst_nakshatras || []).forEach(n => {
+      html += `<div class="bw-row">
+        <span>${escHtml(n.nakshatra)}</span>
+        <span style="color:var(--bad);font-weight:700;">${n.good_count} ${l.goodCount} / ${n.bad_count} ${l.badCount}</span>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  document.getElementById('navtaraContent').innerHTML = html;
+}
+
+// ─── Tab 4: Remedies & Activation ────
+function renderRemedies() {
+  const pn = nakData.planet_nakshatras;
+  const l = L();
+  let html = '<div class="remedy-grid">';
+
+  PLANET_ORDER.forEach(planet => {
+    if (!pn[planet]) return;
+    const d = pn[planet];
+    const det = d.detail || {};
+    const remedy = det.remedy || {};
+    const colorStyle = getColorStyle(det.color);
+
+    html += `<div class="remedy-card">
+      <div class="remedy-card-header" style="border-bottom:4px solid ${colorStyle.includes('gradient') ? 'var(--gold)' : colorStyle};">
+        <span class="planet-name" style="color:var(--accent);">${escHtml(planetName(planet))}</span>
+        <span class="nak-name">&mdash; ${escHtml(d.nakshatra)}</span>
+      </div>
+      <div class="remedy-card-body">`;
+
+    if (det.activation) {
+      html += `<div class="activation-box">
+        <strong>${l.activation}</strong>
+        ${escHtml(det.activation)}
+      </div>`;
+    }
+
+    html += `<table class="remedy-table">`;
+
+    if (remedy.deity_worship) {
+      html += `<tr><th>${l.deityWorship}</th><td>${escHtml(remedy.deity_worship)}</td></tr>`;
+    }
+    if (remedy.mantra) {
+      html += `<tr><th>${l.mantra}</th><td>
+        <div class="mantra-box" onclick="copyMantra(this)">${escHtml(remedy.mantra)}</div>
+      </td></tr>`;
+    }
+    if (remedy.gemstone) {
+      html += `<tr><th>${l.gemstone}</th><td>${escHtml(remedy.gemstone)}</td></tr>`;
+    }
+    if (remedy.donation) {
+      html += `<tr><th>${l.donation}</th><td>${escHtml(remedy.donation)}</td></tr>`;
+    }
+    if (remedy.fasting) {
+      html += `<tr><th>${l.fasting}</th><td>${escHtml(remedy.fasting)}</td></tr>`;
+    }
+    if (remedy.color_therapy) {
+      html += `<tr><th>${l.colorTherapy}</th><td>${escHtml(remedy.color_therapy)}</td></tr>`;
+    }
+    if (remedy.plant_remedy) {
+      html += `<tr><th>${l.plantRemedy}</th><td>${escHtml(remedy.plant_remedy)}</td></tr>`;
+    }
+
+    html += `</table></div></div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('remediesContent').innerHTML = html;
+}
+
+// ─── Set transit date to today ───────
+(function setTransitDefaults() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  document.getElementById('transitDateInput').value = `${dd}-${mm}-${yyyy}`;
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('transitTimeInput').value = `${hh}:${mi}`;
+})();
+
+// ─── Tab 5: Transit Navtara ─────────
+let transitData = null;
+
+async function fetchTransitNavtara() {
+  const btn = document.getElementById('transitBtn');
+  const status = document.getElementById('transitStatus');
+  btn.disabled = true;
+  status.innerHTML = '<span class="loading" style="padding:0;">Checking...</span>';
+
+  try {
+    const body = {
+      date: document.getElementById('dobInput').value,
+      time: document.getElementById('tobInput').value,
+      city: document.getElementById('placeInput').value,
+      latitude: parseFloat(document.getElementById('latInput').value),
+      longitude: parseFloat(document.getElementById('lonInput').value),
+      tz_offset: parseFloat(document.getElementById('tzInput').value),
+      ayanamsa: document.getElementById('ayanInput').value,
+      transit_date: document.getElementById('transitDateInput').value,
+      transit_time: document.getElementById('transitTimeInput').value,
+    };
+
+    const res = await fetch(`${API}/api/v1/nakshatra/transit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`API error ${res.status}: ${errBody}`);
+    }
+    transitData = await res.json();
+    renderTransitNavtara();
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderTransitNavtara() {
+  if (!transitData) return;
+  const l = L();
+  const goodTaras = [1, 2, 4, 6, 8, 9];
+  const taraNames = currentLang === 'hi' ? (transitData.tara_names_hi || transitData.tara_names) : transitData.tara_names;
+
+  // Birth Moon reference
+  let html = `<div class="transit-summary-bar">
+    <div class="transit-summary-stat">
+      <div class="stat-num" style="color:var(--accent);">${escHtml(transitData.birth_moon_nakshatra)}</div>
+      <div class="stat-label">${l.birthMoonNak}</div>
+    </div>
+    <div class="transit-summary-stat">
+      <div class="stat-num" style="color:var(--accent);">${escHtml(transitData.birth_moon_lord)}</div>
+      <div class="stat-label">${l.lord}</div>
+    </div>
+    <div style="flex:1;"></div>
+    <div class="transit-summary-stat">
+      <div class="stat-num" style="color:var(--good);">${transitData.good_count}</div>
+      <div class="stat-label">${l.favorable}</div>
+    </div>
+    <div class="transit-summary-stat">
+      <div class="stat-num" style="color:var(--bad);">${transitData.bad_count}</div>
+      <div class="stat-label">${l.unfavorable}</div>
+    </div>
+    <div class="transit-summary-stat">
+      <div class="stat-num">${transitData.total}</div>
+      <div class="stat-label">Total</div>
+    </div>
+  </div>`;
+
+  // Overall score bar
+  const pctGood = transitData.total > 0 ? Math.round(transitData.good_count / transitData.total * 100) : 0;
+  html += `<div style="background:#fff;border:2px solid var(--border);border-radius:8px;padding:12px 20px;margin-bottom:16px;">
+    <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">${l.favorable}: ${pctGood}%</div>
+    <div style="width:100%;background:#eee;height:20px;border-radius:10px;overflow:hidden;">
+      <div style="width:${pctGood}%;height:100%;background:linear-gradient(90deg,var(--good),#66bb6a);border-radius:10px;transition:width 0.5s;"></div>
+    </div>
+  </div>`;
+
+  // Summary table — all planets in one compact table
+  html += `<div style="overflow-x:auto;margin-bottom:20px;">
+    <table class="navtara-table" style="min-width:600px;">
+      <thead><tr>
+        <th>${currentLang === 'hi' ? 'ग्रह' : 'Planet'}</th>
+        <th>${l.nakshatra}</th>
+        <th>${l.pada}</th>
+        <th>${l.lord}</th>
+        <th>${currentLang === 'hi' ? 'तारा' : 'Tara'}</th>
+        <th>${currentLang === 'hi' ? 'तारा नाम' : 'Tara Name'}</th>
+        <th>${l.cycle}</th>
+        <th>${currentLang === 'hi' ? 'परिणाम' : 'Result'}</th>
+      </tr></thead><tbody>`;
+
+  const planets = transitData.transit_planets || [];
+  planets.forEach(tp => {
+    const isGood = tp.is_good;
+    const cls = isGood ? 'tara-good' : 'tara-bad';
+    const taraLabel = currentLang === 'hi' ? (tp.tara_name_hi || tp.tara_name) : tp.tara_name;
+    const resultLabel = isGood ? (currentLang === 'hi' ? 'शुभ' : 'Good') : (currentLang === 'hi' ? 'अशुभ' : 'Bad');
+    const resultStyle = isGood ? 'color:var(--good);font-weight:700;' : 'color:var(--bad);font-weight:700;';
+    html += `<tr>
+      <td style="text-align:left;font-weight:700;padding-left:10px;">${escHtml(planetName(tp.planet))}</td>
+      <td>${escHtml(tp.nakshatra)}</td>
+      <td>${tp.pada}</td>
+      <td>${escHtml(tp.lord)}</td>
+      <td class="${cls}" style="font-size:1rem;font-weight:800;">${tp.tara}</td>
+      <td class="${cls}">${escHtml(taraLabel)}</td>
+      <td>${tp.cycle}</td>
+      <td style="${resultStyle}">${resultLabel}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+
+  // Group by tara — cards
+  html += '<h3 style="color:var(--accent);margin-bottom:12px;font-size:1.05rem;">' +
+    (currentLang === 'hi' ? 'तारा अनुसार वर्गीकरण' : 'Grouped by Tara') + '</h3>';
+
+  const taraGroups = transitData.tara_groups || {};
+  // Sort tara groups by tara number
+  const taraOrder = taraNames ? taraNames : [];
+  taraOrder.forEach((tName, idx) => {
+    const tNum = idx + 1;
+    const isGood = goodTaras.includes(tNum);
+    // Find matching group
+    const enTaraName = transitData.tara_names[idx];
+    const groupPlanets = taraGroups[enTaraName];
+    if (!groupPlanets || groupPlanets.length === 0) return;
+
+    const groupCls = isGood ? 'group-good' : 'group-bad';
+    const icon = isGood ? '&#10003;' : '&#10007;';
+    html += `<div class="transit-tara-group">
+      <h3 class="${groupCls}">${icon} ${tNum}. ${escHtml(tName)} — ${groupPlanets.map(p => escHtml(planetName(p))).join(', ')}</h3>
+    </div>`;
+  });
+
+  // Planet cards
+  html += '<div class="transit-planet-grid">';
+  planets.forEach(tp => {
+    const isGood = tp.is_good;
+    const cardCls = isGood ? 'tara-good-card' : 'tara-bad-card';
+    const badgeCls = isGood ? 'good' : 'bad';
+    const taraLabel = currentLang === 'hi' ? (tp.tara_name_hi || tp.tara_name) : tp.tara_name;
+
+    html += `<div class="transit-planet-card ${cardCls}">
+      <div class="transit-card-header">
+        <span class="planet-name" style="color:var(--accent);">${escHtml(planetName(tp.planet))}</span>
+        <span class="transit-tara-badge ${badgeCls}">${tp.tara}. ${escHtml(taraLabel)}</span>
+      </div>
+      <div class="transit-card-body">
+        <div class="prop-item"><span class="prop-label">${l.nakshatra}</span><span class="prop-value">${escHtml(tp.nakshatra)}</span></div>
+        <div class="prop-item"><span class="prop-label">${l.pada}</span><span class="prop-value">${tp.pada}</span></div>
+        <div class="prop-item"><span class="prop-label">${l.lord}</span><span class="prop-value">${escHtml(tp.lord)}</span></div>
+        <div class="prop-item"><span class="prop-label">${l.cycle}</span><span class="prop-value">${tp.cycle}</span></div>
+        <div class="prop-item"><span class="prop-label">Long.</span><span class="prop-value">${tp.longitude}°</span></div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  document.getElementById('transitNavtaraContent').innerHTML = html;
+}
+
+// ─── Copy mantra ─────────────────────
+function copyMantra(el) {
+  const text = el.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = el.style.borderColor;
+    el.style.borderColor = 'var(--good)';
+    el.style.background = '#e8f5e9';
+    setTimeout(() => {
+      el.style.borderColor = orig || 'var(--gold)';
+      el.style.background = '#fff8e7';
+    }, 1200);
+  }).catch(() => {});
+}
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.dob) document.getElementById('dobInput').value = p.dob;
+    if (p.time) document.getElementById('tobInput').value = p.time;
+    if (p.place) document.getElementById('placeInput').value = p.place;
+    if (p.lat) document.getElementById('latInput').value = p.lat;
+    if (p.lon) document.getElementById('lonInput').value = p.lon;
+    if (p.tz !== undefined) document.getElementById('tzInput').value = p.tz;
+    if (p.ayanamsa) document.getElementById('ayanInput').value = p.ayanamsa;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

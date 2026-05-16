@@ -1,0 +1,2260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ashtakavarga — Transit Analysis | Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+    --good: #2e7d32;
+    --neutral: #ed6c02;
+    --bad: #c62828;
+    --excellent: #1b5e20;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); }
+  .header h1 { font-size:1.5rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; flex-wrap:wrap; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1500px; margin:0 auto; padding:20px; }
+
+  /* Birth form */
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+
+  /* Tabs */
+  .section-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+  .section-tab { padding:10px 18px; background:#fff; border:2px solid var(--border); border-radius:6px; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.2s; }
+  .section-tab:hover { background:#ffe4b5; }
+  .section-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .section-tab.star { border-color:var(--gold); box-shadow:0 0 8px rgba(218,165,32,0.4); }
+  .section-tab.star.active { background:linear-gradient(135deg,var(--header-bg),#a0522d); border-color:var(--gold); }
+
+  /* Card sections */
+  .card { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .card h2 { color:var(--accent); margin-bottom:16px; font-size:1.15rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .card h3 { color:var(--table-header); margin:16px 0 10px; font-size:1rem; }
+
+  /* BAV / SAV tables */
+  .ashtak-table { width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.85rem; }
+  .ashtak-table th { background:var(--table-header); color:#fff; padding:6px 8px; text-align:center; font-weight:600; border:1px solid #6b3410; }
+  .ashtak-table td { padding:6px 8px; text-align:center; border:1px solid var(--border); background:#fff; }
+  .ashtak-table tr:nth-child(even) td { background:var(--table-alt); }
+  .ashtak-table .planet-col { font-weight:700; color:var(--accent); text-align:left; background:#fff3cd !important; min-width:70px; }
+  .ashtak-table .total-col { font-weight:700; background:#fff3cd !important; color:var(--accent); }
+
+  .bav-high { background:#c8e6c9 !important; color:var(--good); font-weight:700; }
+  .bav-mid  { background:#fff9c4 !important; color:#f57f17; }
+  .bav-low  { background:#ffcdd2 !important; color:var(--bad); font-weight:700; }
+
+  /* Kaksha table */
+  .kaksha-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px,1fr)); gap:16px; margin-bottom:16px; }
+  .kaksha-planet-card { background:#fff; border:1px solid var(--border); border-radius:6px; padding:12px; }
+  .kaksha-planet-card h4 { color:var(--accent); margin-bottom:8px; font-size:0.95rem; border-bottom:1px solid #ddd; padding-bottom:4px; }
+  .kaksha-mini-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+  .kaksha-mini-table th { background:var(--table-header); color:#fff; padding:3px 4px; text-align:center; font-size:0.72rem; border:1px solid #6b3410; }
+  .kaksha-mini-table td { padding:3px 4px; text-align:center; border:1px solid #ddd; }
+  .kaksha-yes { background:#c8e6c9; color:var(--good); font-weight:700; }
+  .kaksha-no  { background:#ffcdd2; color:var(--bad); }
+
+  /* Pinda Shodhana */
+  .pinda-table { width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.85rem; }
+  .pinda-table th { background:var(--table-header); color:#fff; padding:6px 8px; text-align:center; font-weight:600; border:1px solid #6b3410; }
+  .pinda-table td { padding:6px 8px; text-align:center; border:1px solid var(--border); background:#fff; }
+  .pinda-table tr:nth-child(even) td { background:var(--table-alt); }
+  .pinda-highlight { font-weight:700; color:var(--accent); background:#fff3cd !important; }
+
+  /* Transit Calendar */
+  .calendar-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .calendar-controls label { font-size:0.85rem; font-weight:600; color:var(--accent); }
+  .calendar-controls input { padding:6px 10px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:16px; }
+  .cal-header { background:var(--table-header); color:#fff; text-align:center; padding:6px; font-size:0.8rem; font-weight:600; border-radius:3px; }
+  .cal-day { padding:8px 4px; text-align:center; border-radius:4px; font-size:0.82rem; cursor:pointer; border:1px solid transparent; transition:all 0.15s; position:relative; }
+  .cal-day:hover { border-color:var(--accent); transform:scale(1.08); z-index:2; }
+  .cal-day .day-num { font-weight:700; font-size:0.9rem; }
+  .cal-day .day-score { font-size:0.7rem; margin-top:2px; }
+  .cal-day.empty { background:transparent; cursor:default; }
+  .cal-day.empty:hover { border-color:transparent; transform:none; }
+  .cal-excellent { background:#a5d6a7; color:#1b5e20; }
+  .cal-good { background:#c8e6c9; color:#2e7d32; }
+  .cal-neutral { background:#fff9c4; color:#f57f17; }
+  .cal-bad { background:#ffcdd2; color:#c62828; }
+  .cal-very_bad { background:#ef9a9a; color:#b71c1c; }
+  .cal-day.selected { border:2px solid var(--accent); box-shadow:0 0 6px var(--shadow); }
+
+  /* Day detail panel */
+  .day-detail { background:#fff; border:2px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px; display:none; }
+  .day-detail h3 { color:var(--accent); margin-bottom:10px; }
+  .day-detail .score-badge { display:inline-block; padding:4px 14px; border-radius:20px; font-weight:700; font-size:0.9rem; margin-left:12px; }
+  .day-detail .planet-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; margin-top:10px; }
+  .day-planet { padding:8px 12px; border-radius:6px; border:1px solid #ddd; font-size:0.85rem; }
+
+  /* Summary */
+  .summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+  .summary-item { background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
+  .summary-item .s-label { font-size:0.75rem; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+  .summary-item .s-value { font-size:1.4rem; font-weight:700; color:var(--accent); margin-top:4px; }
+  .summary-item.s-excellent .s-value { color:var(--excellent); }
+  .summary-item.s-good .s-value { color:var(--good); }
+  .summary-item.s-neutral .s-value { color:var(--neutral); }
+  .summary-item.s-bad .s-value { color:var(--bad); }
+
+  /* Best/Worst days */
+  .bw-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px; }
+  .bw-list { background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px; }
+  .bw-list h4 { color:var(--accent); margin-bottom:8px; font-size:0.9rem; }
+  .bw-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #eee; font-size:0.85rem; }
+  .bw-row:last-child { border-bottom:none; }
+
+  .loading { text-align:center; padding:40px; font-size:1.1rem; color:var(--accent); }
+  .loading::after { content:''; display:inline-block; width:20px; height:20px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:10px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .footer { text-align:center; padding:16px; color:#fff; font-size:0.8rem; background:var(--header-bg); margin-top:40px; }
+
+  /* Place autocomplete */
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+
+  /* Month navigation */
+  .month-nav { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .month-nav button { background:var(--header-bg); color:#fff; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; }
+  .month-nav button:hover { background:#a00; }
+  .month-nav .month-label { font-size:1.1rem; font-weight:700; color:var(--accent); min-width:180px; text-align:center; }
+
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  /* ─── Gochara Kaksha Grid ─────────────────── */
+  .gk-grid-wrap { overflow-x:auto; margin-bottom:20px; }
+  .gk-grid { border-collapse:separate; border-spacing:0; width:100%; min-width:700px; }
+  .gk-grid th { background:var(--table-header); color:#fff; padding:8px 6px; text-align:center; font-weight:700; font-size:0.85rem; border:2px solid #333; position:sticky; top:0; z-index:10; }
+  .gk-grid th.gk-day-col { min-width:50px; }
+  .gk-grid th.gk-planet-col { min-width:90px; }
+  .gk-grid td { padding:0; text-align:center; border:2px solid #333; vertical-align:top; }
+  .gk-grid tr:hover td { outline:3px solid #000; outline-offset:-2px; }
+  .gk-grid .gk-day-cell { padding:6px 8px; font-weight:700; font-size:0.82rem; background:#fff3cd; white-space:nowrap; cursor:pointer; }
+  .gk-grid .gk-day-cell:hover { background:var(--gold); color:#fff; }
+  .gk-grid .gk-score-cell { padding:6px 8px; font-weight:700; font-size:0.9rem; background:#fff; }
+  .gk-grid tr.gk-row-selected .gk-day-cell { background:var(--accent); color:#fff; }
+  .gk-grid tr.gk-row-selected .gk-score-cell { background:#fff3cd; }
+
+  .gk-cell { min-height:52px; display:flex; flex-direction:column; cursor:pointer; transition:transform 0.1s; position:relative; }
+  .gk-cell:hover { transform:scale(1.04); z-index:5; box-shadow:0 2px 8px var(--shadow); }
+  .gk-cell-top { padding:2px 4px; font-size:0.72rem; font-weight:700; color:#333; background:rgba(255,255,255,0.85); line-height:1.1; }
+  .gk-cell-bav { font-size:0.65rem; font-weight:400; color:#666; }
+  .gk-cell-bands { flex:1; display:flex; flex-direction:column; min-height:24px; }
+  .gk-band { flex:1; min-height:4px; border-bottom:1px solid rgba(0,0,0,0.3); }
+  .gk-band:last-child { border-bottom:none; }
+  .gk-band-benefic { background:linear-gradient(90deg,#4caf50,#66bb6a); }
+  .gk-band-malefic { background:linear-gradient(90deg,#e53935,#ef5350); }
+  .gk-band-neutral { background:linear-gradient(90deg,#bdbdbd,#e0e0e0); }
+
+  /* Tooltip for gk cells */
+  .gk-cell .gk-tooltip { display:none; position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:6px 10px; border-radius:6px; font-size:0.75rem; white-space:nowrap; z-index:100; pointer-events:none; }
+  .gk-cell .gk-tooltip::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:#333; }
+  .gk-cell:hover .gk-tooltip { display:block; }
+
+  /* Hourly detail panel */
+  .hourly-panel { background:#fff; border:2px solid var(--gold); border-radius:10px; padding:20px; margin-top:16px; box-shadow:0 4px 16px var(--shadow); }
+  .hourly-panel h3 { color:var(--accent); margin-bottom:16px; font-size:1.1rem; display:flex; align-items:center; gap:10px; }
+  .hourly-panel .close-btn { margin-left:auto; background:none; border:1px solid var(--border); border-radius:4px; padding:4px 12px; cursor:pointer; font-size:0.85rem; color:var(--accent); }
+  .hourly-panel .close-btn:hover { background:#ffcdd2; }
+
+  .hourly-timeline-wrap { overflow-x:auto; margin-bottom:16px; }
+  .hourly-timeline { display:flex; flex-direction:column; gap:6px; min-width:700px; }
+  .ht-row { display:flex; align-items:center; gap:6px; }
+  .ht-label { width:60px; font-weight:700; font-size:0.8rem; color:var(--accent); text-align:right; flex-shrink:0; }
+  .ht-bars { display:flex; flex:1; height:22px; border-radius:3px; overflow:hidden; border:2px solid #333; }
+  .ht-bar { flex:1; transition:opacity 0.15s; position:relative; border-right:1px solid #333; }
+  .ht-bar:last-child { border-right:none; }
+  .ht-bar:hover { opacity:0.8; }
+  .ht-bar-benefic { background:#4caf50; }
+  .ht-bar-malefic { background:#e53935; }
+  .ht-bar-neutral { background:#bdbdbd; }
+
+  /* Composite score chart */
+  .composite-chart { position:relative; height:120px; background:#fff; border:1px solid #ddd; border-radius:6px; margin-bottom:16px; overflow:hidden; }
+  .composite-chart .cc-bar { position:absolute; bottom:0; transition:height 0.3s; border-radius:2px 2px 0 0; }
+  .composite-chart .cc-label { position:absolute; bottom:-18px; font-size:0.6rem; text-align:center; color:#888; }
+  .composite-chart .cc-threshold { position:absolute; left:0; right:0; border-top:1px dashed var(--accent); }
+  .composite-chart .cc-threshold-label { position:absolute; right:4px; font-size:0.6rem; color:var(--accent); }
+
+  /* Score interpretation */
+  .score-interp { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+  .si-card { background:#fff; border:1px solid var(--border); border-radius:8px; padding:12px; text-align:center; }
+  .si-card .si-label { font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+  .si-card .si-value { font-size:1.5rem; font-weight:700; margin-top:4px; }
+  .si-card .si-sub { font-size:0.75rem; color:#666; margin-top:2px; }
+
+  /* Best/worst hours in hourly panel */
+  .bw-hours { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  .bw-hours .bwh-section { background:#fff; border:1px solid var(--border); border-radius:8px; padding:12px; }
+  .bw-hours .bwh-section h4 { font-size:0.85rem; margin-bottom:6px; }
+  .bwh-item { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid #f0f0f0; font-size:0.82rem; }
+
+  /* Moon nakshatra timeline */
+  .moon-nak-timeline { display:flex; gap:2px; margin-bottom:16px; border-radius:6px; overflow:hidden; border:1px solid #ddd; height:30px; }
+  .moon-nak-seg { display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:600; color:#fff; padding:0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Legend for gochara */
+  .gk-legend { display:flex; flex-wrap:wrap; gap:16px; font-size:0.8rem; margin-bottom:16px; padding:10px; background:#fff; border-radius:6px; border:1px solid var(--border); }
+  .gk-legend-item { display:flex; align-items:center; gap:6px; }
+  .gk-legend-swatch { width:16px; height:10px; border-radius:2px; border:1px solid #ccc; }
+
+  /* ─── Advanced Predictions ─────────────── */
+  .adv-sub-tabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:16px; border-bottom:2px solid var(--border); padding-bottom:10px; }
+  .adv-sub-tab { padding:8px 14px; background:#fff; border:1px solid var(--border); border-radius:4px 4px 0 0; cursor:pointer; font-size:0.82rem; font-weight:600; transition:all 0.2s; }
+  .adv-sub-tab:hover { background:#ffe4b5; }
+  .adv-sub-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .adv-panel { display:none; }
+  .adv-panel.active { display:block; }
+
+  .adv-score-card { display:inline-block; padding:12px 20px; border-radius:8px; margin:8px 4px; text-align:center; border:2px solid var(--border); background:#fff; }
+  .adv-score-card .asc-label { font-size:0.7rem; text-transform:uppercase; color:#888; letter-spacing:0.5px; }
+  .adv-score-card .asc-value { font-size:1.6rem; font-weight:700; margin-top:2px; }
+  .adv-score-card.excellent .asc-value { color:var(--excellent); }
+  .adv-score-card.good .asc-value { color:var(--good); }
+  .adv-score-card.average .asc-value { color:var(--neutral); }
+  .adv-score-card.below_average .asc-value { color:#e65100; }
+  .adv-score-card.bad .asc-value { color:var(--bad); }
+
+  .adv-table { width:100%; border-collapse:collapse; margin:12px 0; font-size:0.83rem; }
+  .adv-table th { background:var(--table-header); color:#fff; padding:8px; text-align:center; font-weight:600; border:1px solid #6b3410; }
+  .adv-table td { padding:8px; text-align:center; border:1px solid var(--border); background:#fff; }
+  .adv-table tr:nth-child(even) td { background:var(--table-alt); }
+  .adv-table .planet-name { font-weight:700; color:var(--accent); text-align:left; }
+
+  .adv-alert { padding:12px 16px; border-radius:6px; margin:10px 0; font-size:0.88rem; border:1px solid; }
+  .adv-alert.danger { background:#ffebee; border-color:#e53935; color:#b71c1c; }
+  .adv-alert.warning { background:#fff3e0; border-color:#ff9800; color:#e65100; }
+  .adv-alert.success { background:#e8f5e9; border-color:#4caf50; color:#1b5e20; }
+  .adv-alert.info { background:#e3f2fd; border-color:#2196f3; color:#0d47a1; }
+
+  .kaksha-bar { display:flex; height:24px; border-radius:4px; overflow:hidden; border:1px solid #999; margin:4px 0; }
+  .kaksha-bar-seg { flex:1; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:700; color:#fff; border-right:1px solid rgba(0,0,0,0.2); }
+  .kaksha-bar-seg:last-child { border-right:none; }
+  .kaksha-bar-seg.benefic { background:#4caf50; }
+  .kaksha-bar-seg.malefic { background:#e53935; }
+  .kaksha-bar-seg.current { box-shadow:inset 0 0 0 2px #fff; outline:2px solid #333; z-index:1; }
+
+  .forecast-bar { display:flex; align-items:flex-end; gap:4px; height:100px; padding:8px 0; }
+  .forecast-day { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .forecast-day .fd-bar { width:100%; border-radius:3px 3px 0 0; transition:height 0.3s; min-height:4px; }
+  .forecast-day .fd-label { font-size:0.7rem; color:#666; }
+  .forecast-day .fd-score { font-size:0.75rem; font-weight:700; }
+
+  .bhava-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
+  .bhava-card { background:#fff; border:1px solid var(--border); border-radius:6px; padding:10px; font-size:0.82rem; }
+  .bhava-card h4 { color:var(--accent); font-size:0.85rem; margin-bottom:4px; }
+  .bhava-card.vulnerable { border-left:4px solid #e53935; }
+  .bhava-card.moderate-vuln { border-left:4px solid #ff9800; }
+  .bhava-card.protected { border-left:4px solid #4caf50; }
+  .bhava-card.saturn-active { background:#fff3e0; border-color:#e53935; }
+
+  @media (max-width:768px) {
+    .header { flex-direction:column; gap:8px; }
+    .form-row { flex-direction:column; }
+    .section-tabs { gap:4px; }
+    .section-tab { padding:8px 12px; font-size:0.8rem; }
+    .bw-grid { grid-template-columns:1fr; }
+    .bw-hours { grid-template-columns:1fr; }
+    .kaksha-grid { grid-template-columns:1fr; }
+    .cal-grid { gap:2px; }
+    .cal-day { padding:4px 2px; font-size:0.75rem; }
+    .gk-grid { min-width:600px; }
+    .score-interp { grid-template-columns:1fr 1fr; }
+    .bhava-grid { grid-template-columns:1fr; }
+    .adv-sub-tabs { gap:2px; }
+    .adv-sub-tab { padding:6px 10px; font-size:0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>&#9788;</span> Ashtakavarga — Transit Analysis</h1>
+  <div class="nav-links">
+    <a href="/">Daily Panchang</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga" class="active">Ashtakavarga</a>
+    <a href="/special-lagnas">Special Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth Data Form -->
+  <div class="birth-form">
+    <h2 id="formTitle">Enter Birth Details &amp; Prediction Range</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="dobInput" placeholder="DD-MM-YYYY" maxlength="10" value="23-09-1992" />
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="tobInput" placeholder="HH:MM" maxlength="5" value="23:10" />
+      </div>
+      <div class="form-field">
+        <label>Birth Place</label>
+        <div class="loc-auto">
+          <input type="text" id="placeInput" placeholder="Search city or village..." autocomplete="off" value="Ujjain" style="width:280px;" />
+          <div id="placeSuggestions" class="loc-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Latitude</label>
+        <input type="text" id="latInput" value="23.1765" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>Longitude</label>
+        <input type="text" id="lonInput" value="75.7885" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>TZ (UTC+/-)</label>
+        <input type="text" id="tzInput" value="5.5" style="width:60px;" />
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanInput">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">KP</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Language</label>
+        <select id="langSelect" onchange="switchLanguage()">
+          <option value="en" selected>English</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Prediction Start</label>
+        <input type="text" id="predStartInput" placeholder="DD-MM-YYYY" maxlength="10" />
+      </div>
+      <div class="form-field">
+        <label>Prediction End</label>
+        <input type="text" id="predEndInput" placeholder="DD-MM-YYYY" maxlength="10" />
+      </div>
+      <div class="form-field" style="align-self:flex-end;">
+        <button class="btn" id="generateBtn" onclick="generateAshtakavarga()">Calculate Ashtakavarga</button>
+      </div>
+      <span id="genStatus" style="align-self:center;color:var(--accent);font-size:0.9rem;"></span>
+    </div>
+  </div>
+
+  <!-- Section Tabs -->
+  <div id="sectionTabsWrap" style="display:none;">
+    <div class="section-tabs" id="sectionTabs"></div>
+  </div>
+
+  <!-- BAV Section -->
+  <div class="tab-content" id="bavSection">
+    <div class="card">
+      <h2 id="bavTitle">Bhinnashtakavarga (BAV) — Individual Planet Points</h2>
+      <div id="bavContent"></div>
+    </div>
+  </div>
+
+  <!-- SAV Section -->
+  <div class="tab-content" id="savSection">
+    <div class="card">
+      <h2 id="savTitle">Sarvashtakavarga (SAV) — Combined Points</h2>
+      <div id="savContent"></div>
+    </div>
+  </div>
+
+  <!-- Kaksha Section -->
+  <div class="tab-content" id="kakshaSection">
+    <div class="card">
+      <h2 id="kakshaTitle">Kaksha-based Ashtakavarga</h2>
+      <div id="kakshaContent"></div>
+    </div>
+  </div>
+
+  <!-- Pinda Shodhana Section -->
+  <div class="tab-content" id="pindaSection">
+    <div class="card">
+      <h2 id="pindaTitle">Pinda Shodhana — Purification &amp; Pinda</h2>
+      <div id="pindaContent"></div>
+    </div>
+  </div>
+
+  <!-- Transit Predictions Section -->
+  <div class="tab-content" id="transitSection">
+    <div class="card">
+      <h2 id="transitTitle">Transit Predictions — Daily Ratings</h2>
+      <div id="transitContent"></div>
+    </div>
+  </div>
+
+  <!-- Gochara Kaksha Section -->
+  <div class="tab-content" id="gocharaSection">
+    <div class="card">
+      <h2 id="gocharaTitle">Gochara Kaksha — Monthly Transit Grid</h2>
+      <div id="gocharaContent"></div>
+    </div>
+  </div>
+
+  <!-- Advanced Predictions Section (Book Techniques) -->
+  <div class="tab-content" id="advancedSection">
+    <div class="card">
+      <h2 id="advancedTitle">&#128218; Advanced Predictions — Secrets of Ashtakavarga</h2>
+      <p style="font-size:0.85rem;color:#666;margin-bottom:16px;">
+        Advanced transit prediction techniques from classical texts. Uses birth chart BAV/SAV with current transit positions.
+      </p>
+      <div class="form-row" style="margin-bottom:16px;">
+        <div class="form-field">
+          <label>Transit Date</label>
+          <input type="text" id="advTransitDate" placeholder="DD-MM-YYYY" maxlength="10" />
+        </div>
+        <div class="form-field">
+          <label>Forecast Days</label>
+          <input type="number" id="advForecastDays" value="7" min="1" max="30" style="width:70px;" />
+        </div>
+        <div class="form-field" style="align-self:flex-end;">
+          <button class="btn" onclick="generateAdvanced()">Generate Advanced Predictions</button>
+        </div>
+        <span id="advStatus" style="align-self:center;color:var(--accent);font-size:0.9rem;"></span>
+      </div>
+      <div id="advancedContent"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Ashtakavarga Module &middot; BAV &middot; SAV &middot; Kaksha &middot; Pinda &middot; Transit &middot; Gochara Kaksha
+</div>
+
+<script>
+const API = '';
+let ashData = null;
+let currentLang = 'en';
+let activeTab = 'bav';
+let placeTimer = null;
+let selectedDay = null;
+let calendarMonth = null;
+let gocharaMonth = null;
+let gocharaHourlyData = null;
+let gocharaSelectedDay = null;
+
+// ─── Language ─────────────────────────
+const SIGNS_EN = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const SIGNS_HI = ['मेष','वृषभ','मिथुन','कर्क','सिंह','कन्या','तुला','वृश्चिक','धनु','मकर','कुम्भ','मीन'];
+const PLANETS_EN = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn'];
+const PLANETS_HI = {'Sun':'सूर्य','Moon':'चन्द्र','Mars':'मंगल','Mercury':'बुध','Jupiter':'गुरु','Venus':'शुक्र','Saturn':'शनि','Lagna':'लग्न','Ascendant':'लग्न'};
+const PLANET_ABBR = {'Sun':'Su','Moon':'Mo','Mars':'Ma','Mercury':'Me','Jupiter':'Ju','Venus':'Ve','Saturn':'Sa'};
+const PLANET_ABBR_HI = {'Sun':'सू','Moon':'चं','Mars':'मं','Mercury':'बु','Jupiter':'गु','Venus':'शु','Saturn':'श'};
+const KAKSHA_LORD_ABBR = {'Saturn':'Sa','Jupiter':'Ju','Mars':'Ma','Sun':'Su','Venus':'Ve','Mercury':'Me','Moon':'Mo','Lagna':'As','Ascendant':'As'};
+const KAKSHA_LORD_ABBR_HI = {'Saturn':'श','Jupiter':'गु','Mars':'मं','Sun':'सू','Venus':'शु','Mercury':'बु','Moon':'चं','Lagna':'ल','Ascendant':'ल'};
+const NAK_COLORS = ['#e91e63','#9c27b0','#673ab7','#3f51b5','#2196f3','#00bcd4','#009688','#4caf50','#8bc34a','#cddc39','#ffeb3b','#ffc107','#ff9800','#ff5722','#795548','#607d8b','#e91e63','#9c27b0','#673ab7','#3f51b5','#2196f3','#00bcd4','#009688','#4caf50','#8bc34a','#cddc39','#ffeb3b'];
+
+const LANG = {
+  en: {
+    formTitle: 'Enter Birth Details & Prediction Range',
+    calcBtn: 'Calculate Ashtakavarga',
+    bavTitle: 'Bhinnashtakavarga (BAV) — Individual Planet Points',
+    savTitle: 'Sarvashtakavarga (SAV) — Combined Points',
+    kakshaTitle: 'Kaksha-based Ashtakavarga',
+    pindaTitle: 'Pinda Shodhana — Purification & Pinda',
+    transitTitle: 'Transit Predictions — Daily Ratings',
+    gocharaTitle: 'Gochara Kaksha — Monthly Transit Grid',
+    tabs: { bav:'BAV', sav:'SAV', kaksha:'Kaksha', pinda:'Pinda Shodhana', transit:'Transit', gochara:'Gochara Kaksha', advanced:'Advanced' },
+    tabDesc: { bav:'Individual planet points', sav:'Combined points', kaksha:'8 sub-divisions', pinda:'Trikona + Ekadhipatya + Pinda', transit:'Daily/Monthly predictions', gochara:'Kaksha transit grid', advanced:'Book predictions' },
+    planet:'Planet', sign:'Sign', total:'Total', points:'Points', benefic:'Benefic', malefic:'Malefic',
+    original:'Original', afterTrikona:'After Trikona', afterEkadhi:'After Ekadhipatya',
+    grahaPinda:'Graha Pinda', rashiPinda:'Rashi Pinda', sodhyaPinda:'Sodhya Pinda',
+    strengthTitle:'Sodhya Pinda — Strength Analysis',
+    rank:'Rank', strength:'Strength', dashaHint:'Dasha Period', transitHint:'Transit Sensitivity',
+    strongest:'Strongest', strong:'Strong', moderate:'Moderate', weak:'Weak', weakest:'Weakest',
+    dashaExcellent:'Highly productive & prosperous dasha',
+    dashaStrong:'Generally favourable dasha period',
+    dashaModerate:'Mixed results, moderate gains',
+    dashaWeak:'Challenging dasha, needs remedies',
+    dashaWeakest:'Most difficult dasha, caution advised',
+    transitHigh:'Very sensitive to transits — amplified effects',
+    transitMod:'Moderate transit sensitivity',
+    transitLow:'Low transit sensitivity — subdued effects',
+    excellent:'Excellent', good:'Good', neutral:'Neutral', bad:'Bad',
+    bestDays:'Best Days', worstDays:'Challenging Days', avgScore:'Average Score',
+    totalDays:'Total Days', score:'Score', rating:'Rating', weekday:'Weekday',
+    date:'Date', day:'Day', kaksha:'Kaksha', kakshaLord:'Kaksha Lord',
+    bestHours:'Best Hours', worstHours:'Worst Hours',
+    beneficCount:'Benefic Count', savWeighted:'SAV Weighted',
+    hourlyDetail:'Hourly Detail', moonNakshatra:'Moon Nakshatra',
+    clickDayHint:'Click a day row to see hourly details',
+    interpretation:'Interpretation',
+    bphsNote:'Per BPHS: 3+ planets in benefic kakshas indicates an auspicious period',
+    signs: SIGNS_EN, planets: PLANETS_EN,
+    translatePlanet: p => p,
+    translateSign: (s,i) => s,
+  },
+  hi: {
+    formTitle: 'जन्म विवरण और भविष्यवाणी अवधि दर्ज करें',
+    calcBtn: 'अष्टकवर्ग गणना करें',
+    bavTitle: 'भिन्नाष्टकवर्ग (BAV) — व्यक्तिगत ग्रह अंक',
+    savTitle: 'सर्वाष्टकवर्ग (SAV) — संयुक्त अंक',
+    kakshaTitle: 'कक्षा आधारित अष्टकवर्ग',
+    pindaTitle: 'पिंड शोधन — त्रिकोण + एकाधिपत्य + पिंड',
+    transitTitle: 'गोचर भविष्यवाणी — दैनिक रेटिंग',
+    gocharaTitle: 'गोचर कक्षा — मासिक गोचर ग्रिड',
+    tabs: { bav:'BAV', sav:'SAV', kaksha:'कक्षा', pinda:'पिंड शोधन', transit:'गोचर', gochara:'गोचर कक्षा', advanced:'विशेष' },
+    tabDesc: { bav:'व्यक्तिगत ग्रह अंक', sav:'संयुक्त अंक', kaksha:'8 उप-विभाग', pinda:'त्रिकोण + एकाधिपत्य + पिंड', transit:'दैनिक/मासिक भविष्यवाणी', gochara:'कक्षा गोचर ग्रिड', advanced:'पुस्तक भविष्यवाणी' },
+    planet:'ग्रह', sign:'राशि', total:'कुल', points:'अंक', benefic:'शुभ', malefic:'अशुभ',
+    original:'मूल', afterTrikona:'त्रिकोण शोधन', afterEkadhi:'एकाधिपत्य शोधन',
+    grahaPinda:'ग्रह पिंड', rashiPinda:'राशि पिंड', sodhyaPinda:'शोध्य पिंड',
+    strengthTitle:'शोध्य पिंड — बल विश्लेषण',
+    rank:'क्रम', strength:'बल', dashaHint:'दशा काल', transitHint:'गोचर संवेदनशीलता',
+    strongest:'सर्वाधिक बलवान', strong:'बलवान', moderate:'मध्यम', weak:'दुर्बल', weakest:'सर्वाधिक दुर्बल',
+    dashaExcellent:'अत्यंत उत्पादक एवं समृद्ध दशा',
+    dashaStrong:'सामान्यतः अनुकूल दशा काल',
+    dashaModerate:'मिश्रित फल, मध्यम लाभ',
+    dashaWeak:'चुनौतीपूर्ण दशा, उपाय आवश्यक',
+    dashaWeakest:'सबसे कठिन दशा, सावधानी आवश्यक',
+    transitHigh:'गोचर के प्रति अत्यंत संवेदनशील — प्रभाव बढ़ा हुआ',
+    transitMod:'मध्यम गोचर संवेदनशीलता',
+    transitLow:'कम गोचर संवेदनशीलता — प्रभाव मंद',
+    excellent:'उत्तम', good:'अच्छा', neutral:'सामान्य', bad:'कठिन',
+    bestDays:'सर्वोत्तम दिन', worstDays:'कठिन दिन', avgScore:'औसत अंक',
+    totalDays:'कुल दिन', score:'अंक', rating:'रेटिंग', weekday:'वार',
+    date:'तिथि', day:'दिन', kaksha:'कक्षा', kakshaLord:'कक्षा स्वामी',
+    bestHours:'सर्वोत्तम घंटे', worstHours:'कठिन घंटे',
+    beneficCount:'शुभ संख्या', savWeighted:'SAV भारित',
+    hourlyDetail:'प्रति घंटा विवरण', moonNakshatra:'चन्द्र नक्षत्र',
+    clickDayHint:'प्रति घंटा विवरण के लिए पंक्ति पर क्लिक करें',
+    interpretation:'विश्लेषण',
+    bphsNote:'BPHS के अनुसार: 3+ ग्रह शुभ कक्षाओं में हों तो शुभ काल',
+    signs: SIGNS_HI, planets: PLANETS_EN,
+    translatePlanet: p => PLANETS_HI[p] || p,
+    translateSign: (s,i) => { const idx = SIGNS_EN.indexOf(s); return idx >= 0 ? SIGNS_HI[idx] : s; },
+  },
+};
+
+function L() { return LANG[currentLang]; }
+function tPlanet(p) { return L().translatePlanet(p); }
+function tSign(s) { return L().translateSign(s); }
+function tRating(r) {
+  const map = { excellent: L().excellent, good: L().good, neutral: L().neutral, bad: L().bad, very_bad: L().bad };
+  return map[r] || r;
+}
+function pAbbr(p) { return currentLang === 'hi' ? (PLANET_ABBR_HI[p] || p) : (PLANET_ABBR[p] || p); }
+function klAbbr(k) { return currentLang === 'hi' ? (KAKSHA_LORD_ABBR_HI[k] || k) : (KAKSHA_LORD_ABBR[k] || k); }
+
+function ratingColor(r) {
+  return { excellent:'var(--excellent)', good:'var(--good)', neutral:'var(--neutral)', bad:'var(--bad)', very_bad:'var(--bad)' }[r] || '#333';
+}
+function ratingBg(r) {
+  return { excellent:'#c8e6c9', good:'#e8f5e9', neutral:'#fff9c4', bad:'#ffcdd2', very_bad:'#ef9a9a' }[r] || '#f5f5f5';
+}
+
+function switchLanguage() {
+  currentLang = document.getElementById('langSelect').value;
+  document.getElementById('formTitle').textContent = L().formTitle;
+  document.getElementById('generateBtn').textContent = L().calcBtn;
+  if (ashData) renderAll();
+}
+
+// ─── Birth defaults ───────────────────
+(async function loadBirthDefaults() {
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) {
+      const d = await res.json();
+      document.getElementById('dobInput').value = d.date;
+      document.getElementById('tobInput').value = d.time;
+      document.getElementById('placeInput').value = d.place;
+      document.getElementById('latInput').value = d.latitude;
+      document.getElementById('lonInput').value = d.longitude;
+      document.getElementById('tzInput').value = d.tz_offset;
+      document.getElementById('ayanInput').value = d.ayanamsa;
+    }
+  } catch (_) {}
+  // Set default prediction range to current month
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const start = `01-${String(m+1).padStart(2,'0')}-${y}`;
+  const lastDay = new Date(y, m+1, 0).getDate();
+  const end = `${lastDay}-${String(m+1).padStart(2,'0')}-${y}`;
+  document.getElementById('predStartInput').value = start;
+  document.getElementById('predEndInput').value = end;
+})();
+
+// ─── Place autocomplete ───
+const placeInput = document.getElementById('placeInput');
+const placeDropdown = document.getElementById('placeSuggestions');
+
+placeInput.addEventListener('input', () => {
+  clearTimeout(placeTimer);
+  const q = placeInput.value.trim();
+  if (q.length < 2) { placeDropdown.style.display = 'none'; return; }
+  placeTimer = setTimeout(() => fetchPlaces(q), 350);
+});
+placeInput.addEventListener('focus', () => {
+  if (placeInput.value.trim().length >= 2) fetchPlaces(placeInput.value.trim());
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#placeInput') && !e.target.closest('#placeSuggestions'))
+    placeDropdown.style.display = 'none';
+});
+
+async function fetchPlaces(q) {
+  try {
+    const localRes = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+    const localData = await localRes.json();
+    if (localData.results && localData.results.length > 0) {
+      renderPlaceDropdown(localData.results.map(c => ({
+        display: c.display, name: c.name, lat: c.latitude, lon: c.longitude, tz: c.tz_offset,
+      })));
+      return;
+    }
+    const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`);
+    const nData = await nRes.json();
+    if (nData && nData.length > 0) {
+      const results = nData.map(r => {
+        const parts = [];
+        if (r.address) {
+          if (r.address.city || r.address.town || r.address.village || r.address.hamlet)
+            parts.push(r.address.city || r.address.town || r.address.village || r.address.hamlet);
+          if (r.address.state) parts.push(r.address.state);
+          if (r.address.country) parts.push(r.address.country);
+        }
+        const display = parts.length > 0 ? parts.join(', ') : r.display_name.split(',').slice(0,3).join(',');
+        return { display, name: parts[0] || r.display_name.split(',')[0], lat: parseFloat(r.lat), lon: parseFloat(r.lon), tz: null };
+      });
+      renderPlaceDropdown(results);
+    } else {
+      placeDropdown.innerHTML = '<div style="padding:8px 12px;color:#888;font-size:0.85rem;">No results found</div>';
+      placeDropdown.style.display = 'block';
+    }
+  } catch(e) {
+    try {
+      const res = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data.results && data.results.length) {
+        renderPlaceDropdown(data.results.map(c => ({
+          display: c.display, name: c.name, lat: c.latitude, lon: c.longitude, tz: c.tz_offset,
+        })));
+      } else {
+        placeDropdown.innerHTML = '<div style="padding:8px 12px;color:#888;font-size:0.85rem;">Not found</div>';
+        placeDropdown.style.display = 'block';
+      }
+    } catch(_) { placeDropdown.style.display = 'none'; }
+  }
+}
+
+function renderPlaceDropdown(results) {
+  placeDropdown.innerHTML = results.map((c, i) => {
+    const tzDisplay = c.tz !== null ? `UTC${c.tz>=0?'+':''}${c.tz}` : '';
+    return `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.9rem;"
+         onmouseover="this.style.background='#ffe4b5'" onmouseout="this.style.background='#fff'"
+         onclick="pickPlace(${i})">
+      <strong>${c.display}</strong>
+      ${tzDisplay ? `<span style="color:#888;font-size:0.8rem;margin-left:8px;">${tzDisplay}</span>` : ''}
+    </div>`;
+  }).join('');
+  placeDropdown.style.display = 'block';
+  window._placeResults = results;
+}
+
+function pickPlace(idx) {
+  const c = window._placeResults[idx];
+  placeInput.value = c.name;
+  document.getElementById('latInput').value = c.lat;
+  document.getElementById('lonInput').value = c.lon;
+  if (c.tz !== null) {
+    document.getElementById('tzInput').value = c.tz;
+  } else {
+    const estTz = Math.round(c.lon / 15 * 2) / 2;
+    document.getElementById('tzInput').value = estTz;
+  }
+  placeDropdown.style.display = 'none';
+}
+
+// ─── Build request body helper ──────────
+function buildRequestBody(overrides) {
+  const body = {
+    date: document.getElementById('dobInput').value,
+    time: document.getElementById('tobInput').value,
+    latitude: parseFloat(document.getElementById('latInput').value),
+    longitude: parseFloat(document.getElementById('lonInput').value),
+    tz_offset: parseFloat(document.getElementById('tzInput').value),
+    ayanamsa: document.getElementById('ayanInput').value,
+  };
+  return Object.assign(body, overrides || {});
+}
+
+// ─── Generate Ashtakavarga ──────────────
+async function generateAshtakavarga() {
+  const btn = document.getElementById('generateBtn');
+  const status = document.getElementById('genStatus');
+  btn.disabled = true;
+  status.innerHTML = '<span class="loading" style="padding:0;">Calculating...</span>';
+
+  try {
+    const body = buildRequestBody();
+    const ps = document.getElementById('predStartInput').value.trim();
+    const pe = document.getElementById('predEndInput').value.trim();
+    if (ps) body.predict_start = ps;
+    if (pe) body.predict_end = pe;
+
+    const res = await fetch(`${API}/api/v1/ashtakavarga`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    ashData = await res.json();
+
+    activeTab = 'bav';
+    selectedDay = null;
+    gocharaSelectedDay = null;
+    gocharaHourlyData = null;
+    renderAll();
+
+    document.getElementById('sectionTabsWrap').style.display = 'block';
+    status.textContent = 'Done!';
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Render All ─────────────────────────
+function renderAll() {
+  renderTabs();
+  renderBAV();
+  renderSAV();
+  renderKaksha();
+  renderPinda();
+  renderTransit();
+  renderGochara();
+  switchTab(activeTab);
+  document.getElementById('bavTitle').textContent = L().bavTitle;
+  document.getElementById('savTitle').textContent = L().savTitle;
+  document.getElementById('kakshaTitle').textContent = L().kakshaTitle;
+  document.getElementById('pindaTitle').textContent = L().pindaTitle;
+  document.getElementById('transitTitle').textContent = L().transitTitle;
+  document.getElementById('gocharaTitle').textContent = L().gocharaTitle;
+}
+
+function renderTabs() {
+  const tabs = L().tabs;
+  const descs = L().tabDesc;
+  const keys = ['bav','sav','kaksha','pinda'];
+  if (ashData.predictions) keys.push('transit');
+  if (ashData.predictions && ashData.predictions.kaksha_grid) keys.push('gochara');
+  keys.push('advanced');
+
+  document.getElementById('sectionTabs').innerHTML = keys.map(k =>
+    `<div class="section-tab ${k===activeTab?'active':''} ${(k==='gochara'||k==='advanced')?'star':''}" onclick="switchTab('${k}')">
+      ${k==='gochara'?'&#9733; ':''}${k==='advanced'?'&#128218; ':''}${tabs[k]}<span style="font-size:0.7rem;display:block;opacity:0.7;font-weight:400;">${descs[k]}</span>
+    </div>`
+  ).join('');
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  renderTabs();
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  const mapping = { bav:'bavSection', sav:'savSection', kaksha:'kakshaSection', pinda:'pindaSection', transit:'transitSection', gochara:'gocharaSection', advanced:'advancedSection' };
+  const el = document.getElementById(mapping[tab]);
+  if (el) el.classList.add('active');
+}
+
+// ─── BAV ────────────────────────────────
+function renderBAV() {
+  const bav = ashData.ashtakavarga.bav;
+  const signs = ashData.ashtakavarga.sign_names;
+  const displaySigns = currentLang === 'hi' ? SIGNS_HI : signs;
+
+  let html = '<div style="overflow-x:auto;"><table class="ashtak-table">';
+  html += '<tr><th>' + L().planet + '</th>';
+  for (let i = 0; i < 12; i++) html += `<th>${displaySigns[i]}</th>`;
+  html += '<th>' + L().total + '</th></tr>';
+
+  const bavPlanets = [...PLANETS_EN];
+  if (ashData.ashtakavarga.lagna_bav) bavPlanets.push('Lagna');
+
+  for (const planet of bavPlanets) {
+    const pts = planet === 'Lagna' ? ashData.ashtakavarga.lagna_bav : bav[planet];
+    if (!pts) continue;
+    const total = pts.reduce((a,b) => a+b, 0);
+    const pLabel = planet === 'Lagna' ? (currentLang === 'hi' ? 'लग्न' : 'As') : tPlanet(planet);
+    html += `<tr><td class="planet-col">${pLabel}</td>`;
+    for (let i = 0; i < 12; i++) {
+      const v = pts[i];
+      const cls = v >= 5 ? 'bav-high' : v <= 2 ? 'bav-low' : v >= 4 ? 'bav-mid' : '';
+      html += `<td class="${cls}">${v}</td>`;
+    }
+    html += `<td class="total-col">${total}</td></tr>`;
+  }
+  html += '</table></div>';
+
+  html += '<h3 style="margin-top:20px;">' + (currentLang === 'hi' ? 'व्यक्तिगत ग्रह विवरण' : 'Individual Planet Details') + '</h3>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">';
+
+  for (const planet of bavPlanets) {
+    const pts = planet === 'Lagna' ? ashData.ashtakavarga.lagna_bav : bav[planet];
+    if (!pts) continue;
+    const total = pts.reduce((a,b) => a+b, 0);
+    const pLabel = planet === 'Lagna' ? (currentLang === 'hi' ? 'लग्न' : 'As') : tPlanet(planet);
+    const strongSigns = pts.map((v,i) => v >= 5 ? displaySigns[i] : null).filter(Boolean);
+    const weakSigns = pts.map((v,i) => v <= 2 ? displaySigns[i] : null).filter(Boolean);
+
+    html += `<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px;">
+      <h4 style="color:var(--accent);margin-bottom:8px;">${pLabel} <span style="font-weight:400;font-size:0.85rem;color:#888;">(${L().total}: ${total})</span></h4>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">`;
+    for (let i = 0; i < 12; i++) {
+      const v = pts[i];
+      const bg = v >= 5 ? '#c8e6c9' : v <= 2 ? '#ffcdd2' : v >= 4 ? '#fff9c4' : '#f5f5f5';
+      html += `<div style="width:42px;text-align:center;border-radius:4px;padding:4px;background:${bg};font-size:0.75rem;">
+        <div style="font-weight:700;">${v}</div>
+        <div style="font-size:0.6rem;color:#888;">${displaySigns[i].substring(0,3)}</div>
+      </div>`;
+    }
+    html += `</div>
+      <div style="font-size:0.8rem;">
+        ${strongSigns.length ? `<div style="color:var(--good);">● ${currentLang === 'hi' ? 'बलवान' : 'Strong'}: ${strongSigns.join(', ')}</div>` : ''}
+        ${weakSigns.length ? `<div style="color:var(--bad);">● ${currentLang === 'hi' ? 'दुर्बल' : 'Weak'}: ${weakSigns.join(', ')}</div>` : ''}
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById('bavContent').innerHTML = html;
+}
+
+// ─── SAV ────────────────────────────────
+function renderSAV() {
+  const sav = ashData.ashtakavarga.sav;
+  const signs = ashData.ashtakavarga.sign_names;
+  const displaySigns = currentLang === 'hi' ? SIGNS_HI : signs;
+  const total = ashData.ashtakavarga.sav_total;
+
+  let html = '<div style="overflow-x:auto;"><table class="ashtak-table">';
+  html += '<tr>';
+  for (let i = 0; i < 12; i++) html += `<th>${displaySigns[i]}</th>`;
+  html += `<th>${L().total}</th></tr>`;
+  html += '<tr>';
+  for (let i = 0; i < 12; i++) {
+    const v = sav[i];
+    const cls = v >= 30 ? 'bav-high' : v <= 24 ? 'bav-low' : v >= 28 ? 'bav-mid' : '';
+    html += `<td class="${cls}" style="font-size:1.1rem;font-weight:700;">${v}</td>`;
+  }
+  html += `<td class="total-col" style="font-size:1.1rem;">${total}</td></tr>`;
+  html += '</table></div>';
+
+  const maxSav = Math.max(...sav);
+  html += '<h3 style="margin-top:16px;">' + (currentLang === 'hi' ? 'दृश्य चार्ट' : 'Visual Chart') + '</h3>';
+  html += '<div style="display:flex;gap:6px;align-items:flex-end;height:200px;padding:10px 0;">';
+  for (let i = 0; i < 12; i++) {
+    const pct = (sav[i] / 56) * 100;
+    const barColor = sav[i] >= 30 ? 'var(--good)' : sav[i] <= 24 ? 'var(--bad)' : sav[i] >= 28 ? 'var(--gold)' : '#999';
+    html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+      <div style="font-weight:700;font-size:0.8rem;margin-bottom:4px;">${sav[i]}</div>
+      <div style="width:100%;max-width:50px;background:${barColor};height:${pct}%;border-radius:4px 4px 0 0;min-height:4px;transition:height 0.3s;"></div>
+      <div style="font-size:0.65rem;margin-top:4px;text-align:center;color:#888;">${displaySigns[i].substring(0,3)}</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  const avg = (total / 12).toFixed(1);
+  const strong = sav.map((v,i) => v >= 30 ? displaySigns[i] : null).filter(Boolean);
+  const weak = sav.map((v,i) => v <= 24 ? displaySigns[i] : null).filter(Boolean);
+  html += `<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:12px;">
+    <div style="font-size:0.9rem;"><strong>${L().total}:</strong> ${total}/337 &nbsp;&nbsp; <strong>${currentLang === 'hi' ? 'औसत' : 'Average'}:</strong> ${avg}/sign</div>
+    ${strong.length ? `<div style="color:var(--good);font-size:0.85rem;margin-top:4px;">● ${currentLang === 'hi' ? 'बलवान राशियाँ' : 'Strong signs (>=30)'}: ${strong.join(', ')}</div>` : ''}
+    ${weak.length ? `<div style="color:var(--bad);font-size:0.85rem;margin-top:4px;">● ${currentLang === 'hi' ? 'दुर्बल राशियाँ' : 'Weak signs (<=24)'}: ${weak.join(', ')}</div>` : ''}
+  </div>`;
+
+  document.getElementById('savContent').innerHTML = html;
+}
+
+// ─── Kaksha ─────────────────────────────
+function renderKaksha() {
+  const kaksha = ashData.ashtakavarga.kaksha_table;
+  const signs = ashData.ashtakavarga.sign_names;
+  const displaySigns = currentLang === 'hi' ? SIGNS_HI : signs;
+  const kakshaLords = ['Saturn','Jupiter','Mars','Sun','Venus','Mercury','Moon','Lagna'];
+
+  let html = '<div class="kaksha-grid">';
+  for (const planet of PLANETS_EN) {
+    const pData = kaksha[planet];
+    if (!pData) continue;
+    html += `<div class="kaksha-planet-card">
+      <h4>${tPlanet(planet)}</h4>
+      <table class="kaksha-mini-table">
+      <tr><th>${L().sign}</th>`;
+    for (const kl of kakshaLords) html += `<th>${tPlanet(kl).substring(0,3)}</th>`;
+    html += `<th>${L().points}</th></tr>`;
+
+    for (let si = 0; si < 12; si++) {
+      const signName = signs[si];
+      const sData = pData[signName];
+      if (!sData) continue;
+      html += `<tr><td style="font-weight:600;font-size:0.72rem;text-align:left;">${displaySigns[si].substring(0,4)}</td>`;
+      for (const k of sData.kakshas) {
+        html += `<td class="${k.benefic ? 'kaksha-yes' : 'kaksha-no'}">${k.benefic ? '✓' : '✗'}</td>`;
+      }
+      html += `<td style="font-weight:700;">${sData.total_points}</td></tr>`;
+    }
+    html += '</table></div>';
+  }
+  html += '</div>';
+  document.getElementById('kakshaContent').innerHTML = html;
+}
+
+// ─── Pinda Shodhana ─────────────────────
+function renderPinda() {
+  const pinda = ashData.ashtakavarga.pinda_shodhana;
+  const signs = ashData.ashtakavarga.sign_names;
+  const displaySigns = currentLang === 'hi' ? SIGNS_HI : signs;
+
+  // Pinda planets: 7 planets + Lagna
+  const pindaPlanets = [...PLANETS_EN];
+  if (pinda.planets['Lagna']) pindaPlanets.push('Lagna');
+
+  let html = '<h3>' + (currentLang === 'hi' ? 'ग्रहवार शोधन' : 'Planet-wise Shodhana') + '</h3>';
+  html += '<div style="overflow-x:auto;"><table class="pinda-table">';
+  html += `<tr><th>${L().planet}</th><th>${currentLang === 'hi' ? 'चरण' : 'Stage'}</th>`;
+  for (let i = 0; i < 12; i++) html += `<th>${displaySigns[i].substring(0,3)}</th>`;
+  html += '</tr>';
+
+  for (const planet of pindaPlanets) {
+    const pd = pinda.planets[planet];
+    if (!pd) continue;
+    const pLabel = planet === 'Lagna' ? (currentLang === 'hi' ? 'लग्न' : 'As') : tPlanet(planet);
+    html += `<tr><td class="planet-col" rowspan="3">${pLabel}</td>`;
+    html += `<td style="font-size:0.75rem;">${L().original}</td>`;
+    for (let i = 0; i < 12; i++) html += `<td>${pd.original[i]}</td>`;
+    html += '</tr>';
+
+    html += `<tr><td style="font-size:0.75rem;">${L().afterTrikona}</td>`;
+    for (let i = 0; i < 12; i++) {
+      const changed = pd.after_trikona[i] !== pd.original[i];
+      html += `<td${changed ? ' style="color:var(--accent);font-weight:600;"' : ''}>${pd.after_trikona[i]}</td>`;
+    }
+    html += '</tr>';
+
+    html += `<tr><td style="font-size:0.75rem;">${L().afterEkadhi}</td>`;
+    for (let i = 0; i < 12; i++) {
+      const changed = pd.after_ekadhipatya[i] !== pd.after_trikona[i];
+      html += `<td${changed ? ' style="color:var(--bad);font-weight:600;"' : ''}>${pd.after_ekadhipatya[i]}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+
+  // ── Shodhana Pinda Summary Table (matches Parashara Light) ──
+  html += '<h3 style="margin-top:20px;">' + (currentLang === 'hi' ? 'शोधन पिंड सारांश' : 'Shodhana Pinda Summary') + '</h3>';
+  html += '<div style="overflow-x:auto;"><table class="pinda-table">';
+  html += '<tr><th></th>';
+  for (const planet of pindaPlanets) {
+    const pLabel = planet === 'Lagna' ? (currentLang === 'hi' ? 'लग्न' : 'As') : tPlanet(planet);
+    html += `<th>${pLabel}</th>`;
+  }
+  html += '</tr>';
+
+  // Rashi Pinda row
+  html += `<tr><td style="font-weight:700;">${L().rashiPinda}</td>`;
+  for (const planet of pindaPlanets) {
+    const pd = pinda.planets[planet];
+    html += `<td style="font-weight:600;">${pd ? pd.rashi_pinda : '-'}</td>`;
+  }
+  html += '</tr>';
+
+  // Graha Pinda row
+  html += `<tr><td style="font-weight:700;">${L().grahaPinda}</td>`;
+  for (const planet of pindaPlanets) {
+    const pd = pinda.planets[planet];
+    html += `<td style="font-weight:600;">${pd ? pd.graha_pinda : '-'}</td>`;
+  }
+  html += '</tr>';
+
+  // Sodhya Pinda row (highlighted)
+  html += `<tr style="background:#fff3cd;"><td style="font-weight:700;">${L().sodhyaPinda}</td>`;
+  for (const planet of pindaPlanets) {
+    const pd = pinda.planets[planet];
+    html += `<td class="pinda-highlight">${pd ? pd.sodhya_pinda : '-'}</td>`;
+  }
+  html += '</tr>';
+  html += '</table></div>';
+
+  // ── Sodhya Pinda — Strength Analysis Table ──
+  // Build ranked list from Sodhya Pinda (only 7 planets, not Lagna)
+  const strengthPlanets = PLANETS_EN.filter(p => pinda.planets[p] && pinda.planets[p].sodhya_pinda != null);
+  const ranked = strengthPlanets.map(p => ({ planet: p, pinda: pinda.planets[p].sodhya_pinda }));
+  ranked.sort((a, b) => b.pinda - a.pinda);
+
+  // Assign strength tiers based on rank position
+  function getStrengthTier(rank, total) {
+    if (rank === 0) return 'strongest';
+    if (rank === 1) return 'strong';
+    if (rank >= total - 1) return 'weakest';
+    if (rank >= total - 2) return 'weak';
+    return 'moderate';
+  }
+  function tierColor(tier) {
+    return { strongest:'var(--excellent)', strong:'var(--good)', moderate:'var(--neutral)', weak:'#e65100', weakest:'var(--bad)' }[tier] || '#333';
+  }
+  function tierBg(tier) {
+    return { strongest:'#c8e6c9', strong:'#e8f5e9', moderate:'#fff9c4', weak:'#ffe0b2', weakest:'#ffcdd2' }[tier] || '#fff';
+  }
+  function dashaText(tier) {
+    return { strongest:L().dashaExcellent, strong:L().dashaStrong, moderate:L().dashaModerate, weak:L().dashaWeak, weakest:L().dashaWeakest }[tier] || '';
+  }
+  function transitText(tier) {
+    return { strongest:L().transitHigh, strong:L().transitHigh, moderate:L().transitMod, weak:L().transitLow, weakest:L().transitLow }[tier] || '';
+  }
+
+  html += `<h3 style="margin-top:24px;">${L().strengthTitle}</h3>`;
+  html += '<div style="overflow-x:auto;"><table class="pinda-table">';
+  html += `<tr><th>${L().rank}</th><th>${L().planet}</th><th>${L().sodhyaPinda}</th><th>${L().strength}</th><th>${L().dashaHint}</th><th>${L().transitHint}</th></tr>`;
+
+  for (let i = 0; i < ranked.length; i++) {
+    const r = ranked[i];
+    const tier = getStrengthTier(i, ranked.length);
+    const bg = tierBg(tier);
+    const clr = tierColor(tier);
+    html += `<tr style="background:${bg};">`;
+    html += `<td style="font-weight:700;color:${clr};">#${i + 1}</td>`;
+    html += `<td style="font-weight:700;">${tPlanet(r.planet)}</td>`;
+    html += `<td style="font-weight:700;font-size:1.05rem;">${r.pinda}</td>`;
+    html += `<td style="font-weight:600;color:${clr};">${L()[tier]}</td>`;
+    html += `<td style="font-size:0.82rem;">${dashaText(tier)}</td>`;
+    html += `<td style="font-size:0.82rem;">${transitText(tier)}</td>`;
+    html += '</tr>';
+  }
+  html += '</table></div>';
+
+  // Add Lagna Sodhya Pinda note if available
+  if (pinda.planets['Lagna'] && pinda.planets['Lagna'].sodhya_pinda != null) {
+    const lagnaVal = pinda.planets['Lagna'].sodhya_pinda;
+    const lagnaLabel = currentLang === 'hi' ? 'लग्न' : 'Ascendant (Lagna)';
+    const lagnaNote = currentLang === 'hi'
+      ? `${lagnaLabel} शोध्य पिंड: <strong>${lagnaVal}</strong> — लग्न बल समग्र जीवन शक्ति एवं शारीरिक स्वास्थ्य को दर्शाता है। उच्च मान = प्रबल संविधान।`
+      : `${lagnaLabel} Sodhya Pinda: <strong>${lagnaVal}</strong> — Lagna strength indicates overall vitality and physical constitution. Higher value = stronger constitution.`;
+    html += `<div style="margin-top:12px;padding:10px 16px;background:#fff3cd;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">${lagnaNote}</div>`;
+  }
+
+  document.getElementById('pindaContent').innerHTML = html;
+}
+
+// ─── Transit Predictions ────────────────
+function renderTransit() {
+  if (!ashData.predictions) {
+    document.getElementById('transitContent').innerHTML =
+      `<div style="text-align:center;padding:40px;color:#888;">
+        ${currentLang === 'hi' ? 'भविष्यवाणी अवधि निर्दिष्ट करें' : 'Specify prediction dates to see transit predictions'}
+      </div>`;
+    return;
+  }
+
+  const pred = ashData.predictions;
+  const daily = pred.daily;
+  const summary = pred.summary;
+
+  if (!calendarMonth && daily.length > 0) {
+    const firstParts = daily[0].date.split('-');
+    calendarMonth = { year: parseInt(firstParts[2]), month: parseInt(firstParts[1]) };
+  }
+
+  let html = '';
+  html += '<div class="summary-grid">';
+  html += `<div class="summary-item"><div class="s-label">${L().totalDays}</div><div class="s-value">${summary.total_days}</div></div>`;
+  html += `<div class="summary-item"><div class="s-label">${L().avgScore}</div><div class="s-value">${summary.average_score}</div></div>`;
+  html += `<div class="summary-item s-excellent"><div class="s-label">${L().excellent}</div><div class="s-value">${summary.excellent_days}</div></div>`;
+  html += `<div class="summary-item s-good"><div class="s-label">${L().good}</div><div class="s-value">${summary.good_days}</div></div>`;
+  html += `<div class="summary-item s-neutral"><div class="s-label">${L().neutral}</div><div class="s-value">${summary.neutral_days}</div></div>`;
+  html += `<div class="summary-item s-bad"><div class="s-label">${L().bad}</div><div class="s-value">${summary.bad_days}</div></div>`;
+  html += '</div>';
+
+  html += '<div id="calendarWrap"></div>';
+  html += '<div class="day-detail" id="dayDetail"></div>';
+
+  html += '<div class="bw-grid">';
+  html += `<div class="bw-list"><h4 style="color:var(--good);">&#9733; ${L().bestDays}</h4>`;
+  for (const d of summary.best_days) {
+    html += `<div class="bw-row"><span>${d.date}</span><span style="color:var(--good);font-weight:600;">${d.score} — ${tRating(d.rating)}</span></div>`;
+  }
+  html += '</div>';
+  html += `<div class="bw-list"><h4 style="color:var(--bad);">&#9660; ${L().worstDays}</h4>`;
+  for (const d of summary.worst_days) {
+    html += `<div class="bw-row"><span>${d.date}</span><span style="color:var(--bad);font-weight:600;">${d.score} — ${tRating(d.rating)}</span></div>`;
+  }
+  html += '</div></div>';
+
+  document.getElementById('transitContent').innerHTML = html;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  if (!ashData || !ashData.predictions) return;
+  const daily = ashData.predictions.daily;
+
+  const months = [];
+  const monthSet = new Set();
+  for (const d of daily) {
+    const parts = d.date.split('-');
+    const key = `${parts[2]}-${parts[1]}`;
+    if (!monthSet.has(key)) { monthSet.add(key); months.push({ year: parseInt(parts[2]), month: parseInt(parts[1]) }); }
+  }
+  if (!calendarMonth && months.length > 0) calendarMonth = months[0];
+
+  const cm = calendarMonth;
+  const monthNames = currentLang === 'hi'
+    ? ['','जनवरी','फरवरी','मार्च','अप्रैल','मई','जून','जुलाई','अगस्त','सितम्बर','अक्तूबर','नवम्बर','दिसम्बर']
+    : ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames = currentLang === 'hi'
+    ? ['सोम','मंगल','बुध','गुरु','शुक्र','शनि','रवि']
+    : ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  const monthDays = daily.filter(d => {
+    const parts = d.date.split('-');
+    return parseInt(parts[2]) === cm.year && parseInt(parts[1]) === cm.month;
+  });
+
+  let html = '<div class="month-nav">';
+  const prevMonth = cm.month === 1 ? { year: cm.year-1, month: 12 } : { year: cm.year, month: cm.month-1 };
+  const nextMonth = cm.month === 12 ? { year: cm.year+1, month: 1 } : { year: cm.year, month: cm.month+1 };
+  const hasPrev = months.some(m => m.year < cm.year || (m.year === cm.year && m.month < cm.month));
+  const hasNext = months.some(m => m.year > cm.year || (m.year === cm.year && m.month > cm.month));
+
+  html += `<button ${hasPrev ? `onclick="navigateMonth(${prevMonth.year},${prevMonth.month})"` : 'disabled'}>&#9664;</button>`;
+  html += `<div class="month-label">${monthNames[cm.month]} ${cm.year}</div>`;
+  html += `<button ${hasNext ? `onclick="navigateMonth(${nextMonth.year},${nextMonth.month})"` : 'disabled'}>&#9654;</button>`;
+  html += '</div>';
+
+  html += '<div class="cal-grid">';
+  for (const dn of dayNames) html += `<div class="cal-header">${dn}</div>`;
+
+  const firstDate = new Date(cm.year, cm.month - 1, 1);
+  let firstDow = firstDate.getDay();
+  firstDow = firstDow === 0 ? 6 : firstDow - 1;
+  for (let i = 0; i < firstDow; i++) html += '<div class="cal-day empty"></div>';
+
+  const daysInMonth = new Date(cm.year, cm.month, 0).getDate();
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${String(day).padStart(2,'0')}-${String(cm.month).padStart(2,'0')}-${cm.year}`;
+    const dayData = monthDays.find(d => d.date === dateStr);
+    if (dayData) {
+      const sel = selectedDay === dateStr ? ' selected' : '';
+      html += `<div class="cal-day cal-${dayData.rating}${sel}" onclick="showDayDetail('${dateStr}')">
+        <div class="day-num">${day}</div>
+        <div class="day-score">${dayData.score}</div>
+      </div>`;
+    } else {
+      html += `<div class="cal-day empty" style="opacity:0.3;"><div class="day-num">${day}</div></div>`;
+    }
+  }
+  html += '</div>';
+
+  html += `<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.8rem;margin-top:8px;">
+    <span><span style="display:inline-block;width:14px;height:14px;background:#a5d6a7;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>${L().excellent} (>=70)</span>
+    <span><span style="display:inline-block;width:14px;height:14px;background:#c8e6c9;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>${L().good} (55-69)</span>
+    <span><span style="display:inline-block;width:14px;height:14px;background:#fff9c4;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>${L().neutral} (40-54)</span>
+    <span><span style="display:inline-block;width:14px;height:14px;background:#ffcdd2;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>${L().bad} (<40)</span>
+  </div>`;
+
+  document.getElementById('calendarWrap').innerHTML = html;
+}
+
+function navigateMonth(y, m) {
+  calendarMonth = { year: y, month: m };
+  renderCalendar();
+}
+
+function showDayDetail(dateStr) {
+  selectedDay = dateStr;
+  renderCalendar();
+
+  const daily = ashData.predictions.daily;
+  const dayData = daily.find(d => d.date === dateStr);
+  if (!dayData) return;
+
+  const panel = document.getElementById('dayDetail');
+
+  let html = `<h3>${dateStr} — ${dayData.weekday}
+    <span class="score-badge" style="background:${ratingBg(dayData.rating)};color:${ratingColor(dayData.rating)};">
+      ${dayData.score} — ${tRating(dayData.rating)}
+    </span>
+  </h3>`;
+
+  html += '<div class="planet-list">';
+  const planets = dayData.planets || [];
+  for (const p of planets) {
+    const pKey = typeof p === 'object' ? p : {};
+    const planetName = pKey.planet || '';
+    const sign = pKey.sign || '';
+    const bav = pKey.bav != null ? pKey.bav : '';
+    const sav = pKey.sav != null ? pKey.sav : '';
+    const pRating = pKey.rating || '';
+    const kl = pKey.kaksha_lord || '';
+    html += `<div class="day-planet" style="border-color:${ratingColor(pRating)};background:${ratingBg(pRating)};">
+      <div style="font-weight:700;color:${ratingColor(pRating)};">${tPlanet(planetName)}</div>
+      <div style="font-size:0.8rem;">
+        ${tSign(sign)} &middot; BAV: ${bav} &middot; SAV: ${sav}
+        ${kl ? ` &middot; ${L().kaksha}: ${tPlanet(kl)}` : ''}
+      </div>
+      <div style="font-size:0.75rem;color:${ratingColor(pRating)};font-weight:600;">${tRating(pRating)}</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+}
+
+// ═══════════════════════════════════════════════════════
+// ─── GOCHARA KAKSHA (Tab 6) — The Star Feature ────────
+// ═══════════════════════════════════════════════════════
+
+function renderGochara() {
+  if (!ashData || !ashData.predictions || !ashData.predictions.kaksha_grid) {
+    document.getElementById('gocharaContent').innerHTML =
+      `<div style="text-align:center;padding:40px;color:#888;">
+        ${currentLang === 'hi' ? 'भविष्यवाणी अवधि निर्दिष्ट करें' : 'Specify prediction dates to see Gochara Kaksha grid'}
+      </div>`;
+    return;
+  }
+
+  const kgData = ashData.predictions.kaksha_grid;
+  const days = kgData.days;
+  if (!days || days.length === 0) {
+    document.getElementById('gocharaContent').innerHTML = '<div style="text-align:center;padding:40px;color:#888;">No data available</div>';
+    return;
+  }
+
+  // Determine available months
+  const allMonths = [];
+  const monthSet = new Set();
+  for (const d of days) {
+    const parts = d.date.split('-');
+    const key = `${parts[2]}-${parts[1]}`;
+    if (!monthSet.has(key)) { monthSet.add(key); allMonths.push({ year: parseInt(parts[2]), month: parseInt(parts[1]) }); }
+  }
+  if (!gocharaMonth && allMonths.length > 0) gocharaMonth = allMonths[0];
+
+  const gm = gocharaMonth;
+  const monthNames = currentLang === 'hi'
+    ? ['','जनवरी','फरवरी','मार्च','अप्रैल','मई','जून','जुलाई','अगस्त','सितम्बर','अक्तूबर','नवम्बर','दिसम्बर']
+    : ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // Filter days for current gochara month
+  const monthDays = days.filter(d => {
+    const parts = d.date.split('-');
+    return parseInt(parts[2]) === gm.year && parseInt(parts[1]) === gm.month;
+  });
+
+  const prevMonth = gm.month === 1 ? { year: gm.year-1, month: 12 } : { year: gm.year, month: gm.month-1 };
+  const nextMonth = gm.month === 12 ? { year: gm.year+1, month: 1 } : { year: gm.year, month: gm.month+1 };
+
+  let html = '';
+
+  // Month navigation — always enabled, fetches new data if needed
+  html += '<div class="month-nav">';
+  html += `<button onclick="gocharaNav(${prevMonth.year},${prevMonth.month})">&#9664;</button>`;
+  html += `<div class="month-label">${monthNames[gm.month]} ${gm.year}</div>`;
+  html += `<button onclick="gocharaNav(${nextMonth.year},${nextMonth.month})">&#9654;</button>`;
+  html += `<button onclick="gocharaNavYear(${gm.year})" style="margin-left:12px;font-size:0.8rem;padding:4px 12px;" title="${currentLang==='hi'?'वार्षिक दृश्य':'Yearly View'}">&#128197; ${currentLang==='hi'?'वर्ष':'Year'}</button>`;
+  html += '</div>';
+
+  // Legend
+  html += '<div class="gk-legend">';
+  html += `<div class="gk-legend-item"><div class="gk-legend-swatch" style="background:linear-gradient(90deg,#4caf50,#66bb6a);"></div>${L().benefic} ${L().kaksha}</div>`;
+  html += `<div class="gk-legend-item"><div class="gk-legend-swatch" style="background:linear-gradient(90deg,#e53935,#ef5350);"></div>${L().malefic} ${L().kaksha}</div>`;
+  html += `<div class="gk-legend-item"><span style="font-size:0.75rem;color:#888;">${currentLang === 'hi' ? '6 पट्टियाँ = 4 घंटे की अवधि (0-4, 4-8, ..., 20-24)' : '6 bands = 4-hour slices (0-4, 4-8, ..., 20-24)'}</span></div>`;
+  html += `<div class="gk-legend-item"><span style="font-size:0.75rem;color:var(--accent);font-weight:600;">${L().clickDayHint}</span></div>`;
+  html += '</div>';
+
+  // The main Gochara grid
+  html += '<div class="gk-grid-wrap"><table class="gk-grid">';
+  html += '<thead><tr>';
+  html += `<th class="gk-day-col">${L().date}</th>`;
+  html += `<th class="gk-day-col">${L().day}</th>`;
+  for (const p of PLANETS_EN) {
+    html += `<th class="gk-planet-col">${pAbbr(p)}<br><span style="font-weight:400;font-size:0.7rem;">${tPlanet(p)}</span></th>`;
+  }
+  html += `<th class="gk-day-col">${L().score}</th>`;
+  html += `<th class="gk-day-col">${L().rating}</th>`;
+  html += '</tr></thead><tbody>';
+
+  for (const dayObj of monthDays) {
+    const dateParts = dayObj.date.split('-');
+    const dayNum = parseInt(dateParts[0]);
+    const weekdayShort = (dayObj.weekday || dayObj.day || '').substring(0, 3);
+    const isSelected = gocharaSelectedDay === dayObj.date;
+    const rowClass = isSelected ? ' class="gk-row-selected"' : '';
+
+    html += `<tr${rowClass} onclick="gocharaDayClick('${dayObj.date}')" style="cursor:pointer;">`;
+    html += `<td class="gk-day-cell">${dayNum}</td>`;
+    html += `<td class="gk-day-cell">${weekdayShort}</td>`;
+
+    // Planet cells
+    const planets = dayObj.planets || {};
+    for (const pName of PLANETS_EN) {
+      const pData = planets[pName];
+      if (!pData) {
+        html += '<td style="background:#f5f5f5;"><div class="gk-cell"><div class="gk-cell-top">--</div></div></td>';
+        continue;
+      }
+
+      const kl = pData.kaksha_lord || '';
+      const bav = pData.bav != null ? pData.bav : '?';
+      const bPct = pData.benefic_pct != null ? pData.benefic_pct : 50;
+      const slices = pData.slices || [];
+      const signName = pData.sign || '';
+
+      // Determine overall cell background tint
+      const cellBg = bPct >= 60 ? 'rgba(76,175,80,0.08)' : bPct <= 40 ? 'rgba(229,57,53,0.08)' : 'rgba(255,255,255,0.5)';
+
+      // Tooltip
+      const tooltipText = `${tPlanet(pName)} in ${tSign(signName)} | BAV: ${bav} | ${L().kakshaLord}: ${tPlanet(kl)} | ${L().benefic}: ${Math.round(bPct)}%`;
+
+      html += `<td style="background:${cellBg};padding:0;">`;
+      html += `<div class="gk-cell">`;
+      html += `<div class="gk-tooltip">${tooltipText}</div>`;
+      html += `<div class="gk-cell-top">${klAbbr(kl)} <span class="gk-cell-bav">${bav}</span></div>`;
+      html += '<div class="gk-cell-bands">';
+
+      if (slices.length > 0) {
+        for (const sl of slices) {
+          // sl has: {h, b, k} where b = benefic (boolean), k = kaksha lord
+          const bandClass = sl.b ? 'gk-band-benefic' : 'gk-band-malefic';
+          html += `<div class="gk-band ${bandClass}" title="${sl.h}:00 - ${sl.k ? tPlanet(sl.k) : ''}"></div>`;
+        }
+      } else {
+        // Fallback: single band based on benefic_pct
+        const bandClass = bPct >= 50 ? 'gk-band-benefic' : 'gk-band-malefic';
+        for (let s = 0; s < 6; s++) {
+          html += `<div class="gk-band ${bandClass}"></div>`;
+        }
+      }
+      html += '</div></div></td>';
+    }
+
+    // Score and rating columns
+    const scoreVal = dayObj.score != null ? dayObj.score : '?';
+    const ratingVal = dayObj.rating || 'neutral';
+    const rc = ratingColor(ratingVal);
+    const rb = ratingBg(ratingVal);
+    html += `<td class="gk-score-cell" style="color:${rc};font-weight:700;">${scoreVal}</td>`;
+    html += `<td class="gk-score-cell" style="background:${rb};color:${rc};font-weight:600;font-size:0.78rem;">${tRating(ratingVal)}</td>`;
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+
+  // Hourly detail panel placeholder
+  html += '<div id="gocharaHourlyPanel"></div>';
+
+  document.getElementById('gocharaContent').innerHTML = html;
+
+  // Re-render hourly if already selected
+  if (gocharaSelectedDay && gocharaHourlyData) {
+    renderGocharaHourly(gocharaHourlyData);
+  }
+}
+
+async function gocharaNav(y, m) {
+  gocharaMonth = { year: y, month: m };
+  gocharaSelectedDay = null;
+  gocharaHourlyData = null;
+
+  // Check if this month's data already exists in current dataset
+  const kgData = ashData && ashData.predictions && ashData.predictions.kaksha_grid;
+  if (kgData && kgData.days) {
+    const hasMonth = kgData.days.some(d => {
+      const parts = d.date.split('-');
+      return parseInt(parts[2]) === y && parseInt(parts[1]) === m;
+    });
+    if (hasMonth) { renderGochara(); return; }
+  }
+
+  // Fetch new data for the target month from API
+  const container = document.getElementById('gocharaContent');
+  container.innerHTML = `<div style="text-align:center;padding:40px;"><span class="loading"></span> ${currentLang==='hi'?'डेटा लोड हो रहा है...':'Loading data...'}</div>`;
+  try {
+    const firstDay = `01-${String(m).padStart(2,'0')}-${y}`;
+    const lastDayNum = new Date(y, m, 0).getDate();
+    const lastDay = `${String(lastDayNum).padStart(2,'0')}-${String(m).padStart(2,'0')}-${y}`;
+    const body = buildRequestBody({ predict_start: firstDay, predict_end: lastDay });
+    const res = await fetch(`${API}/api/v1/ashtakavarga`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+
+    // Merge new month's kaksha_grid days into existing data
+    if (data.predictions && data.predictions.kaksha_grid) {
+      if (!ashData.predictions) ashData.predictions = {};
+      if (!ashData.predictions.kaksha_grid) {
+        ashData.predictions.kaksha_grid = data.predictions.kaksha_grid;
+      } else {
+        // Remove any existing days for this month, then add new ones
+        const existingDays = ashData.predictions.kaksha_grid.days.filter(d => {
+          const parts = d.date.split('-');
+          return !(parseInt(parts[2]) === y && parseInt(parts[1]) === m);
+        });
+        ashData.predictions.kaksha_grid.days = existingDays.concat(data.predictions.kaksha_grid.days);
+      }
+      // Also merge daily predictions if present
+      if (data.predictions.daily && ashData.predictions.daily) {
+        const existingDaily = ashData.predictions.daily.filter(d => {
+          const parts = d.date.split('-');
+          return !(parseInt(parts[2]) === y && parseInt(parts[1]) === m);
+        });
+        ashData.predictions.daily = existingDaily.concat(data.predictions.daily);
+      }
+    }
+    renderGochara();
+  } catch(e) {
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--bad);">Error loading month: ${e.message}</div>`;
+  }
+}
+
+async function gocharaNavYear(year) {
+  gocharaSelectedDay = null;
+  gocharaHourlyData = null;
+
+  const container = document.getElementById('gocharaContent');
+  container.innerHTML = `<div style="text-align:center;padding:40px;"><span class="loading"></span> ${currentLang==='hi'?'वार्षिक डेटा लोड हो रहा है...':'Loading yearly data...'}</div>`;
+
+  try {
+    const body = buildRequestBody({
+      predict_start: `01-01-${year}`,
+      predict_end: `31-12-${year}`,
+    });
+    const res = await fetch(`${API}/api/v1/ashtakavarga`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+
+    if (data.predictions && data.predictions.kaksha_grid) {
+      if (!ashData.predictions) ashData.predictions = {};
+      ashData.predictions.kaksha_grid = data.predictions.kaksha_grid;
+      if (data.predictions.daily) ashData.predictions.daily = data.predictions.daily;
+      if (data.predictions.summary) ashData.predictions.summary = data.predictions.summary;
+    }
+    renderGocharaYearly(year);
+  } catch(e) {
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--bad);">Error: ${e.message}</div>`;
+  }
+}
+
+function renderGocharaYearly(year) {
+  const container = document.getElementById('gocharaContent');
+  if (!ashData || !ashData.predictions || !ashData.predictions.kaksha_grid) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">No yearly data</div>';
+    return;
+  }
+  const days = ashData.predictions.kaksha_grid.days;
+  const monthNames = currentLang === 'hi'
+    ? ['जनवरी','फरवरी','मार्च','अप्रैल','मई','जून','जुलाई','अगस्त','सितम्बर','अक्तूबर','नवम्बर','दिसम्बर']
+    : ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // Group days by month
+  const monthData = {};
+  for (let m = 1; m <= 12; m++) monthData[m] = [];
+  for (const d of days) {
+    const parts = d.date.split('-');
+    const dy = parseInt(parts[2]);
+    const dm = parseInt(parts[1]);
+    if (dy === year && dm >= 1 && dm <= 12) monthData[dm].push(d);
+  }
+
+  // Compute monthly stats
+  const monthStats = [];
+  for (let m = 1; m <= 12; m++) {
+    const md = monthData[m];
+    if (md.length === 0) {
+      monthStats.push({ month: m, name: monthNames[m-1], days: 0, avgScore: 0, excellent: 0, good: 0, neutral: 0, bad: 0, bestDay: null, worstDay: null });
+      continue;
+    }
+    const scores = md.map(d => d.score || 0);
+    const avg = scores.reduce((a,b) => a+b, 0) / scores.length;
+    const ratings = md.map(d => d.rating || 'neutral');
+    const sorted = [...md].sort((a,b) => (b.score||0) - (a.score||0));
+    monthStats.push({
+      month: m, name: monthNames[m-1], days: md.length,
+      avgScore: Math.round(avg * 10) / 10,
+      excellent: ratings.filter(r => r==='excellent').length,
+      good: ratings.filter(r => r==='good').length,
+      neutral: ratings.filter(r => r==='neutral').length,
+      bad: ratings.filter(r => r==='bad' || r==='very_bad').length,
+      bestDay: sorted[0],
+      worstDay: sorted[sorted.length - 1],
+    });
+  }
+
+  // Overall year stats
+  const allScores = days.filter(d => { const p = d.date.split('-'); return parseInt(p[2]) === year; }).map(d => d.score || 0);
+  const yearAvg = allScores.length > 0 ? Math.round((allScores.reduce((a,b) => a+b, 0) / allScores.length) * 10) / 10 : 0;
+
+  // Find best and worst months
+  const rankedMonths = [...monthStats].filter(m => m.days > 0).sort((a,b) => b.avgScore - a.avgScore);
+  const bestMonth = rankedMonths[0];
+  const worstMonth = rankedMonths[rankedMonths.length - 1];
+
+  let html = '';
+
+  // Nav: back to month view
+  html += '<div class="month-nav">';
+  html += `<button onclick="gocharaNavYear(${year-1})">&#9664;</button>`;
+  html += `<div class="month-label">${currentLang==='hi'?'वार्षिक दृश्य':'Yearly View'} — ${year}</div>`;
+  html += `<button onclick="gocharaNavYear(${year+1})">&#9654;</button>`;
+  html += `<button onclick="gocharaMonth={year:${year},month:1};renderGochara();" style="margin-left:12px;font-size:0.8rem;padding:4px 12px;" title="${currentLang==='hi'?'मासिक दृश्य':'Monthly View'}">&#128197; ${currentLang==='hi'?'माह':'Month'}</button>`;
+  html += '</div>';
+
+  // Year summary card
+  const yearRating = yearAvg >= 70 ? 'excellent' : yearAvg >= 55 ? 'good' : yearAvg >= 40 ? 'neutral' : 'bad';
+  html += `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">`;
+  html += `<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;">
+    <div style="font-size:0.8rem;opacity:0.7;">${currentLang==='hi'?'वार्षिक औसत':'Year Average'}</div>
+    <div style="font-size:2rem;font-weight:800;color:${ratingColor(yearRating)};">${yearAvg}</div>
+    <div style="font-size:0.85rem;color:${ratingColor(yearRating)};font-weight:600;">${tRating(yearRating)}</div>
+  </div>`;
+  if (bestMonth) {
+    html += `<div style="flex:1;min-width:150px;background:rgba(76,175,80,0.06);border:1px solid rgba(76,175,80,0.2);border-radius:8px;padding:16px;text-align:center;">
+      <div style="font-size:0.8rem;opacity:0.7;">${currentLang==='hi'?'सर्वोत्तम माह':'Best Month'}</div>
+      <div style="font-size:1.3rem;font-weight:700;color:var(--good);">${bestMonth.name}</div>
+      <div style="font-size:0.85rem;color:var(--good);">${currentLang==='hi'?'औसत':'Avg'}: ${bestMonth.avgScore}</div>
+    </div>`;
+  }
+  if (worstMonth && worstMonth !== bestMonth) {
+    html += `<div style="flex:1;min-width:150px;background:rgba(229,57,53,0.06);border:1px solid rgba(229,57,53,0.2);border-radius:8px;padding:16px;text-align:center;">
+      <div style="font-size:0.8rem;opacity:0.7;">${currentLang==='hi'?'कठिन माह':'Challenging Month'}</div>
+      <div style="font-size:1.3rem;font-weight:700;color:var(--bad);">${worstMonth.name}</div>
+      <div style="font-size:0.85rem;color:var(--bad);">${currentLang==='hi'?'औसत':'Avg'}: ${worstMonth.avgScore}</div>
+    </div>`;
+  }
+  html += `<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;">
+    <div style="font-size:0.8rem;opacity:0.7;">${currentLang==='hi'?'कुल दिन':'Total Days'}</div>
+    <div style="font-size:2rem;font-weight:800;">${allScores.length}</div>
+  </div>`;
+  html += '</div>';
+
+  // Monthly heatmap bar chart
+  html += `<div style="margin-bottom:20px;">`;
+  html += `<h3 style="margin:0 0 12px;font-size:1rem;">${currentLang==='hi'?'मासिक औसत अंक':'Monthly Average Scores'}</h3>`;
+  html += '<div style="display:flex;align-items:flex-end;gap:4px;height:180px;padding:8px 0;border-bottom:1px solid var(--border);">';
+  const maxScore = Math.max(...monthStats.map(m => m.avgScore), 1);
+  for (const ms of monthStats) {
+    const barH = ms.days > 0 ? Math.max((ms.avgScore / 100) * 160, 4) : 4;
+    const barRating = ms.avgScore >= 70 ? 'excellent' : ms.avgScore >= 55 ? 'good' : ms.avgScore >= 40 ? 'neutral' : 'bad';
+    const barColor = ratingColor(barRating);
+    const shortName = ms.name.substring(0, 3);
+    html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;" onclick="gocharaMonth={year:${year},month:${ms.month}};renderGochara();" title="${ms.name}: ${ms.avgScore}">`;
+    html += `<div style="font-size:0.7rem;font-weight:600;color:${barColor};margin-bottom:2px;">${ms.days > 0 ? ms.avgScore : '--'}</div>`;
+    html += `<div style="width:80%;height:${barH}px;background:${barColor};border-radius:4px 4px 0 0;opacity:${ms.days>0?0.85:0.2};transition:opacity 0.2s;"></div>`;
+    html += `<div style="font-size:0.65rem;margin-top:4px;opacity:0.7;">${shortName}</div>`;
+    html += '</div>';
+  }
+  html += '</div></div>';
+
+  // Monthly detail table
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">';
+  html += `<thead><tr style="background:var(--bg);border-bottom:2px solid var(--border);">
+    <th style="padding:8px;text-align:left;">${currentLang==='hi'?'माह':'Month'}</th>
+    <th style="padding:8px;text-align:center;">${currentLang==='hi'?'औसत':'Avg Score'}</th>
+    <th style="padding:8px;text-align:center;">${L().excellent}</th>
+    <th style="padding:8px;text-align:center;">${L().good}</th>
+    <th style="padding:8px;text-align:center;">${L().neutral}</th>
+    <th style="padding:8px;text-align:center;">${L().bad}</th>
+    <th style="padding:8px;text-align:center;">${currentLang==='hi'?'सर्वोत्तम दिन':'Best Day'}</th>
+    <th style="padding:8px;text-align:center;">${currentLang==='hi'?'कठिन दिन':'Worst Day'}</th>
+  </tr></thead><tbody>`;
+
+  for (const ms of monthStats) {
+    if (ms.days === 0) {
+      html += `<tr style="border-bottom:1px solid var(--border);opacity:0.4;"><td style="padding:6px 8px;">${ms.name}</td><td colspan="7" style="text-align:center;padding:6px;">—</td></tr>`;
+      continue;
+    }
+    const mRating = ms.avgScore >= 70 ? 'excellent' : ms.avgScore >= 55 ? 'good' : ms.avgScore >= 40 ? 'neutral' : 'bad';
+    const bestDayStr = ms.bestDay ? ms.bestDay.date.split('-')[0] : '';
+    const worstDayStr = ms.worstDay ? ms.worstDay.date.split('-')[0] : '';
+    html += `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="gocharaMonth={year:${year},month:${ms.month}};renderGochara();">`;
+    html += `<td style="padding:6px 8px;font-weight:600;">${ms.name}</td>`;
+    html += `<td style="padding:6px 8px;text-align:center;font-weight:700;color:${ratingColor(mRating)};">${ms.avgScore}</td>`;
+    html += `<td style="padding:6px 8px;text-align:center;color:var(--good);">${ms.excellent}</td>`;
+    html += `<td style="padding:6px 8px;text-align:center;color:#2196f3;">${ms.good}</td>`;
+    html += `<td style="padding:6px 8px;text-align:center;color:#9e9e9e;">${ms.neutral}</td>`;
+    html += `<td style="padding:6px 8px;text-align:center;color:var(--bad);">${ms.bad}</td>`;
+    html += `<td style="padding:6px 8px;text-align:center;color:var(--good);font-weight:600;">${bestDayStr} <span style="font-weight:400;opacity:0.7;">(${ms.bestDay ? ms.bestDay.score : ''})</span></td>`;
+    html += `<td style="padding:6px 8px;text-align:center;color:var(--bad);font-weight:600;">${worstDayStr} <span style="font-weight:400;opacity:0.7;">(${ms.worstDay ? ms.worstDay.score : ''})</span></td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+
+  // Hint
+  html += `<div style="text-align:center;margin-top:12px;font-size:0.8rem;color:var(--accent);font-weight:600;">${currentLang==='hi'?'किसी माह पर क्लिक करें विस्तृत दैनिक ग्रिड देखने के लिए':'Click any month to see detailed daily grid'}</div>`;
+
+  container.innerHTML = html;
+}
+
+async function gocharaDayClick(dateStr) {
+  gocharaSelectedDay = dateStr;
+  // Re-render grid to highlight row
+  renderGochara();
+
+  const panel = document.getElementById('gocharaHourlyPanel');
+  if (!panel) return;
+  panel.innerHTML = `<div class="hourly-panel"><div class="loading" style="padding:20px;">${currentLang === 'hi' ? 'प्रति घंटा विवरण लोड हो रहा है...' : 'Loading hourly detail...'}</div></div>`;
+
+  try {
+    const body = buildRequestBody({ predict_start: dateStr, predict_end: dateStr });
+    const res = await fetch(`${API}/api/v1/ashtakavarga/daily`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    gocharaHourlyData = data;
+    renderGocharaHourly(data);
+  } catch(e) {
+    panel.innerHTML = `<div class="hourly-panel"><div style="color:var(--bad);padding:16px;">Error: ${e.message}</div></div>`;
+  }
+}
+
+function renderGocharaHourly(data) {
+  const panel = document.getElementById('gocharaHourlyPanel');
+  if (!panel) return;
+
+  const hourly = data.hourly || [];
+  const planetTimelines = data.planet_timelines || {};
+  const planetSummary = data.planet_summary || {};
+  const bestHours = data.best_hours || [];
+  const worstHours = data.worst_hours || [];
+
+  let html = '<div class="hourly-panel">';
+
+  // Header with close button
+  html += `<h3>${L().hourlyDetail}: ${gocharaSelectedDay}
+    <button class="close-btn" onclick="closeGocharaHourly()">&#10005; ${currentLang === 'hi' ? 'बंद करें' : 'Close'}</button>
+  </h3>`;
+
+  // ── Score Interpretation Panel ──
+  if (hourly.length > 0) {
+    const avgScore = hourly.reduce((s,h) => s + (h.score || 0), 0) / hourly.length;
+    const avgBenefic = hourly.reduce((s,h) => s + (h.benefic_count || 0), 0) / hourly.length;
+    // Find the most common rating
+    const ratingCounts = {};
+    hourly.forEach(h => { ratingCounts[h.rating] = (ratingCounts[h.rating]||0)+1; });
+    const dominantRating = Object.entries(ratingCounts).sort((a,b) => b[1]-a[1])[0];
+    const dayRating = dominantRating ? dominantRating[0] : 'neutral';
+    // SAV weighted from first hour as representative
+    const savW = hourly[0] && hourly[0].score != null ? hourly[0].score : '--';
+
+    html += '<div class="score-interp">';
+    html += `<div class="si-card"><div class="si-label">${currentLang === 'hi' ? 'कक्षा अंक' : 'Kaksha Score'}</div><div class="si-value" style="color:${ratingColor(dayRating)};">${avgScore.toFixed(1)}</div><div class="si-sub">${currentLang === 'hi' ? 'औसत प्रति घंटा' : 'Avg per hour'}</div></div>`;
+    html += `<div class="si-card"><div class="si-label">${L().beneficCount}</div><div class="si-value" style="color:${avgBenefic >= 4 ? 'var(--good)' : avgBenefic >= 3 ? 'var(--neutral)' : 'var(--bad)'};">${avgBenefic.toFixed(1)}<span style="font-size:0.8rem;color:#888;">/7</span></div><div class="si-sub">${currentLang === 'hi' ? 'औसत शुभ ग्रह' : 'Avg benefic planets'}</div></div>`;
+    html += `<div class="si-card"><div class="si-label">${L().rating}</div><div class="si-value" style="color:${ratingColor(dayRating)};">${tRating(dayRating)}</div><div class="si-sub">${currentLang === 'hi' ? 'प्रमुख रेटिंग' : 'Dominant rating'}</div></div>`;
+    html += `<div class="si-card"><div class="si-label">${L().savWeighted}</div><div class="si-value" style="color:var(--accent);">${savW}</div><div class="si-sub">${currentLang === 'hi' ? 'SAV भारित कुल' : 'SAV weighted total'}</div></div>`;
+    html += '</div>';
+
+    // BPHS interpretation
+    html += `<div style="background:#fff3cd;border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:0.85rem;">
+      <strong>${L().interpretation}:</strong> ${L().bphsNote}.
+      ${avgBenefic >= 4 ? `<span style="color:var(--good);font-weight:600;"> ${currentLang === 'hi' ? 'आज शुभ दिन है!' : 'Today is auspicious!'}</span>` : avgBenefic >= 3 ? `<span style="color:var(--neutral);"> ${currentLang === 'hi' ? 'सामान्य दिन' : 'Average day.'}</span>` : `<span style="color:var(--bad);"> ${currentLang === 'hi' ? 'सावधानी बरतें' : 'Exercise caution.'}</span>`}
+    </div>`;
+  }
+
+  // ── Best / Worst Hours ──
+  if (bestHours.length > 0 || worstHours.length > 0) {
+    html += '<div class="bw-hours">';
+    html += `<div class="bwh-section"><h4 style="color:var(--good);">&#9733; ${L().bestHours}</h4>`;
+    for (const bh of bestHours.slice(0, 3)) {
+      const timeStr = bh.time || `${String(bh.hour).padStart(2,'0')}:00`;
+      html += `<div class="bwh-item"><span>${timeStr}</span><span style="color:var(--good);font-weight:600;">${bh.score} - ${tRating(bh.rating)}</span></div>`;
+    }
+    html += '</div>';
+    html += `<div class="bwh-section"><h4 style="color:var(--bad);">&#9660; ${L().worstHours}</h4>`;
+    for (const wh of worstHours.slice(0, 3)) {
+      const timeStr = wh.time || `${String(wh.hour).padStart(2,'0')}:00`;
+      html += `<div class="bwh-item"><span>${timeStr}</span><span style="color:var(--bad);font-weight:600;">${wh.score} - ${tRating(wh.rating)}</span></div>`;
+    }
+    html += '</div></div>';
+  }
+
+  // ── Moon Nakshatra Timeline ──
+  if (hourly.length > 0) {
+    // Gather nakshatra transitions
+    const nakSegments = [];
+    let currentNak = null;
+    let segStart = 0;
+    for (let i = 0; i < hourly.length; i++) {
+      const nak = hourly[i].moon_nakshatra || hourly[i].moon_sign || '';
+      if (nak !== currentNak) {
+        if (currentNak !== null) nakSegments.push({ name: currentNak, start: segStart, end: i });
+        currentNak = nak;
+        segStart = i;
+      }
+    }
+    if (currentNak !== null) nakSegments.push({ name: currentNak, start: segStart, end: hourly.length });
+
+    if (nakSegments.length > 0) {
+      html += `<div style="margin-bottom:8px;font-weight:600;font-size:0.85rem;color:var(--accent);">${L().moonNakshatra}</div>`;
+      html += '<div class="moon-nak-timeline">';
+      for (let ni = 0; ni < nakSegments.length; ni++) {
+        const seg = nakSegments[ni];
+        const widthPct = ((seg.end - seg.start) / hourly.length) * 100;
+        const col = NAK_COLORS[ni % NAK_COLORS.length];
+        html += `<div class="moon-nak-seg" style="width:${widthPct}%;background:${col};" title="${seg.name}: ${seg.start}:00 - ${seg.end}:00">${seg.name}</div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  // ── Planet-wise 24-hour Timelines ──
+  html += `<div style="margin-bottom:8px;font-weight:600;font-size:0.9rem;color:var(--accent);">${currentLang === 'hi' ? 'ग्रहवार 24-घंटा कक्षा समयरेखा' : 'Planet-wise 24-Hour Kaksha Timeline'}</div>`;
+  html += '<div class="hourly-timeline-wrap"><div class="hourly-timeline">';
+
+  // Hour labels
+  html += '<div class="ht-row"><div class="ht-label" style="font-size:0.65rem;color:#888;">' + (currentLang === 'hi' ? 'घंटा' : 'Hour') + '</div>';
+  html += '<div class="ht-bars" style="height:16px;border:none;background:transparent;">';
+  for (let h = 0; h < 24; h++) {
+    html += `<div style="flex:1;text-align:center;font-size:0.55rem;color:#888;">${h}</div>`;
+  }
+  html += '</div></div>';
+
+  // For each planet, show timeline
+  if (Object.keys(planetTimelines).length > 0) {
+    for (const pName of PLANETS_EN) {
+      const tl = planetTimelines[pName];
+      if (!tl) continue;
+      html += `<div class="ht-row"><div class="ht-label">${pAbbr(pName)}</div><div class="ht-bars">`;
+      for (let h = 0; h < 24; h++) {
+        const hData = tl[h] || (Array.isArray(tl) ? tl[h] : null);
+        if (hData) {
+          const isBenefic = hData.benefic || hData.b;
+          const barClass = isBenefic ? 'ht-bar-benefic' : 'ht-bar-malefic';
+          const kl = hData.kaksha_lord || hData.k || '';
+          html += `<div class="ht-bar ${barClass}" title="${h}:00 - ${tPlanet(kl)}"></div>`;
+        } else {
+          html += '<div class="ht-bar ht-bar-neutral"></div>';
+        }
+      }
+      html += '</div></div>';
+    }
+  } else if (hourly.length > 0) {
+    // Fallback: extract from hourly data
+    for (const pName of PLANETS_EN) {
+      html += `<div class="ht-row"><div class="ht-label">${pAbbr(pName)}</div><div class="ht-bars">`;
+      for (let h = 0; h < 24; h++) {
+        const hEntry = hourly.find(e => e.hour === h);
+        if (hEntry && hEntry.planets) {
+          const pEntry = hEntry.planets.find(p => p.planet === pName);
+          if (pEntry) {
+            const barClass = pEntry.benefic ? 'ht-bar-benefic' : 'ht-bar-malefic';
+            html += `<div class="ht-bar ${barClass}" title="${h}:00 - BAV:${pEntry.bav} ${tPlanet(pEntry.kaksha_lord || '')}"></div>`;
+          } else {
+            html += '<div class="ht-bar ht-bar-neutral"></div>';
+          }
+        } else {
+          html += '<div class="ht-bar ht-bar-neutral"></div>';
+        }
+      }
+      html += '</div></div>';
+    }
+  }
+  html += '</div></div>';
+
+  // ── Composite Score Chart ──
+  if (hourly.length > 0) {
+    html += `<div style="margin-bottom:8px;margin-top:16px;font-weight:600;font-size:0.9rem;color:var(--accent);">${currentLang === 'hi' ? 'समग्र अंक (प्रति घंटा)' : 'Composite Score (Hourly)'}</div>`;
+    const maxScore = Math.max(...hourly.map(h => h.score || 0), 100);
+
+    html += '<div style="position:relative;height:140px;background:#fff;border:1px solid #ddd;border-radius:6px;overflow:visible;padding:0 2px;">';
+
+    // Threshold lines
+    html += `<div style="position:absolute;left:0;right:0;bottom:${(50/maxScore)*130}px;border-top:1px dashed var(--neutral);z-index:1;"><span style="position:absolute;right:4px;top:-12px;font-size:0.6rem;color:var(--neutral);">50</span></div>`;
+    html += `<div style="position:absolute;left:0;right:0;bottom:${(70/maxScore)*130}px;border-top:1px dashed var(--good);z-index:1;"><span style="position:absolute;right:4px;top:-12px;font-size:0.6rem;color:var(--good);">70</span></div>`;
+
+    // Bars
+    const barW = 100 / 24;
+    for (let i = 0; i < hourly.length && i < 24; i++) {
+      const h = hourly[i];
+      const score = h.score || 0;
+      const barH = (score / maxScore) * 130;
+      const r = h.rating || 'neutral';
+      const bgColor = r === 'excellent' ? '#4caf50' : r === 'good' ? '#81c784' : r === 'neutral' ? '#ffc107' : '#e53935';
+      html += `<div style="position:absolute;bottom:0;left:${i*barW}%;width:${barW}%;height:${barH}px;background:${bgColor};border-radius:2px 2px 0 0;opacity:0.85;transition:height 0.3s;" title="${h.time || i+':00'}: ${score}"></div>`;
+      html += `<div style="position:absolute;bottom:-16px;left:${i*barW}%;width:${barW}%;text-align:center;font-size:0.55rem;color:#888;">${i}</div>`;
+    }
+    html += '</div>';
+    html += '<div style="height:20px;"></div>'; // spacer for labels
+  }
+
+  // ── Detailed Hourly Table (collapsed by default) ──
+  if (hourly.length > 0) {
+    html += `<details style="margin-top:16px;"><summary style="cursor:pointer;font-weight:600;font-size:0.9rem;color:var(--accent);padding:8px 0;">${currentLang === 'hi' ? 'विस्तृत प्रति घंटा तालिका' : 'Detailed Hourly Table'} (${hourly.length} ${currentLang === 'hi' ? 'घंटे' : 'hours'})</summary>`;
+    html += '<div style="overflow-x:auto;margin-top:8px;"><table class="ashtak-table" style="font-size:0.78rem;">';
+    html += `<tr><th>${currentLang === 'hi' ? 'समय' : 'Time'}</th><th>${L().score}</th><th>${L().rating}</th><th>${L().beneficCount}</th>`;
+    for (const p of PLANETS_EN) html += `<th>${pAbbr(p)}</th>`;
+    if (hourly[0] && hourly[0].moon_nakshatra) html += `<th>${L().moonNakshatra}</th>`;
+    html += '</tr>';
+
+    for (const h of hourly) {
+      const rc = ratingColor(h.rating);
+      html += `<tr>`;
+      html += `<td style="font-weight:600;">${h.time || String(h.hour).padStart(2,'0')+':00'}</td>`;
+      html += `<td style="color:${rc};font-weight:700;">${h.score}</td>`;
+      html += `<td style="color:${rc};">${tRating(h.rating)}</td>`;
+      html += `<td>${h.benefic_count || '--'}</td>`;
+
+      const planets = h.planets || [];
+      for (const pName of PLANETS_EN) {
+        const pe = Array.isArray(planets) ? planets.find(p => p.planet === pName) : null;
+        if (pe) {
+          const bg = pe.benefic ? '#e8f5e9' : '#ffebee';
+          const tc = pe.benefic ? 'var(--good)' : 'var(--bad)';
+          html += `<td style="background:${bg};color:${tc};font-size:0.72rem;">${pe.bav}<br><span style="font-size:0.6rem;">${klAbbr(pe.kaksha_lord || pe.kaksha || '')}</span></td>`;
+        } else {
+          html += '<td>--</td>';
+        }
+      }
+      if (h.moon_nakshatra) html += `<td style="font-size:0.72rem;">${h.moon_nakshatra}</td>`;
+      html += '</tr>';
+    }
+    html += '</table></div></details>';
+  }
+
+  html += '</div>';
+
+  panel.innerHTML = html;
+}
+
+function closeGocharaHourly() {
+  gocharaSelectedDay = null;
+  gocharaHourlyData = null;
+  renderGochara();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADVANCED PREDICTIONS (Secrets of Ashtakavarga)
+// ═══════════════════════════════════════════════════════════════
+
+let advData = null;
+let advActivePanel = 'daily_score';
+
+// Set default transit date to today
+(function initAdvDate() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('advTransitDate').value = `${dd}-${mm}-${now.getFullYear()}`;
+})();
+
+async function generateAdvanced() {
+  const status = document.getElementById('advStatus');
+  status.innerHTML = '<span class="loading" style="padding:0;">Calculating...</span>';
+
+  try {
+    const body = {
+      date: document.getElementById('dobInput').value,
+      time: document.getElementById('tobInput').value,
+      latitude: parseFloat(document.getElementById('latInput').value),
+      longitude: parseFloat(document.getElementById('lonInput').value),
+      tz_offset: parseFloat(document.getElementById('tzInput').value),
+      ayanamsa: document.getElementById('ayanInput').value,
+      transit_date: document.getElementById('advTransitDate').value,
+      forecast_days: parseInt(document.getElementById('advForecastDays').value) || 7,
+    };
+
+    const res = await fetch(`${API}/api/v1/ashtakavarga-advanced`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `API error ${res.status}`);
+    }
+    advData = await res.json();
+    renderAdvanced();
+    status.textContent = 'Done!';
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+}
+
+function switchAdvPanel(panel) {
+  advActivePanel = panel;
+  renderAdvanced();
+}
+
+function renderAdvanced() {
+  if (!advData) {
+    document.getElementById('advancedContent').innerHTML = '<p style="color:#888;">Click "Generate Advanced Predictions" to see results.</p>';
+    return;
+  }
+
+  const panels = [
+    { key:'daily_score', label:'Daily Score' },
+    { key:'rekha_strength', label:'Rekha Strength' },
+    { key:'gantavya', label:'Gantavya Rasi' },
+    { key:'life_pred', label:'Life Predictions' },
+    { key:'kaksha_timing', label:'Kaksha Timing' },
+    { key:'trikona_trouble', label:'Trikona Trouble' },
+    { key:'bhava_vuln', label:'Bhava Vulnerability' },
+    { key:'forecast', label:'Weekly Forecast' },
+  ];
+
+  let html = '<div class="adv-sub-tabs">';
+  panels.forEach(p => {
+    html += `<div class="adv-sub-tab ${advActivePanel===p.key?'active':''}" onclick="switchAdvPanel('${p.key}')">${p.label}</div>`;
+  });
+  html += '</div>';
+
+  html += `<div class="adv-panel active">`;
+  switch(advActivePanel) {
+    case 'daily_score': html += renderAdvDailyScore(); break;
+    case 'rekha_strength': html += renderAdvRekhaStrength(); break;
+    case 'gantavya': html += renderAdvGantavya(); break;
+    case 'life_pred': html += renderAdvLifePredictions(); break;
+    case 'kaksha_timing': html += renderAdvKakshaTiming(); break;
+    case 'trikona_trouble': html += renderAdvTrikonaTrouble(); break;
+    case 'bhava_vuln': html += renderAdvBhavaVuln(); break;
+    case 'forecast': html += renderAdvForecast(); break;
+  }
+  html += '</div>';
+
+  document.getElementById('advancedContent').innerHTML = html;
+}
+
+function advRatingColor(r) {
+  const map = { excellent:'var(--excellent)', good:'var(--good)', average:'var(--neutral)', below_average:'#e65100', bad:'var(--bad)', very_bad:'var(--bad)', neutral:'var(--neutral)', weak:'var(--bad)' };
+  return map[r] || '#333';
+}
+
+// ─── Daily SAV Score ───────────────────────
+function renderAdvDailyScore() {
+  const d = advData.daily_sav_score;
+  let html = `<h3>Daily Ashtakavarga Score — ${advData.transit_date}</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">Sum of all 7 planets' BAV scores in their current transit signs. Per Ch4 Sloka 69-76: 28+ is good, below 28 is difficult.</p>`;
+
+  html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">`;
+  html += `<div class="adv-score-card ${d.rating}"><div class="asc-label">Total Score</div><div class="asc-value">${d.total_score}/${d.max_possible}</div></div>`;
+  html += `<div class="adv-score-card ${d.rating}"><div class="asc-label">Strength</div><div class="asc-value">${d.percentage}%</div></div>`;
+  html += `<div class="adv-score-card ${d.rating}"><div class="asc-label">Rating</div><div class="asc-value">${d.rating.replace('_',' ')}</div></div>`;
+  html += `</div>`;
+
+  html += `<div class="adv-alert ${d.total_score>=28?'success':'warning'}">${d.interpretation}</div>`;
+
+  html += `<table class="adv-table"><thead><tr><th>Planet</th><th>Transit Sign</th><th>BAV Score</th><th>Contribution</th></tr></thead><tbody>`;
+  d.breakdown.forEach(b => {
+    const pct = (b.bav_contribution / 8 * 100).toFixed(0);
+    const barColor = b.bav_contribution >= 4 ? '#4caf50' : b.bav_contribution >= 3 ? '#ff9800' : '#e53935';
+    html += `<tr>
+      <td class="planet-name">${tPlanet(b.planet)}</td>
+      <td>${tSign(b.sign)}</td>
+      <td><strong>${b.bav_contribution}/8</strong></td>
+      <td><div style="background:#eee;border-radius:3px;height:16px;position:relative;"><div style="background:${barColor};height:100%;width:${pct}%;border-radius:3px;"></div></div></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+// ─── Rekha Strength ───────────────────────
+function renderAdvRekhaStrength() {
+  const data = advData.rekha_strength;
+  let html = `<h3>Transit Rekha Strength — Effectiveness %</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">Each planet gives only (BAV/8)×100% of its full transit result. High BAV = strong transit effects.</p>`;
+
+  html += `<table class="adv-table"><thead><tr><th>Planet</th><th>Sign</th><th>BAV</th><th>BAV Strength</th><th>SAV</th><th>SAV Strength</th><th>Quality</th></tr></thead><tbody>`;
+  data.forEach(r => {
+    const qColor = advRatingColor(r.quality);
+    html += `<tr>
+      <td class="planet-name">${tPlanet(r.planet)}</td>
+      <td>${tSign(r.sign)}</td>
+      <td><strong>${r.bav_score}/8</strong></td>
+      <td><strong style="color:${advRatingColor(r.quality)}">${r.bav_strength_pct}%</strong></td>
+      <td>${r.sav_score}/56</td>
+      <td>${r.sav_strength_pct}%</td>
+      <td style="color:${qColor};font-weight:700;text-transform:capitalize;">${r.quality}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+
+  // Visual bar
+  html += '<div style="margin-top:16px;"><strong>Visual Strength:</strong></div>';
+  data.forEach(r => {
+    const color = r.quality === 'excellent' ? '#1b5e20' : r.quality === 'good' ? '#4caf50' : r.quality === 'neutral' ? '#ff9800' : '#e53935';
+    html += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span style="width:60px;font-size:0.8rem;font-weight:600;">${pAbbr(r.planet)}</span>
+      <div style="flex:1;background:#eee;height:20px;border-radius:4px;overflow:hidden;">
+        <div style="width:${r.bav_strength_pct}%;height:100%;background:${color};display:flex;align-items:center;padding-left:4px;color:#fff;font-size:0.7rem;font-weight:700;">${r.bav_strength_pct}%</div>
+      </div>
+    </div>`;
+  });
+
+  return html;
+}
+
+// ─── Gantavya Rasi ───────────────────────
+function renderAdvGantavya() {
+  const data = advData.gantavya_rasi;
+  let html = `<h3>Gantavya Rasi — Advance Effects</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">Planets start giving effects of the NEXT sign before entering it. Saturn: 6 months early, Jupiter: 2 months, Mars: 8 days, Sun: 5 days, Venus: 4 days, Mercury: 3 days, Moon: 1 day.</p>`;
+
+  // Show active gantavya alerts first
+  const active = data.filter(d => d.is_in_gantavya_zone);
+  if (active.length > 0) {
+    active.forEach(a => {
+      html += `<div class="adv-alert warning"><strong>${a.planet}</strong> — ${a.note}</div>`;
+    });
+  } else {
+    html += `<div class="adv-alert info">No planets currently in their Gantavya zone.</div>`;
+  }
+
+  html += `<table class="adv-table"><thead><tr><th>Planet</th><th>Current Sign</th><th>Deg</th><th>Next Sign</th><th>Days to Change</th><th>Gantavya Window</th><th>In Zone?</th><th>Next Sign BAV</th></tr></thead><tbody>`;
+  data.forEach(r => {
+    const inZone = r.is_in_gantavya_zone;
+    html += `<tr style="${inZone?'background:#fff3e0;':''}">
+      <td class="planet-name">${tPlanet(r.planet)}</td>
+      <td>${tSign(r.current_sign)}</td>
+      <td>${r.degree_in_sign}°</td>
+      <td>${tSign(r.next_sign)}</td>
+      <td>${r.days_to_sign_change}</td>
+      <td>${r.gantavya_window_days} days</td>
+      <td style="font-weight:700;color:${inZone?'var(--bad)':'var(--good)'};">${inZone?'YES':'No'}</td>
+      <td>${r.next_sign_bav}/8</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+// ─── Life Predictions ───────────────────────
+function renderAdvLifePredictions() {
+  const data = advData.life_predictions;
+  let html = `<h3>Planet-Specific Life Predictions</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">Each planet's transit BAV score predicts specific life areas (Ch6). Sun=Father, Moon=Mother, Mars=Siblings, Mercury=Education, Jupiter=Children/Wealth, Venus=Spouse, Saturn=Longevity.</p>`;
+
+  data.forEach(p => {
+    const rColor = advRatingColor(p.rating);
+    const bgColor = p.rating === 'excellent' || p.rating === 'good' ? '#e8f5e9' :
+                    p.rating === 'average' ? '#fff9c4' : '#ffebee';
+    html += `<div style="background:${bgColor};border:1px solid ${rColor};border-left:4px solid ${rColor};border-radius:6px;padding:12px;margin:10px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <strong style="font-size:1rem;color:var(--accent);">${tPlanet(p.planet)} — ${p.signifies}</strong>
+        <span style="background:${rColor};color:#fff;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;">${p.rating.toUpperCase()} (${p.bav_score}/8)</span>
+      </div>
+      <div style="font-size:0.85rem;color:#333;">Transit: <strong>${tSign(p.transit_sign)}</strong> | Strength: ${p.strength_pct}%</div>
+      <div style="font-size:0.88rem;margin-top:6px;color:#555;">${p.prediction}</div>
+    </div>`;
+  });
+  return html;
+}
+
+// ─── Kaksha Fine Timing ───────────────────────
+function renderAdvKakshaTiming() {
+  const data = advData.kaksha_fine_timing;
+  let html = `<h3>Kaksha Fine Timing — Active Degree Ranges</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">A planet only gives results in the specific 3°45' kaksha where contributing planets have rekhas (Ch4 Sloka 4). Green = benefic kaksha, Red = malefic.</p>`;
+
+  data.forEach(p => {
+    const statusColor = p.current_kaksha_benefic ? 'var(--good)' : 'var(--bad)';
+    html += `<div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px;margin:10px 0;">`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <strong style="color:var(--accent);">${tPlanet(p.planet)} in ${tSign(p.sign)} (${p.longitude}°)</strong>
+      <span style="color:${statusColor};font-weight:700;font-size:0.85rem;">${p.current_kaksha_benefic?'Currently BENEFIC':'Currently MALEFIC'} kaksha</span>
+    </div>`;
+    html += `<div style="font-size:0.82rem;color:#666;margin-bottom:6px;">${p.timing_note}</div>`;
+
+    // Kaksha bar visualization
+    html += '<div class="kaksha-bar">';
+    p.kakshas.forEach(k => {
+      const cls = (k.is_benefic ? 'benefic' : 'malefic') + (k.is_current ? ' current' : '');
+      html += `<div class="kaksha-bar-seg ${cls}" title="${k.lord}: ${k.start_deg}°-${k.end_deg}° (${k.is_benefic?'Benefic':'Malefic'})">${klAbbr(k.lord)}</div>`;
+    });
+    html += '</div>';
+
+    html += `<div style="font-size:0.75rem;color:#888;margin-top:4px;">Benefic: ${p.benefic_kaksha_count}/8 | Current: Kaksha ${p.current_kaksha.kaksha} (${p.current_kaksha.kaksha_lord})</div>`;
+    html += '</div>';
+  });
+  return html;
+}
+
+// ─── Trikona Nakshatra Trouble ───────────────────────
+function renderAdvTrikonaTrouble() {
+  const t = advData.trikona_trouble;
+  let html = `<h3>Trikona Nakshatra Trouble Prediction</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">Ch3 Sloka 23-24: Sum SAV from Lagna to Saturn × 7 ÷ 27 = nakshatra where malefic transit causes maximum trouble.</p>`;
+
+  if (t.error) {
+    html += `<div class="adv-alert warning">${t.error}</div>`;
+    return html;
+  }
+
+  if (t.is_active_threat) {
+    html += `<div class="adv-alert danger">${t.warning}</div>`;
+  } else {
+    html += `<div class="adv-alert success">${t.warning}</div>`;
+  }
+
+  html += `<table class="adv-table"><tbody>
+    <tr><td style="text-align:left;font-weight:600;">Lagna Sign</td><td>${tSign(t.lagna_sign)}</td></tr>
+    <tr><td style="text-align:left;font-weight:600;">Saturn Sign (Birth)</td><td>${tSign(t.saturn_sign)}</td></tr>
+    <tr><td style="text-align:left;font-weight:600;">SAV Sum (Lagna→Saturn)</td><td>${t.sav_sum_lagna_to_saturn}</td></tr>
+    <tr><td style="text-align:left;font-weight:600;">Formula</td><td>${t.formula}</td></tr>
+    <tr><td style="text-align:left;font-weight:600;color:var(--bad);">Trouble Nakshatra</td><td><strong style="color:var(--bad);">${t.trouble_nakshatra}</strong></td></tr>
+  </tbody></table>`;
+
+  html += `<h4 style="margin-top:12px;color:var(--accent);">Trikona Trouble Nakshatras (equal danger):</h4>`;
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">';
+  t.trikona_trouble_nakshatras.forEach(n => {
+    html += `<div style="background:#ffebee;border:1px solid #e53935;border-radius:4px;padding:6px 12px;font-weight:600;font-size:0.85rem;">${n.name} (#${n.index+1})</div>`;
+  });
+  html += '</div>';
+
+  return html;
+}
+
+// ─── Bhava Vulnerability ───────────────────────
+function renderAdvBhavaVuln() {
+  const data = advData.bhava_vulnerability;
+  let html = `<h3>Bhava Vulnerability Assessment</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">Ch7: When Saturn transits a sign with low SAV, that bhava suffers. Shows current vulnerability of each house.</p>`;
+
+  // Summary alerts
+  const activeThreats = data.filter(b => b.saturn_transiting && b.vulnerability !== 'protected');
+  const highVuln = data.filter(b => b.vulnerability === 'high' && !b.saturn_transiting);
+
+  if (activeThreats.length > 0) {
+    activeThreats.forEach(b => {
+      html += `<div class="adv-alert danger"><strong>Bhava ${b.bhava} (${b.bhava_name})</strong> — ${b.status}</div>`;
+    });
+  }
+  if (highVuln.length > 0) {
+    html += `<div class="adv-alert warning">High vulnerability: ${highVuln.map(b=>`Bhava ${b.bhava}`).join(', ')} — watch when Saturn transits these signs.</div>`;
+  }
+
+  html += '<div class="bhava-grid">';
+  data.forEach(b => {
+    const cls = b.saturn_transiting && b.vulnerability !== 'protected' ? 'saturn-active' :
+                b.vulnerability === 'high' ? 'vulnerable' :
+                b.vulnerability === 'moderate' ? 'moderate-vuln' : 'protected';
+    html += `<div class="bhava-card ${cls}">
+      <h4>Bhava ${b.bhava} — ${b.bhava_name}</h4>
+      <div style="font-size:0.82rem;"><strong>Sign:</strong> ${tSign(b.sign)} | <strong>SAV:</strong> ${b.sav_score}</div>
+      <div style="font-size:0.82rem;margin-top:2px;"><strong>Vulnerability:</strong> <span style="color:${b.vulnerability==='high'?'var(--bad)':b.vulnerability==='moderate'?'#e65100':'var(--good)'};font-weight:700;">${b.vulnerability.toUpperCase()}</span></div>
+      ${b.saturn_transiting?'<div style="font-size:0.82rem;color:var(--bad);font-weight:700;margin-top:2px;">Saturn transiting here!</div>':''}
+      ${b.trouble_nakshatra?`<div style="font-size:0.78rem;color:#666;margin-top:2px;">Trouble Nak: ${b.trouble_nakshatra.name}</div>`:''}
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+// ─── Weekly Forecast ───────────────────────
+function renderAdvForecast() {
+  const data = advData.weekly_forecast;
+  let html = `<h3>Multi-Day SAV Forecast</h3>`;
+  html += `<p style="font-size:0.85rem;color:#666;margin-bottom:12px;">Daily aggregate BAV score shows which days are astrologically favorable. Higher score = better day.</p>`;
+
+  // Bar chart
+  const maxScore = Math.max(...data.map(d => d.score), 40);
+  html += '<div class="forecast-bar">';
+  data.forEach(d => {
+    const height = Math.max((d.score / maxScore) * 80, 8);
+    const color = d.rating === 'excellent' ? '#1b5e20' : d.rating === 'good' ? '#4caf50' : d.rating === 'average' ? '#ff9800' : d.rating === 'below_average' ? '#e65100' : '#e53935';
+    html += `<div class="forecast-day">
+      <div class="fd-score" style="color:${color};">${d.score}</div>
+      <div class="fd-bar" style="height:${height}px;background:${color};"></div>
+      <div class="fd-label">${d.date.substring(0,5)}</div>
+      <div class="fd-label">${d.weekday.substring(0,3)}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Table
+  html += `<table class="adv-table" style="margin-top:16px;"><thead><tr><th>Date</th><th>Day</th><th>Score</th><th>%</th><th>Rating</th><th>Interpretation</th></tr></thead><tbody>`;
+  data.forEach(d => {
+    const rColor = advRatingColor(d.rating);
+    html += `<tr>
+      <td><strong>${d.date}</strong></td>
+      <td>${d.weekday}</td>
+      <td style="font-weight:700;">${d.score}/56</td>
+      <td>${d.percentage}%</td>
+      <td style="color:${rColor};font-weight:700;text-transform:capitalize;">${d.rating.replace('_',' ')}</td>
+      <td style="text-align:left;font-size:0.8rem;">${d.interpretation}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+
+  // Best/worst
+  const sorted = [...data].sort((a,b) => b.score - a.score);
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+  html += `<div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;">
+    <div class="adv-alert success" style="flex:1;"><strong>Best Day:</strong> ${best.date} (${best.weekday}) — Score ${best.score}</div>
+    <div class="adv-alert danger" style="flex:1;"><strong>Worst Day:</strong> ${worst.date} (${worst.weekday}) — Score ${worst.score}</div>
+  </div>`;
+
+  return html;
+}
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.dob) document.getElementById('dobInput').value = p.dob;
+    if (p.time) document.getElementById('tobInput').value = p.time;
+    if (p.place) document.getElementById('placeInput').value = p.place;
+    if (p.lat) document.getElementById('latInput').value = p.lat;
+    if (p.lon) document.getElementById('lonInput').value = p.lon;
+    if (p.tz !== undefined) document.getElementById('tzInput').value = p.tz;
+    if (p.ayanamsa) document.getElementById('ayanInput').value = p.ayanamsa;
+  } catch(e) {}
+})();
+
+</script>
+</body>
+</html>

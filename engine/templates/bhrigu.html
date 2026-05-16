@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bhrigu Samhita — Classical Life Reading</title>
+<style>
+  :root {
+    --accent: #8b1a1a;
+    --gold: #b8860b;
+    --header-bg: #8b1a1a;
+    --border: #ddd;
+    --shadow: rgba(0,0,0,0.1);
+    --excellent: #2e7d32;
+    --good: #4caf50;
+    --neutral: #f57f17;
+    --bad: #c62828;
+    --table-header: #5d4037;
+    --table-alt: #fdf6ec;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Georgia','Times New Roman',serif; background:#faf3e8; color:#333; line-height:1.6; }
+
+  .header { background:var(--header-bg); color:#fff; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .header h1 { font-size:1.4rem; font-weight:700; }
+  .header h1 span { font-size:1.6rem; }
+  .nav-links { display:flex; gap:8px; flex-wrap:wrap; }
+  .nav-links a { color:#ffcdd2; text-decoration:none; font-size:0.85rem; padding:4px 10px; border-radius:4px; transition:all 0.2s; }
+  .nav-links a:hover, .nav-links a.active { background:rgba(255,255,255,0.2); color:#fff; }
+
+  .container { max-width:1100px; margin:0 auto; padding:20px; }
+
+  .card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:24px; margin-bottom:20px; box-shadow:0 2px 8px var(--shadow); }
+
+  .form-row { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; align-items:flex-end; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; font-family:inherit; }
+
+  .btn { background:var(--header-bg); color:#fff; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:700; font-size:0.9rem; transition:all 0.2s; }
+  .btn:hover { background:#a00; transform:translateY(-1px); box-shadow:0 2px 8px var(--shadow); }
+  .btn:disabled { opacity:0.6; cursor:not-allowed; }
+  .btn-transit { background:var(--gold); }
+  .btn-transit:hover { background:#9a7209; }
+
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+
+  /* Ascendant banner */
+  .asc-banner { background:linear-gradient(135deg, #8b1a1a 0%, #b8860b 100%); color:#fff; padding:20px; border-radius:10px; margin-bottom:20px; text-align:center; }
+  .asc-banner h2 { font-size:1.8rem; margin-bottom:4px; }
+  .asc-banner .asc-sub { font-size:0.95rem; opacity:0.9; }
+
+  /* Planet prediction cards */
+  .pred-card { background:#fff; border:1px solid var(--border); border-radius:10px; margin-bottom:16px; overflow:hidden; transition:all 0.2s; }
+  .pred-card:hover { box-shadow:0 4px 16px var(--shadow); }
+  .pred-card-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; cursor:pointer; border-bottom:1px solid #eee; }
+  .pred-card-header .planet-info { display:flex; align-items:center; gap:12px; }
+  .pred-card-header .planet-icon { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700; color:#fff; }
+  .pred-card-header .planet-name { font-size:1.1rem; font-weight:700; color:var(--accent); }
+  .pred-card-header .planet-house { font-size:0.85rem; color:#666; }
+  .pred-card-header .house-badge { background:var(--gold); color:#fff; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700; }
+  .pred-card-body { padding:16px 18px; border-top:1px solid #f0f0f0; }
+  .pred-card-body .prediction-text { font-size:0.95rem; line-height:1.7; color:#444; font-style:italic; border-left:3px solid var(--gold); padding-left:14px; margin:8px 0; }
+  .pred-card-body .signification { font-size:0.82rem; color:#888; margin-top:8px; }
+
+  /* Planet icon colors */
+  .icon-Sun { background:#ff8f00; }
+  .icon-Moon { background:#7986cb; }
+  .icon-Mars { background:#e53935; }
+  .icon-Mercury { background:#43a047; }
+  .icon-Jupiter { background:#fdd835; color:#333!important; }
+  .icon-Venus { background:#ec407a; }
+  .icon-Saturn { background:#455a64; }
+  .icon-Rahu { background:#37474f; }
+  .icon-Ketu { background:#795548; }
+
+  /* Summary cards */
+  .summary-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin-bottom:20px; }
+  .summary-card { background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
+  .summary-card .sc-label { font-size:0.75rem; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+  .summary-card .sc-value { font-size:1.5rem; font-weight:700; color:var(--accent); margin-top:4px; }
+
+  /* Transit section */
+  .transit-section { margin-top:24px; }
+  .transit-header { background:var(--gold); color:#fff; padding:12px 18px; border-radius:8px 8px 0 0; font-weight:700; font-size:1.1rem; }
+  .transit-body { background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px; padding:16px; }
+  .transit-row { display:flex; align-items:center; gap:12px; padding:10px; border-bottom:1px solid #f0f0f0; }
+  .transit-row:last-child { border-bottom:none; }
+  .transit-row .tr-planet { font-weight:700; color:var(--accent); min-width:80px; }
+  .transit-row .tr-house { background:#f5f5f5; padding:3px 10px; border-radius:4px; font-size:0.82rem; font-weight:600; min-width:100px; text-align:center; }
+  .transit-row .tr-pred { font-size:0.88rem; color:#555; flex:1; }
+
+  .loading { text-align:center; padding:40px; font-size:1.1rem; color:var(--accent); }
+  .loading::after { content:''; display:inline-block; width:20px; height:20px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:10px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .footer { text-align:center; padding:16px; color:#fff; font-size:0.8rem; background:var(--header-bg); margin-top:40px; }
+
+  .tab-btns { display:flex; gap:4px; margin-bottom:16px; }
+  .tab-btn { padding:10px 18px; background:#fff; border:1px solid var(--border); border-radius:6px 6px 0 0; cursor:pointer; font-weight:600; font-size:0.9rem; transition:all 0.2s; }
+  .tab-btn:hover { background:#ffe4b5; }
+  .tab-btn.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  .no-data { color:#888; font-style:italic; padding:20px; text-align:center; }
+
+  @media (max-width:768px) {
+    .header { flex-direction:column; gap:8px; }
+    .form-row { flex-direction:column; }
+    .summary-row { grid-template-columns:1fr 1fr; }
+    .transit-row { flex-direction:column; align-items:flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>&#9788;</span> Bhrigu Samhita — Classical Life Reading</h1>
+  <div class="nav-links">
+    <a href="/">Daily Panchang</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu" class="active">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth Data Form -->
+  <div class="card">
+    <h2 style="color:var(--accent);margin-bottom:12px;">Enter Birth Details</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="dobInput" placeholder="DD-MM-YYYY" maxlength="10" value="23-09-1992" />
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="tobInput" placeholder="HH:MM" maxlength="5" value="23:10" />
+      </div>
+      <div class="form-field">
+        <label>Birth Place</label>
+        <div class="loc-auto">
+          <input type="text" id="placeInput" placeholder="Search city..." autocomplete="off" value="Ujjain" style="width:250px;" />
+          <div id="placeSuggestions" class="loc-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Latitude</label>
+        <input type="text" id="latInput" value="23.1765" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>Longitude</label>
+        <input type="text" id="lonInput" value="75.7885" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>TZ</label>
+        <input type="text" id="tzInput" value="5.5" style="width:60px;" />
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanInput">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">KP</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Transit Date (for current reading)</label>
+        <input type="text" id="transitDateInput" placeholder="DD-MM-YYYY" maxlength="10" />
+      </div>
+      <div class="form-field" style="align-self:flex-end;">
+        <button class="btn" onclick="generateReading()">Generate Bhrigu Reading</button>
+      </div>
+      <span id="status" style="align-self:center;color:var(--accent);font-size:0.9rem;"></span>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results"></div>
+
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Bhrigu Samhita Module &middot; Based on T.M. Rao's Abridged Version
+</div>
+
+<script>
+const API = '';
+let bhriguData = null;
+let placeTimer = null;
+
+// Planet symbols
+const PLANET_SYMBOLS = {
+  Sun: 'Su', Moon: 'Mo', Mars: 'Ma', Mercury: 'Me',
+  Jupiter: 'Ju', Venus: 'Ve', Saturn: 'Sa', Rahu: 'Ra', Ketu: 'Ke'
+};
+
+// Set default transit date
+(function() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('transitDateInput').value = `${dd}-${mm}-${now.getFullYear()}`;
+})();
+
+// Load birth defaults
+(async function() {
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) {
+      const d = await res.json();
+      document.getElementById('dobInput').value = d.date;
+      document.getElementById('tobInput').value = d.time;
+      document.getElementById('placeInput').value = d.place;
+      document.getElementById('latInput').value = d.latitude;
+      document.getElementById('lonInput').value = d.longitude;
+      document.getElementById('tzInput').value = d.tz_offset;
+      document.getElementById('ayanInput').value = d.ayanamsa;
+    }
+  } catch(_) {}
+})();
+
+// Place autocomplete
+const placeInput = document.getElementById('placeInput');
+const placeDropdown = document.getElementById('placeSuggestions');
+
+placeInput.addEventListener('input', () => {
+  clearTimeout(placeTimer);
+  const q = placeInput.value.trim();
+  if (q.length < 2) { placeDropdown.style.display='none'; return; }
+  placeTimer = setTimeout(() => fetchPlaces(q), 350);
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#placeInput') && !e.target.closest('#placeSuggestions'))
+    placeDropdown.style.display='none';
+});
+
+async function fetchPlaces(q) {
+  try {
+    const res = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (data.results && data.results.length) {
+      placeDropdown.innerHTML = data.results.map((c,i) =>
+        `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.9rem;"
+          onmouseover="this.style.background='#ffe4b5'" onmouseout="this.style.background='#fff'"
+          onclick="pickPlace(${i})"><strong>${c.display}</strong>
+          <span style="color:#888;font-size:0.8rem;margin-left:8px;">UTC${c.tz_offset>=0?'+':''}${c.tz_offset}</span></div>`
+      ).join('');
+      placeDropdown.style.display='block';
+      window._placeResults = data.results;
+    }
+  } catch(_) { placeDropdown.style.display='none'; }
+}
+
+function pickPlace(idx) {
+  const c = window._placeResults[idx];
+  placeInput.value = c.name;
+  document.getElementById('latInput').value = c.latitude;
+  document.getElementById('lonInput').value = c.longitude;
+  document.getElementById('tzInput').value = c.tz_offset;
+  placeDropdown.style.display='none';
+}
+
+// Generate reading
+async function generateReading() {
+  const status = document.getElementById('status');
+  status.innerHTML = '<span class="loading" style="padding:0;">Consulting Bhrigu Samhita...</span>';
+
+  try {
+    const body = {
+      date: document.getElementById('dobInput').value,
+      time: document.getElementById('tobInput').value,
+      latitude: parseFloat(document.getElementById('latInput').value),
+      longitude: parseFloat(document.getElementById('lonInput').value),
+      tz_offset: parseFloat(document.getElementById('tzInput').value),
+      ayanamsa: document.getElementById('ayanInput').value,
+      transit_date: document.getElementById('transitDateInput').value,
+    };
+
+    const res = await fetch(`${API}/api/v1/bhrigu/transit`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({}));
+      throw new Error(err.detail || `API error ${res.status}`);
+    }
+    bhriguData = await res.json();
+    renderResults();
+    status.textContent = 'Reading complete!';
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderResults() {
+  if (!bhriguData) return;
+  const d = bhriguData;
+
+  let html = '';
+
+  // Ascendant banner
+  html += `<div class="asc-banner">
+    <h2>${d.ascendant.sign} Ascendant (Lagna)</h2>
+    <div class="asc-sub">Longitude: ${d.ascendant.longitude}&deg; &middot; Bhrigu Samhita Predictions for ${d.ascendant.sign} Rising</div>
+  </div>`;
+
+  // Summary
+  html += '<div class="summary-row">';
+  html += `<div class="summary-card"><div class="sc-label">Ascendant</div><div class="sc-value">${d.ascendant.sign}</div></div>`;
+  html += `<div class="summary-card"><div class="sc-label">Chart Strength</div><div class="sc-value" style="font-size:1.1rem;">${d.summary.chart_strength}</div></div>`;
+  html += `<div class="summary-card"><div class="sc-label">Benefics in Kendra</div><div class="sc-value">${d.summary.benefics_in_kendra}</div></div>`;
+  html += `<div class="summary-card"><div class="sc-label">Predictions Available</div><div class="sc-value">${d.predictions_available}/${d.predictions_total}</div></div>`;
+  html += '</div>';
+
+  // Tabs: Birth Reading + Transit Reading
+  html += '<div class="tab-btns">';
+  html += '<div class="tab-btn active" onclick="switchBhriguTab(\'birth\')">Birth Chart Reading</div>';
+  if (d.transit) {
+    html += '<div class="tab-btn" onclick="switchBhriguTab(\'transit\')">Current Transit Reading</div>';
+  }
+  html += '</div>';
+
+  // Birth panel
+  html += '<div class="tab-panel active" id="birthPanel">';
+  html += renderPlanetCards(d.planet_predictions, 'birth');
+  html += '</div>';
+
+  // Transit panel
+  if (d.transit) {
+    html += '<div class="tab-panel" id="transitPanel">';
+    html += `<div style="margin-bottom:12px;font-size:0.9rem;color:#666;">Transit predictions for <strong>${d.transit.transit_date}</strong> based on ${d.transit.ascendant} Ascendant</div>`;
+    html += renderPlanetCards(d.transit.transit_predictions, 'transit');
+    html += '</div>';
+  }
+
+  document.getElementById('results').innerHTML = html;
+}
+
+function renderPlanetCards(predictions, mode) {
+  let html = '';
+  predictions.forEach((p, idx) => {
+    const symbol = PLANET_SYMBOLS[p.planet] || p.planet[0];
+    const houseKey = mode === 'transit' ? 'transit_house' : 'house';
+    const house = p[houseKey];
+    const houseName = p.house_name;
+
+    html += `<div class="pred-card">
+      <div class="pred-card-header" onclick="toggleCard(this)">
+        <div class="planet-info">
+          <div class="planet-icon icon-${p.planet}">${symbol}</div>
+          <div>
+            <div class="planet-name">${p.planet}</div>
+            <div class="planet-house">in ${p.sign} &middot; ${houseName}</div>
+          </div>
+        </div>
+        <div class="house-badge">House ${house}</div>
+      </div>
+      <div class="pred-card-body" style="display:${idx < 3 ? 'block' : 'none'};">
+        <div class="prediction-text">${p.prediction}</div>
+        <div class="signification"><strong>Significations:</strong> ${p.signification || PLANET_SIGNIFICATIONS[p.planet] || ''}</div>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+const PLANET_SIGNIFICATIONS = {
+  Sun: "Soul, Father, Authority, Government, Health, Fame, Willpower",
+  Moon: "Mind, Mother, Emotions, Public, Comfort, Liquids, Travel",
+  Mars: "Energy, Siblings, Courage, Property, Blood, Surgery, Competition",
+  Mercury: "Intelligence, Speech, Education, Business, Communication, Skin",
+  Jupiter: "Wisdom, Children, Wealth, Guru, Dharma, Fortune, Expansion",
+  Venus: "Spouse, Marriage, Luxury, Arts, Vehicles, Beauty, Pleasure",
+  Saturn: "Karma, Longevity, Discipline, Service, Delays, Chronic Issues",
+  Rahu: "Obsession, Foreign, Illusion, Technology, Unconventional, Sudden",
+  Ketu: "Spirituality, Detachment, Past Life, Liberation, Occult, Loss",
+};
+
+function toggleCard(header) {
+  const body = header.nextElementSibling;
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+function switchBhriguTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  if (tab === 'birth') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.getElementById('birthPanel').classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    document.getElementById('transitPanel').classList.add('active');
+  }
+}
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.dob) document.getElementById('dobInput').value = p.dob;
+    if (p.time) document.getElementById('tobInput').value = p.time;
+    if (p.place) document.getElementById('placeInput').value = p.place;
+    if (p.lat) document.getElementById('latInput').value = p.lat;
+    if (p.lon) document.getElementById('lonInput').value = p.lon;
+    if (p.tz !== undefined) document.getElementById('tzInput').value = p.tz;
+    if (p.ayanamsa) document.getElementById('ayanInput').value = p.ayanamsa;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

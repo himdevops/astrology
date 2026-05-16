@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Special Lagnas — Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); }
+  .header h1 { font-size:1.6rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1400px; margin:0 auto; padding:20px; }
+
+  /* Birth form */
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .form-field input[type="text"] { min-width:140px; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+  .loc-note { font-size:0.75rem; color:#888; margin-top:4px; }
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+
+  /* Section card */
+  .section { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .section h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .section h3 { color:var(--accent); margin-bottom:10px; font-size:1rem; }
+
+  /* Info banner */
+  .info-banner { background:#fff3cd; border:2px solid var(--gold); border-radius:8px; padding:16px 24px; margin-bottom:24px; display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+  .info-item { text-align:center; }
+  .info-label { font-size:0.75rem; color:#888; text-transform:uppercase; }
+  .info-value { font-size:1rem; font-weight:700; color:var(--accent); }
+  .info-title { font-size:1.2rem; font-weight:700; color:var(--accent); }
+
+  /* Tables */
+  table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  th { background:var(--table-header); color:#fff; padding:10px 12px; text-align:left; font-weight:600; }
+  td { padding:8px 12px; border-bottom:1px solid #ddd; }
+  tr:nth-child(even) td { background:var(--table-alt); }
+  tr:hover td { background:#ffe4b5; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:600; }
+  .badge-ak { background:#8B0000; color:#fff; }
+  .badge-amk { background:#B8860B; color:#fff; }
+  .badge-bk { background:#2e7d32; color:#fff; }
+  .badge-mk { background:#1565c0; color:#fff; }
+  .badge-pk { background:#6a1b9a; color:#fff; }
+  .badge-gk { background:#e65100; color:#fff; }
+  .badge-dk { background:#c62828; color:#fff; }
+  .badge-rk { background:#455a64; color:#fff; }
+
+  /* Varga popup */
+  .varga-btn { padding:4px 10px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.75rem; font-weight:600; }
+  .varga-btn:hover { background:#a00; }
+
+  .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; }
+  .modal-overlay.active { display:flex; }
+  .modal { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:24px; max-width:800px; width:90%; max-height:80vh; overflow-y:auto; position:relative; }
+  .modal h3 { color:var(--accent); margin-bottom:16px; font-size:1.1rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .modal-close { position:absolute; top:12px; right:16px; font-size:1.5rem; cursor:pointer; color:var(--accent); font-weight:700; }
+
+  /* Lagna chart tabs */
+  .lagna-tabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:20px; }
+  .lagna-tab { padding:8px 14px; background:#fff; border:1px solid var(--border); border-radius:4px; cursor:pointer; font-size:0.82rem; font-weight:600; transition:all 0.2s; text-align:center; min-width:100px; }
+  .lagna-tab:hover { background:#ffe4b5; }
+  .lagna-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .lagna-tab .tab-sub { font-size:0.7rem; font-weight:400; opacity:0.8; }
+
+  /* Chart container */
+  .chart-container { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .chart-svg-wrap { flex:0 0 420px; }
+  .chart-details { flex:1; min-width:300px; }
+
+  /* Karaka grid */
+  .karaka-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px; }
+  .karaka-card { background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; box-shadow:0 1px 4px var(--shadow); }
+  .karaka-card .karaka-title { font-size:0.75rem; color:#888; text-transform:uppercase; margin-bottom:4px; }
+  .karaka-card .karaka-planet { font-size:1.3rem; font-weight:700; color:var(--accent); }
+  .karaka-card .karaka-deg { font-size:0.8rem; color:#666; margin-top:4px; }
+  .karaka-card .karaka-nak { font-size:0.78rem; color:#8B4513; margin-top:2px; }
+
+  /* Yogi info */
+  .yogi-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:16px; }
+  .yogi-card { background:#fff; border:1px solid var(--border); border-radius:8px; padding:16px; }
+  .yogi-card h4 { color:var(--accent); font-size:0.9rem; margin-bottom:8px; border-bottom:1px solid var(--border); padding-bottom:4px; }
+  .yogi-row { display:flex; justify-content:space-between; padding:4px 0; font-size:0.85rem; }
+  .yogi-label { color:#666; }
+  .yogi-value { font-weight:700; color:var(--accent); }
+
+  .loading { text-align:center; padding:40px; font-size:1.1rem; color:var(--accent); }
+  .loading::after { content:''; display:inline-block; width:20px; height:20px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:10px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .footer { text-align:center; padding:16px; color:#fff; font-size:0.8rem; background:var(--header-bg); margin-top:40px; }
+
+  @media (max-width:768px) {
+    .header { flex-direction:column; gap:8px; }
+    .form-row { flex-direction:column; }
+    .karaka-grid { grid-template-columns:1fr 1fr; }
+    .yogi-grid { grid-template-columns:1fr; }
+    .chart-container { flex-direction:column; }
+    .chart-svg-wrap { flex:1; width:100%; }
+    .lagna-tabs { gap:2px; }
+    .lagna-tab { padding:6px 8px; font-size:0.75rem; min-width:70px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>&#9788;</span> Special Lagnas &amp; Sensitive Points</h1>
+  <div class="nav-links">
+    <a href="/">Daily Panchang</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas" class="active">Special Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth Data Form -->
+  <div class="birth-form">
+    <h2>Enter Birth Details</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="dobInput" placeholder="DD-MM-YYYY" maxlength="10" value="23-09-1992" />
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="tobInput" placeholder="HH:MM" maxlength="8" value="23:10" />
+      </div>
+      <div class="form-field">
+        <label>Birth Place</label>
+        <div class="loc-auto">
+          <input type="text" id="placeInput" placeholder="City, village, or place..." autocomplete="off" value="Ujjain" style="width:260px;" />
+          <div id="placeSuggestions" class="loc-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Latitude</label>
+        <input type="text" id="latInput" value="23.1765" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>Longitude</label>
+        <input type="text" id="lonInput" value="75.7885" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>TZ (UTC±)</label>
+        <input type="text" id="tzInput" value="5.5" style="width:60px;" />
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanInput">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">KP</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <button class="btn" id="generateBtn" onclick="generate()">Calculate Special Lagnas</button>
+      <span id="genStatus" style="margin-left:16px;color:var(--accent);font-size:0.9rem;"></span>
+    </div>
+    <div class="loc-note">Enter any place name (city, town, village). If found in database, lat/lon/tz auto-fill.</div>
+  </div>
+
+  <!-- Birth Info Banner -->
+  <div id="infoBanner" class="info-banner" style="display:none;"></div>
+
+  <!-- Lagna Charts -->
+  <div class="section" id="chartSection" style="display:none;">
+    <h2>Special Lagna Charts</h2>
+    <div class="lagna-tabs" id="lagnaTabs"></div>
+    <div class="chart-container">
+      <div class="chart-svg-wrap" id="chartSvg"></div>
+      <div class="chart-details" id="chartPlanets"></div>
+    </div>
+  </div>
+
+  <!-- Chara Karakas -->
+  <div class="section" id="karakaSection" style="display:none;">
+    <h2>Chara Karakas (Jaimini)
+      <span style="float:right;font-size:0.85rem;font-weight:400;">
+        <label style="cursor:pointer;margin-right:12px;">
+          <input type="radio" name="karakaSys" value="7" checked onchange="switchKarakaSystem(7)"> 7-Karaka (Standard)
+        </label>
+        <label style="cursor:pointer;">
+          <input type="radio" name="karakaSys" value="8" onchange="switchKarakaSystem(8)"> 8-Karaka (Jaimini)
+        </label>
+      </span>
+    </h2>
+    <div class="karaka-grid" id="karakaGrid"></div>
+    <div style="margin-top:16px;">
+      <h3>Karaka Details</h3>
+      <div id="karakaTable"></div>
+    </div>
+  </div>
+
+  <!-- Special Lagnas -->
+  <div class="section" id="lagnaSection" style="display:none;">
+    <h2>Special Lagnas (BPHS / Jaimini)</h2>
+    <div id="lagnaTable"></div>
+  </div>
+
+  <!-- Sensitive Points -->
+  <div class="section" id="sensitiveSection" style="display:none;">
+    <h2>Sensitive Points</h2>
+    <div id="sensitiveTable"></div>
+  </div>
+
+  <!-- Yogi / Avayogi -->
+  <div class="section" id="yogiSection" style="display:none;">
+    <h2>Yogi &amp; Avayogi</h2>
+    <div class="yogi-grid" id="yogiGrid"></div>
+  </div>
+
+  <!-- Gulika / Mandi -->
+  <div class="section" id="gulikaSection" style="display:none;">
+    <h2>Gulika (Mandi)</h2>
+    <div id="gulikaInfo"></div>
+  </div>
+
+</div>
+
+<!-- Varga Modal -->
+<div class="modal-overlay" id="vargaModal">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal()">&times;</span>
+    <h3 id="vargaModalTitle">Varga Placements</h3>
+    <div id="vargaModalBody"></div>
+  </div>
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Special Lagnas &amp; Sensitive Points
+</div>
+
+<script>
+const API = '';
+let data = null;
+let placeTimer = null;
+
+// ─── Birth Defaults ───────────────────────────
+const BIRTH_DEFAULTS = {
+  date: '23-09-1992', time: '23:10', place: 'Ujjain',
+  latitude: 23.1765, longitude: 75.7885, tz_offset: 5.5, ayanamsa: 'lahiri',
+};
+
+(async function loadBirthDefaults() {
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) { Object.assign(BIRTH_DEFAULTS, await res.json()); }
+  } catch (_) {}
+  document.getElementById('dobInput').value = BIRTH_DEFAULTS.date;
+  document.getElementById('tobInput').value = BIRTH_DEFAULTS.time;
+  document.getElementById('placeInput').value = BIRTH_DEFAULTS.place;
+  document.getElementById('latInput').value = BIRTH_DEFAULTS.latitude;
+  document.getElementById('lonInput').value = BIRTH_DEFAULTS.longitude;
+  document.getElementById('tzInput').value = BIRTH_DEFAULTS.tz_offset;
+  document.getElementById('ayanInput').value = BIRTH_DEFAULTS.ayanamsa;
+})();
+
+// ─── City Autocomplete ────────────────────────
+document.getElementById('placeInput').addEventListener('input', function() {
+  clearTimeout(placeTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('placeSuggestions').style.display = 'none'; return; }
+  placeTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+      if (!r.ok) return;
+      const cities = await r.json();
+      const dd = document.getElementById('placeSuggestions');
+      if (!cities.length) { dd.style.display = 'none'; return; }
+      dd.innerHTML = cities.map(c =>
+        `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.85rem;"
+              onmousedown="selectCity('${c.name}',${c.latitude},${c.longitude},${c.tz_offset})">${c.name}${c.state ? ', ' + c.state : ''}${c.country ? ' (' + c.country + ')' : ''}</div>`
+      ).join('');
+      dd.style.display = 'block';
+    } catch (_) {}
+  }, 300);
+});
+document.getElementById('placeInput').addEventListener('blur', () => {
+  setTimeout(() => { document.getElementById('placeSuggestions').style.display = 'none'; }, 200);
+});
+function selectCity(name, lat, lon, tz) {
+  document.getElementById('placeInput').value = name;
+  document.getElementById('latInput').value = lat;
+  document.getElementById('lonInput').value = lon;
+  document.getElementById('tzInput').value = tz;
+  document.getElementById('placeSuggestions').style.display = 'none';
+}
+
+// ─── Karaka System Toggle ─────────────────────
+let karakaSystem = 7;
+function switchKarakaSystem(sys) {
+  karakaSystem = sys;
+  if (data) generate();  // Re-fetch with new system
+}
+
+// ─── Generate ─────────────────────────────────
+async function generate() {
+  const btn = document.getElementById('generateBtn');
+  const status = document.getElementById('genStatus');
+  btn.disabled = true;
+  status.textContent = 'Calculating...';
+
+  const payload = {
+    date: document.getElementById('dobInput').value,
+    time: document.getElementById('tobInput').value,
+    latitude: parseFloat(document.getElementById('latInput').value),
+    longitude: parseFloat(document.getElementById('lonInput').value),
+    tz_offset: parseFloat(document.getElementById('tzInput').value),
+    ayanamsa: document.getElementById('ayanInput').value,
+    karaka_system: karakaSystem,
+  };
+
+  try {
+    const res = await fetch(`${API}/api/v1/special-lagnas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    data = await res.json();
+    renderAll();
+    status.textContent = '';
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+// ─── Render All ───────────────────────────────
+function renderAll() {
+  renderInfoBanner();
+  renderLagnaCharts();
+  renderKarakas();
+  renderSpecialLagnas();
+  renderSensitivePoints();
+  renderYogi();
+  renderGulika();
+}
+
+// ─── Planet abbreviations ─────────────────────
+const PLANET_ABBR = {Su:'Sun',Mo:'Moon',Ma:'Mars',Me:'Mercury',Ju:'Jupiter',Ve:'Venus',Sa:'Saturn',Ra:'Rahu',Ke:'Ketu'};
+const ABBR = {Sun:'Su',Moon:'Mo',Mars:'Ma',Mercury:'Me',Jupiter:'Ju',Venus:'Ve',Saturn:'Sa',Rahu:'Ra',Ketu:'Ke'};
+const SIGNS_LIST = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+
+// ─── Lagna Charts ─────────────────────────────
+let activeLagnaChart = 'ascendant';
+
+const LAGNA_CHART_LIST = [
+  { key: 'ascendant', label: 'Lagna (D1)', abbr: 'Asc' },
+  { key: 'hora_lagna', label: 'Hora Lagna', abbr: 'HL' },
+  { key: 'ghati_lagna', label: 'Ghati Lagna', abbr: 'GL' },
+  { key: 'bhava_lagna', label: 'Bhava Lagna', abbr: 'BL' },
+  { key: 'sree_lagna', label: 'Sree Lagna', abbr: 'SL' },
+  { key: 'pranapada_lagna', label: 'Pranapada', abbr: 'PP' },
+  { key: 'varnada_lagna', label: 'Varnada Lagna', abbr: 'VL' },
+  { key: 'indu_lagna', label: 'Indu Lagna', abbr: 'IL' },
+  { key: 'karakamsha', label: 'Karakamsha', abbr: 'KL' },
+  { key: 'arudha_lagna', label: 'Arudha Lagna', abbr: 'AL' },
+  { key: 'gulika', label: 'Gulika', abbr: 'Gu' },
+];
+
+function renderLagnaCharts() {
+  document.getElementById('chartSection').style.display = 'block';
+
+  // Tabs
+  document.getElementById('lagnaTabs').innerHTML = LAGNA_CHART_LIST.map(l =>
+    `<div class="lagna-tab ${l.key === activeLagnaChart ? 'active' : ''}" onclick="switchLagnaChart('${l.key}')">
+      ${l.abbr}<br><span class="tab-sub">${l.label}</span>
+    </div>`
+  ).join('');
+
+  drawLagnaChart(activeLagnaChart);
+}
+
+function switchLagnaChart(key) {
+  activeLagnaChart = key;
+  renderLagnaCharts();
+}
+
+function drawLagnaChart(key) {
+  // Get ascendant sign index for this lagna
+  let ascSignIdx, lagnaLabel, lagnaSign;
+  if (key === 'ascendant') {
+    ascSignIdx = data.ascendant.sign_index;
+    lagnaLabel = 'Lagna (Ascendant)';
+    lagnaSign = data.ascendant.sign;
+  } else if (key === 'gulika') {
+    ascSignIdx = data.gulika.sign_index;
+    lagnaLabel = data.gulika.label;
+    lagnaSign = data.gulika.sign;
+  } else {
+    const lagna = data.special_lagnas[key];
+    ascSignIdx = lagna.sign_index;
+    lagnaLabel = lagna.label;
+    lagnaSign = lagna.sign;
+  }
+
+  // Build planet house assignments relative to this lagna
+  const planets = data.planets;
+  const planetHouses = planets.map(p => ({
+    planet: p.planet,
+    sign: p.sign,
+    sign_index: p.sign_index,
+    house: ((p.sign_index - ascSignIdx + 12) % 12) + 1,
+    retrograde: p.retrograde,
+  }));
+
+  // Draw SVG chart
+  document.getElementById('chartSvg').innerHTML = drawNorthIndianChart(400, 400, ascSignIdx, planetHouses);
+
+  // Planet table
+  let html = `<table><tr><th>Planet</th><th>Sign</th><th>House</th><th>Status</th></tr>`;
+  html += `<tr style="background:#fff3cd;font-weight:600;">
+    <td>⬆ ${lagnaLabel}</td><td>${lagnaSign}</td><td>1</td><td>—</td>
+  </tr>`;
+  planetHouses.forEach(p => {
+    const badge = p.retrograde
+      ? '<span class="badge" style="background:#ff6b6b;color:#fff;">R</span>'
+      : '<span class="badge" style="background:#51cf66;color:#fff;">D</span>';
+    html += `<tr><td><strong>${p.planet}</strong></td><td>${p.sign}</td><td>${p.house}</td><td>${badge}</td></tr>`;
+  });
+  html += '</table>';
+  document.getElementById('chartPlanets').innerHTML = html;
+}
+
+// ─── North Indian Diamond Chart SVG ───────────
+function drawNorthIndianChart(W, H, ascIdx, planetHouses) {
+  const m = 8;
+  const s = W - 2 * m;
+
+  // Key geometry points
+  const TL = [m, m], TR = [m+s, m], BR = [m+s, m+s], BL = [m, m+s];
+  const T = [m+s/2, m], R = [m+s, m+s/2], B = [m+s/2, m+s], L = [m, m+s/2];
+  const C = [m+s/2, m+s/2];
+
+  // 12 house regions — text anchor positions
+  const houses = [
+    { tx: C[0],        ty: m + s*0.18 },   // H1 top diamond
+    { tx: m + s*0.24,  ty: m + s*0.08 },   // H2
+    { tx: m + s*0.08,  ty: m + s*0.24 },   // H3
+    { tx: m + s*0.18,  ty: C[1] },          // H4 left diamond
+    { tx: m + s*0.08,  ty: m + s*0.76 },   // H5
+    { tx: m + s*0.24,  ty: m + s*0.92 },   // H6
+    { tx: C[0],        ty: m + s*0.82 },    // H7 bottom diamond
+    { tx: m + s*0.76,  ty: m + s*0.92 },   // H8
+    { tx: m + s*0.92,  ty: m + s*0.76 },   // H9
+    { tx: m + s*0.82,  ty: C[1] },          // H10 right diamond
+    { tx: m + s*0.92,  ty: m + s*0.24 },   // H11
+    { tx: m + s*0.76,  ty: m + s*0.08 },   // H12
+  ];
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:420px;">`;
+
+  // Background
+  svg += `<rect x="${m}" y="${m}" width="${s}" height="${s}" fill="#FFF8F0" stroke="#8B4513" stroke-width="2.5" rx="2"/>`;
+
+  // Inner diamond
+  svg += `<polygon points="${T} ${R} ${B} ${L}" fill="none" stroke="#8B4513" stroke-width="1.5"/>`;
+
+  // Diagonals
+  svg += `<line x1="${TL[0]}" y1="${TL[1]}" x2="${BR[0]}" y2="${BR[1]}" stroke="#8B4513" stroke-width="1.5"/>`;
+  svg += `<line x1="${TR[0]}" y1="${TR[1]}" x2="${BL[0]}" y2="${BL[1]}" stroke="#8B4513" stroke-width="1.5"/>`;
+
+  // Populate houses
+  for (let h = 0; h < 12; h++) {
+    const signIdx = (ascIdx + h) % 12;
+    const houseNum = h + 1;
+    const hp = houses[h];
+    const isCorner = [1, 2, 4, 5, 7, 8, 10, 11].includes(h);
+
+    // Sign number label
+    const sf = isCorner ? 9 : 10;
+    svg += `<text x="${hp.tx}" y="${hp.ty}" text-anchor="middle" font-size="${sf}" fill="#8B4513" font-weight="600">${signIdx + 1}</text>`;
+
+    // Planets in this house
+    const planetsHere = planetHouses.filter(p => p.house === houseNum);
+    if (planetsHere.length > 0) {
+      const names = planetsHere.map(p => {
+        const abbr = ABBR[p.planet] || p.planet.substring(0, 2);
+        return p.retrograde ? abbr + 'ᴿ' : abbr;
+      });
+
+      if (isCorner && names.length > 2) {
+        const r1 = names.slice(0, 2).join(' ');
+        const r2 = names.slice(2).join(' ');
+        svg += `<text x="${hp.tx}" y="${hp.ty+12}" text-anchor="middle" font-size="8.5" fill="#222" font-weight="600">${r1}</text>`;
+        svg += `<text x="${hp.tx}" y="${hp.ty+22}" text-anchor="middle" font-size="8.5" fill="#222" font-weight="600">${r2}</text>`;
+      } else if (isCorner) {
+        svg += `<text x="${hp.tx}" y="${hp.ty+12}" text-anchor="middle" font-size="9" fill="#222" font-weight="600">${names.join(' ')}</text>`;
+      } else {
+        names.forEach((n, i) => {
+          svg += `<text x="${hp.tx}" y="${hp.ty + 14 + i * 14}" text-anchor="middle" font-size="11" fill="#222" font-weight="600">${n}</text>`;
+        });
+      }
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ─── Info Banner ──────────────────────────────
+function renderInfoBanner() {
+  const b = data.birth_info;
+  const asc = data.ascendant;
+  document.getElementById('infoBanner').style.display = 'flex';
+  document.getElementById('infoBanner').innerHTML = `
+    <div class="info-item"><div class="info-label">Lagna</div><div class="info-value">${asc.degree_display}</div></div>
+    <div class="info-item"><div class="info-label">Lagna Lord</div><div class="info-value">${asc.sign_lord}</div></div>
+    <div class="info-item"><div class="info-label">Nakshatra</div><div class="info-value">${asc.nakshatra} (Pada ${asc.nakshatra_pada})</div></div>
+    <div class="info-item"><div class="info-label">Weekday</div><div class="info-value">${b.weekday} (${b.weekday_lord})</div></div>
+    <div class="info-item"><div class="info-label">Birth Type</div><div class="info-value">${b.is_day_birth ? 'Day Birth' : 'Night Birth'}</div></div>
+    <div class="info-item"><div class="info-label">Sunrise</div><div class="info-value">${b.sunrise}</div></div>
+    <div class="info-item"><div class="info-label">Sunset</div><div class="info-value">${b.sunset}</div></div>
+    <div class="info-item"><div class="info-label">Ghatis from Sunrise</div><div class="info-value">${b.ghatis_from_sunrise}</div></div>
+  `;
+}
+
+// ─── Chara Karakas ────────────────────────────
+function renderKarakas() {
+  const karakas = data.chara_karakas;
+  document.getElementById('karakaSection').style.display = 'block';
+
+  const badgeClass = { 'AK':'badge-ak','AmK':'badge-amk','BK':'badge-bk','MK':'badge-mk','PK':'badge-pk','GK':'badge-gk','DK':'badge-dk','RK':'badge-rk' };
+
+  // Cards
+  document.getElementById('karakaGrid').innerHTML = karakas.map(k => `
+    <div class="karaka-card">
+      <div class="karaka-title">${k.karaka} <span class="badge ${badgeClass[k.abbrev] || ''}">${k.abbrev}</span></div>
+      <div class="karaka-planet">${k.planet}</div>
+      <div class="karaka-deg">${k.degree_display}</div>
+      <div class="karaka-nak">${k.nakshatra} &middot; ${k.nakshatra_lord}</div>
+      <div style="font-size:0.75rem;color:#999;margin-top:2px;">Deg in sign: ${k.degree_in_sign.toFixed(2)}&deg;</div>
+    </div>
+  `).join('');
+
+  // Table
+  document.getElementById('karakaTable').innerHTML = `
+    <table>
+      <tr><th>Karaka</th><th>Abbrev</th><th>Planet</th><th>Sign</th><th>Deg in Sign</th><th>Nakshatra</th><th>Nak Lord</th></tr>
+      ${karakas.map(k => `
+        <tr>
+          <td><strong>${k.karaka}</strong></td>
+          <td><span class="badge ${badgeClass[k.abbrev] || ''}">${k.abbrev}</span></td>
+          <td><strong>${k.planet}</strong></td>
+          <td>${k.sign}</td>
+          <td>${k.degree_in_sign.toFixed(2)}&deg;</td>
+          <td>${k.nakshatra}</td>
+          <td>${k.nakshatra_lord}</td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+}
+
+// ─── Special Lagnas ───────────────────────────
+function renderSpecialLagnas() {
+  const lagnas = data.special_lagnas;
+  const gulika = data.gulika;
+  document.getElementById('lagnaSection').style.display = 'block';
+
+  const rows = Object.values(lagnas);
+  // Add Gulika as a row
+  rows.push(gulika);
+
+  document.getElementById('lagnaTable').innerHTML = `
+    <table>
+      <tr><th>Lagna</th><th>Sign</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>Nak Lord</th><th>Vargas</th></tr>
+      ${rows.map(r => `
+        <tr>
+          <td><strong>${r.label}</strong></td>
+          <td>${r.sign} <span style="color:#888;font-size:0.8rem;">(${r.sign_lord})</span></td>
+          <td>${r.degree_display}</td>
+          <td>${r.nakshatra}</td>
+          <td>${r.nakshatra_pada}</td>
+          <td>${r.nakshatra_lord}</td>
+          <td><button class="varga-btn" onclick="showVargas('${r.label}', '${r.key}', 'lagna')">View Vargas</button></td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+}
+
+// ─── Sensitive Points ─────────────────────────
+function renderSensitivePoints() {
+  const points = data.sensitive_points;
+  document.getElementById('sensitiveSection').style.display = 'block';
+
+  const rows = Object.values(points);
+
+  document.getElementById('sensitiveTable').innerHTML = `
+    <table>
+      <tr><th>Point</th><th>Sign</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>Nak Lord</th><th>Vargas</th></tr>
+      ${rows.map(r => `
+        <tr>
+          <td><strong>${r.label}</strong></td>
+          <td>${r.sign} <span style="color:#888;font-size:0.8rem;">(${r.sign_lord})</span></td>
+          <td>${r.degree_display}</td>
+          <td>${r.nakshatra}</td>
+          <td>${r.nakshatra_pada}</td>
+          <td>${r.nakshatra_lord}</td>
+          <td><button class="varga-btn" onclick="showVargas('${r.label}', '${r.key}', 'sensitive')">View Vargas</button></td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+}
+
+// ─── Yogi / Avayogi ───────────────────────────
+function renderYogi() {
+  const y = data.yogi_avayogi;
+  document.getElementById('yogiSection').style.display = 'block';
+
+  document.getElementById('yogiGrid').innerHTML = `
+    <div class="yogi-card">
+      <h4>Yogi (Most Auspicious)</h4>
+      <div class="yogi-row"><span class="yogi-label">Yogi Point</span><span class="yogi-value">${y.yogi_point.toFixed(2)}&deg;</span></div>
+      <div class="yogi-row"><span class="yogi-label">Yogi Nakshatra</span><span class="yogi-value">${y.yogi_nakshatra}</span></div>
+      <div class="yogi-row"><span class="yogi-label">Yogi Planet</span><span class="yogi-value">${y.yogi_planet}</span></div>
+      <div style="margin-top:8px;padding:8px;background:#e8f5e9;border-radius:4px;font-size:0.8rem;color:#2e7d32;">
+        <strong>${y.yogi_planet}</strong> is the most auspicious planet. Dashas/transits of this planet bring prosperity.
+      </div>
+    </div>
+    <div class="yogi-card">
+      <h4>Avayogi (Inauspicious)</h4>
+      <div class="yogi-row"><span class="yogi-label">Avayogi Point</span><span class="yogi-value">${y.avayogi_point.toFixed(2)}&deg;</span></div>
+      <div class="yogi-row"><span class="yogi-label">Avayogi Nakshatra</span><span class="yogi-value">${y.avayogi_nakshatra}</span></div>
+      <div class="yogi-row"><span class="yogi-label">Avayogi Planet</span><span class="yogi-value">${y.avayogi_planet}</span></div>
+      <div style="margin-top:8px;padding:8px;background:#ffebee;border-radius:4px;font-size:0.8rem;color:#c62828;">
+        <strong>${y.avayogi_planet}</strong> is inauspicious. Its dashas/transits may bring obstacles.
+      </div>
+    </div>
+    <div class="yogi-card">
+      <h4>Duplicate Yogi</h4>
+      <div class="yogi-row"><span class="yogi-label">Duplicate Yogi Planet</span><span class="yogi-value">${y.duplicate_yogi}</span></div>
+      <div style="margin-top:8px;padding:8px;background:#fff3e0;border-radius:4px;font-size:0.8rem;color:#e65100;">
+        Lord of Avayogi's nakshatra. Can act as a secondary benefic.
+      </div>
+    </div>
+  `;
+}
+
+// ─── Gulika ───────────────────────────────────
+function renderGulika() {
+  const g = data.gulika;
+  document.getElementById('gulikaSection').style.display = 'block';
+
+  document.getElementById('gulikaInfo').innerHTML = `
+    <table>
+      <tr><th>Point</th><th>Sign</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>Nak Lord</th><th>Vargas</th></tr>
+      <tr>
+        <td><strong>Gulika (Mandi)</strong></td>
+        <td>${g.sign} <span style="color:#888;font-size:0.8rem;">(${g.sign_lord})</span></td>
+        <td>${g.degree_display}</td>
+        <td>${g.nakshatra}</td>
+        <td>${g.nakshatra_pada}</td>
+        <td>${g.nakshatra_lord}</td>
+        <td><button class="varga-btn" onclick="showVargas('Gulika (Mandi)', 'gulika', 'gulika')">View Vargas</button></td>
+      </tr>
+    </table>
+    <div style="margin-top:12px;padding:12px;background:#fff;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;color:#666;">
+      <strong>Gulika</strong> (son of Saturn) is a malefic sub-planet. Its house placement indicates areas of life subject to karmic hardship.
+      The sign lord of Gulika becomes a functional malefic for the chart.
+    </div>
+  `;
+}
+
+// ─── Varga Modal ──────────────────────────────
+function showVargas(label, key, type) {
+  let vargas;
+  if (type === 'lagna') {
+    vargas = data.special_lagnas[key]?.vargas || {};
+  } else if (type === 'gulika') {
+    vargas = data.gulika?.vargas || {};
+  } else {
+    vargas = data.sensitive_points[key]?.vargas || {};
+  }
+
+  document.getElementById('vargaModalTitle').textContent = `${label} — Varga Placements`;
+
+  const vargaNames = {
+    'D1':'Rashi','D2':'Hora','D3':'Drekkana','D4':'Chaturthamsha','D7':'Saptamsha',
+    'D9':'Navamsha','D10':'Dashamsha','D12':'Dwadashamsha','D16':'Shodashamsha',
+    'D20':'Vimshamsha','D24':'Chaturvimshamsha','D27':'Saptavimshamsha',
+    'D30':'Trimshamsha','D40':'Khavedamsha','D45':'Akshavedamsha','D60':'Shashtiamsha',
+  };
+
+  document.getElementById('vargaModalBody').innerHTML = `
+    <table>
+      <tr><th>Varga</th><th>Name</th><th>Sign</th><th>Sign Lord</th></tr>
+      ${Object.entries(vargas).map(([v, info]) => `
+        <tr>
+          <td><strong>${v}</strong></td>
+          <td>${vargaNames[v] || v}</td>
+          <td>${info.sign}</td>
+          <td>${info.sign_lord}</td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+
+  document.getElementById('vargaModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('vargaModal').classList.remove('active');
+}
+
+// Close modal on overlay click
+document.getElementById('vargaModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.dob) document.getElementById('dobInput').value = p.dob;
+    if (p.time) document.getElementById('tobInput').value = p.time;
+    if (p.place) document.getElementById('placeInput').value = p.place;
+    if (p.lat) document.getElementById('latInput').value = p.lat;
+    if (p.lon) document.getElementById('lonInput').value = p.lon;
+    if (p.tz !== undefined) document.getElementById('tzInput').value = p.tz;
+    if (p.ayanamsa) document.getElementById('ayanInput').value = p.ayanamsa;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

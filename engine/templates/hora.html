@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hora & Auspicious Time — Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+    --good: #2e7d32;
+    --neutral: #ed6c02;
+    --bad: #c62828;
+    --excellent: #1b5e20;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); }
+  .header h1 { font-size:1.5rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; flex-wrap:wrap; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1500px; margin:0 auto; padding:20px; }
+
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+
+  /* Tabs */
+  .section-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+  .section-tab { padding:10px 18px; background:#fff; border:2px solid var(--border); border-radius:6px; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.2s; }
+  .section-tab:hover { background:#ffe4b5; }
+  .section-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  .card { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .card h2 { color:var(--accent); margin-bottom:16px; font-size:1.15rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+
+  /* Summary bar */
+  .summary-bar { display:flex; gap:20px; flex-wrap:wrap; padding:16px 20px; background:#fff; border:2px solid var(--border); border-radius:8px; margin-bottom:16px; align-items:center; }
+  .stat-box { text-align:center; min-width:80px; }
+  .stat-num { font-size:1.6rem; font-weight:800; }
+  .stat-label { font-size:0.75rem; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+
+  /* Hora table */
+  .hora-wrap { overflow-x:auto; }
+  .hora-table { border-collapse:collapse; font-size:0.82rem; width:100%; min-width:900px; }
+  .hora-table th { background:var(--table-header); color:#fff; padding:8px 10px; text-align:center; font-weight:700; border:2px solid #333; position:sticky; top:0; z-index:10; }
+  .hora-table td { padding:7px 10px; text-align:center; border:2px solid #333; }
+  .hora-table tr.day-hora td { background:#fff; }
+  .hora-table tr.night-hora td { background:#e8e0d0; }
+  .hora-table tr.hora-excellent td { background:#a5d6a7; }
+  .hora-table tr.hora-very-good td { background:#c8e6c9; }
+  .hora-table tr.hora-good td { background:#e8f5e9; }
+  .hora-table tr.hora-average td { background:#fff8e1; }
+  .hora-table tr.hora-poor td { background:#ffcdd2; }
+
+  /* Rating badges */
+  .rating-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; }
+  .rating-excellent { background:#1b5e20; color:#fff; }
+  .rating-very_good { background:#2e7d32; color:#fff; }
+  .rating-good { background:#66bb6a; color:#fff; }
+  .rating-average { background:#ffb300; color:#333; }
+  .rating-poor { background:#c62828; color:#fff; }
+
+  /* Score bar */
+  .score-bar-wrap { width:80px; display:inline-block; vertical-align:middle; }
+  .score-bar-bg { width:100%; height:14px; background:#eee; border-radius:7px; overflow:hidden; }
+  .score-bar-fill { height:100%; border-radius:7px; transition:width 0.3s; }
+
+  /* Tara badge */
+  .tara-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:700; }
+  .tara-good { background:#c8e6c9; color:var(--good); }
+  .tara-bad { background:#ffcdd2; color:var(--bad); }
+
+  /* Chaughadiya quality */
+  .cq-excellent { color:#1b5e20; font-weight:800; }
+  .cq-very_good { color:var(--good); font-weight:700; }
+  .cq-good { color:#558b2f; font-weight:600; }
+  .cq-bad { color:var(--neutral); font-weight:600; }
+  .cq-very_bad { color:var(--bad); font-weight:800; }
+
+  /* Best times cards */
+  .best-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px; margin-top:16px; }
+  .best-card { background:#fff; border:2px solid var(--border); border-radius:10px; padding:16px; text-align:center; box-shadow:0 2px 8px var(--shadow); }
+  .best-card .time-range { font-size:1.3rem; font-weight:800; color:var(--accent); }
+  .best-card .lord-name { font-size:1rem; margin:6px 0; }
+
+  /* Chaughadiya section */
+  .chaugh-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .chaugh-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  .chaugh-table th { background:var(--table-header); color:#fff; padding:8px 12px; text-align:center; border:2px solid #333; }
+  .chaugh-table td { padding:8px 12px; text-align:center; border:2px solid #333; background:#fff; }
+  .chaugh-table tr:nth-child(even) td { background:var(--table-alt); }
+
+  /* Timeline */
+  .timeline-wrap { position:relative; margin:20px 0; overflow-x:auto; }
+  .timeline-bar { display:flex; height:50px; border-radius:8px; overflow:hidden; border:2px solid #333; min-width:900px; }
+  .timeline-slot { display:flex; align-items:center; justify-content:center; flex-direction:column; font-size:0.7rem; font-weight:700; border-right:1px solid #666; cursor:pointer; transition:opacity 0.2s; position:relative; }
+  .timeline-slot:hover { opacity:0.85; }
+  .timeline-slot .slot-lord { font-size:0.75rem; }
+  .timeline-slot .slot-time { font-size:0.6rem; opacity:0.8; }
+  .timeline-labels { display:flex; min-width:900px; font-size:0.65rem; color:#555; margin-top:2px; }
+  .timeline-labels span { text-align:center; }
+
+  .loading { text-align:center; padding:40px; font-size:1.1rem; color:var(--accent); }
+  .loading::after { content:''; display:inline-block; width:20px; height:20px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:10px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .footer { text-align:center; padding:16px; color:#fff; font-size:0.8rem; background:var(--header-bg); margin-top:40px; }
+
+  @media (max-width:768px) {
+    .header { flex-direction:column; gap:8px; }
+    .nav-links { justify-content:center; }
+    .form-row { flex-direction:column; }
+    .chaugh-grid { grid-template-columns:1fr; }
+    .best-grid { grid-template-columns:1fr 1fr; }
+    .summary-bar { gap:10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>&#9733; Vedic <span>Astrology</span> Engine</h1>
+  <div class="nav-links">
+    <a href="/">Daily Panchang</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas">Special Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora" class="active">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth + Date Form -->
+  <div class="birth-form">
+    <h2 id="formTitle">Hora & Auspicious Time</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="dobInput" placeholder="DD-MM-YYYY" maxlength="10" value="23-09-1992" />
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="tobInput" placeholder="HH:MM" maxlength="5" value="23:10" />
+      </div>
+      <div class="form-field">
+        <label>Place</label>
+        <div class="loc-auto">
+          <input type="text" id="placeInput" placeholder="Search city..." autocomplete="off" value="Ujjain" style="width:280px;" />
+          <div id="placeSuggestions" class="loc-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Lat</label>
+        <input type="text" id="latInput" value="23.1765" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>Lon</label>
+        <input type="text" id="lonInput" value="75.7885" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>TZ</label>
+        <input type="text" id="tzInput" value="5.5" style="width:60px;" />
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanInput">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">KP</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Target Date</label>
+        <input type="text" id="targetDateInput" placeholder="DD-MM-YYYY" maxlength="10" />
+      </div>
+      <div class="form-field">
+        <label>Language</label>
+        <select id="langSelect" onchange="switchLanguage()">
+          <option value="en" selected>English</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+      </div>
+      <button class="btn" id="generateBtn" onclick="analyzeHora()">Find Auspicious Times</button>
+      <span id="genStatus" style="margin-left:16px;color:var(--accent);font-size:0.9rem;"></span>
+    </div>
+    <div style="margin-top:8px;">
+      <button class="btn" style="padding:6px 14px;font-size:0.85rem;background:var(--gold);color:#333;" onclick="prevDay()">&larr; Prev Day</button>
+      <button class="btn" style="padding:6px 14px;font-size:0.85rem;background:var(--gold);color:#333;margin-left:4px;" onclick="setToday()">Today</button>
+      <button class="btn" style="padding:6px 14px;font-size:0.85rem;background:var(--gold);color:#333;margin-left:4px;" onclick="nextDay()">Next Day &rarr;</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div id="sectionTabsWrap" style="display:none;">
+    <div class="section-tabs" id="sectionTabs">
+      <div class="section-tab active" onclick="switchTab('horaTable')" id="tabHoraTable">Hora Table</div>
+      <div class="section-tab" onclick="switchTab('timeline')" id="tabTimeline">Visual Timeline</div>
+      <div class="section-tab" onclick="switchTab('chaughadiya')" id="tabChaughadiya">Chaughadiya</div>
+      <div class="section-tab" onclick="switchTab('bestTimes')" id="tabBestTimes">Best Times</div>
+    </div>
+  </div>
+
+  <div class="tab-content active" id="horaTableSection">
+    <div id="horaTableContent"></div>
+  </div>
+  <div class="tab-content" id="timelineSection">
+    <div id="timelineContent"></div>
+  </div>
+  <div class="tab-content" id="chaughadiyaSection">
+    <div id="chaughadiyaContent"></div>
+  </div>
+  <div class="tab-content" id="bestTimesSection">
+    <div id="bestTimesContent"></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Hora & Auspicious Time &middot; Navtara + Ashtakavarga + Chaughadiya
+</div>
+
+<script>
+const API = '';
+let horaData = null;
+let currentLang = 'en';
+let placeTimer = null;
+
+const PLANETS_HI = {Sun:'सूर्य',Moon:'चंद्र',Mars:'मंगल',Mercury:'बुध',Jupiter:'गुरु',Venus:'शुक्र',Saturn:'शनि',Rahu:'राहु',Ketu:'केतु',Ascendant:'लग्न'};
+const PLANET_COLORS = {Sun:'#ff8f00',Moon:'#e0e0e0',Mars:'#e53935',Mercury:'#43a047',Jupiter:'#fdd835',Venus:'#e91e63',Saturn:'#5c6bc0'};
+const RATING_LABELS = {excellent:'Excellent',very_good:'Very Good',good:'Good',average:'Average',poor:'Poor'};
+const RATING_LABELS_HI = {excellent:'उत्तम',very_good:'बहुत अच्छा',good:'अच्छा',average:'सामान्य',poor:'खराब'};
+
+const LANG = {
+  en: {
+    formTitle: 'Hora & Auspicious Time',
+    calcBtn: 'Find Auspicious Times',
+    tabHoraTable: 'Hora Table', tabTimeline: 'Visual Timeline',
+    tabChaughadiya: 'Chaughadiya', tabBestTimes: 'Best Times',
+    horaNum: '#', time: 'Time', lord: 'Lord', dayNight: 'Day/Night',
+    nakshatra: 'Nakshatra', tara: 'Tara', bav: 'BAV', sav: 'SAV',
+    chaugh: 'Chaughadiya', score: 'Score', rating: 'Rating',
+    day: 'Day', night: 'Night', sunrise: 'Sunrise', sunset: 'Sunset',
+    birthMoon: 'Birth Moon', dayLord: 'Day Lord',
+    excellent: 'Excellent', very_good: 'Very Good', good: 'Good',
+    average: 'Average', poor: 'Poor',
+    bestTimesTitle: 'Top 5 Auspicious Times',
+    dayChaughadiya: 'Day Chaughadiya', nightChaughadiya: 'Night Chaughadiya',
+    quality: 'Quality', duration: 'Duration (min)',
+    pada: 'Pada',
+  },
+  hi: {
+    formTitle: 'होरा एवं शुभ मुहूर्त',
+    calcBtn: 'शुभ मुहूर्त खोजें',
+    tabHoraTable: 'होरा तालिका', tabTimeline: 'समय-रेखा',
+    tabChaughadiya: 'चौघड़िया', tabBestTimes: 'शुभ समय',
+    horaNum: '#', time: 'समय', lord: 'स्वामी', dayNight: 'दिन/रात',
+    nakshatra: 'नक्षत्र', tara: 'तारा', bav: 'BAV', sav: 'SAV',
+    chaugh: 'चौघड़िया', score: 'अंक', rating: 'श्रेणी',
+    day: 'दिन', night: 'रात', sunrise: 'सूर्योदय', sunset: 'सूर्यास्त',
+    birthMoon: 'जन्म चंद्र', dayLord: 'दिन स्वामी',
+    excellent: 'उत्तम', very_good: 'बहुत अच्छा', good: 'अच्छा',
+    average: 'सामान्य', poor: 'खराब',
+    bestTimesTitle: 'शीर्ष 5 शुभ मुहूर्त',
+    dayChaughadiya: 'दिन चौघड़िया', nightChaughadiya: 'रात चौघड़िया',
+    quality: 'गुणवत्ता', duration: 'अवधि (मिनट)',
+    pada: 'पाद',
+  },
+};
+
+function L() { return LANG[currentLang]; }
+function pn(p) { return currentLang === 'hi' ? (PLANETS_HI[p] || p) : p; }
+function escHtml(s) { return s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─── Set target date to today ───────
+(function setDefaults() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  document.getElementById('targetDateInput').value = `${dd}-${mm}-${yyyy}`;
+})();
+
+// ─── Date navigation ───────────────
+function parseInputDate(val) {
+  const parts = val.split('-');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  }
+  return new Date();
+}
+function formatDate(d) {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}
+function prevDay() {
+  const d = parseInputDate(document.getElementById('targetDateInput').value);
+  d.setDate(d.getDate() - 1);
+  document.getElementById('targetDateInput').value = formatDate(d);
+  analyzeHora();
+}
+function nextDay() {
+  const d = parseInputDate(document.getElementById('targetDateInput').value);
+  d.setDate(d.getDate() + 1);
+  document.getElementById('targetDateInput').value = formatDate(d);
+  analyzeHora();
+}
+function setToday() {
+  document.getElementById('targetDateInput').value = formatDate(new Date());
+  analyzeHora();
+}
+
+// ─── Language toggle ───────────────
+function switchLanguage() {
+  currentLang = document.getElementById('langSelect').value;
+  const l = L();
+  document.getElementById('formTitle').textContent = l.formTitle;
+  document.getElementById('generateBtn').textContent = l.calcBtn;
+  document.getElementById('tabHoraTable').textContent = l.tabHoraTable;
+  document.getElementById('tabTimeline').textContent = l.tabTimeline;
+  document.getElementById('tabChaughadiya').textContent = l.tabChaughadiya;
+  document.getElementById('tabBestTimes').textContent = l.tabBestTimes;
+  if (horaData) { renderAll(); }
+}
+
+// ─── Tabs ──────────────────────────
+const TAB_MAP = {horaTable:'horaTableSection', timeline:'timelineSection', chaughadiya:'chaughadiyaSection', bestTimes:'bestTimesSection'};
+const TAB_BTN = {horaTable:'tabHoraTable', timeline:'tabTimeline', chaughadiya:'tabChaughadiya', bestTimes:'tabBestTimes'};
+function switchTab(tab) {
+  Object.keys(TAB_MAP).forEach(k => {
+    document.getElementById(TAB_MAP[k]).classList.toggle('active', k === tab);
+    document.getElementById(TAB_BTN[k]).classList.toggle('active', k === tab);
+  });
+}
+
+// ─── Birth defaults ──────────────
+(async function loadBirthDefaults() {
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) {
+      const d = await res.json();
+      document.getElementById('dobInput').value = d.date;
+      document.getElementById('tobInput').value = d.time;
+      document.getElementById('placeInput').value = d.place;
+      document.getElementById('latInput').value = d.latitude;
+      document.getElementById('lonInput').value = d.longitude;
+      document.getElementById('tzInput').value = d.tz_offset;
+      document.getElementById('ayanInput').value = d.ayanamsa;
+    }
+  } catch (_) {}
+})();
+
+// ─── Place autocomplete ─────────
+const placeInput = document.getElementById('placeInput');
+const placeDropdown = document.getElementById('placeSuggestions');
+placeInput.addEventListener('input', () => {
+  clearTimeout(placeTimer);
+  const q = placeInput.value.trim();
+  if (q.length < 2) { placeDropdown.style.display = 'none'; return; }
+  placeTimer = setTimeout(() => fetchPlaces(q), 250);
+});
+placeInput.addEventListener('focus', () => {
+  if (placeInput.value.trim().length >= 2) fetchPlaces(placeInput.value.trim());
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#placeInput') && !e.target.closest('#placeSuggestions'))
+    placeDropdown.style.display = 'none';
+});
+
+async function fetchPlaces(q) {
+  try {
+    const localRes = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+    const localData = await localRes.json();
+    if (localData.results && localData.results.length > 0) {
+      renderPlaceResults(localData.results.map(c => ({
+        display: c.display, name: c.name, lat: c.latitude, lon: c.longitude, tz: c.tz_offset,
+      })));
+      return;
+    }
+    const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`);
+    const nData = await nRes.json();
+    if (nData && nData.length > 0) {
+      const results = nData.map(r => {
+        const parts = [];
+        if (r.address) {
+          if (r.address.city || r.address.town || r.address.village || r.address.hamlet) parts.push(r.address.city || r.address.town || r.address.village || r.address.hamlet);
+          if (r.address.state) parts.push(r.address.state);
+          if (r.address.country) parts.push(r.address.country);
+        }
+        const display = parts.length > 0 ? parts.join(', ') : r.display_name.split(',').slice(0,3).join(',');
+        return { display, name: parts[0] || r.display_name.split(',')[0], lat: parseFloat(r.lat), lon: parseFloat(r.lon), tz: null };
+      });
+      renderPlaceResults(results);
+    } else {
+      placeDropdown.innerHTML = '<div style="padding:8px 12px;color:#888;">No results</div>';
+      placeDropdown.style.display = 'block';
+    }
+  } catch(e) { placeDropdown.style.display = 'none'; }
+}
+window._placeResults = [];
+function renderPlaceResults(results) {
+  window._placeResults = results;
+  placeDropdown.innerHTML = results.map((c, i) => {
+    const tzStr = c.tz !== null ? `UTC${c.tz>=0?'+':''}${c.tz}` : '';
+    return `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.9rem;"
+         onmouseover="this.style.background='#ffe4b5'" onmouseout="this.style.background='#fff'"
+         onclick="pickPlace(${i})">
+      <strong>${c.display}</strong>
+      ${tzStr ? `<span style="color:#888;font-size:0.8rem;margin-left:8px;">${tzStr}</span>` : ''}
+    </div>`;
+  }).join('');
+  placeDropdown.style.display = 'block';
+}
+function pickPlace(idx) {
+  const c = window._placeResults[idx];
+  placeInput.value = c.name;
+  document.getElementById('latInput').value = c.lat;
+  document.getElementById('lonInput').value = c.lon;
+  if (c.tz !== null) document.getElementById('tzInput').value = c.tz;
+  else document.getElementById('tzInput').value = Math.round(c.lon / 15 * 2) / 2;
+  placeDropdown.style.display = 'none';
+}
+
+// ─── API Call ─────────────────────
+async function analyzeHora() {
+  const btn = document.getElementById('generateBtn');
+  const status = document.getElementById('genStatus');
+  btn.disabled = true;
+  status.innerHTML = '<span class="loading" style="padding:0;">Calculating...</span>';
+
+  try {
+    const body = {
+      date: document.getElementById('dobInput').value,
+      time: document.getElementById('tobInput').value,
+      city: document.getElementById('placeInput').value,
+      latitude: parseFloat(document.getElementById('latInput').value),
+      longitude: parseFloat(document.getElementById('lonInput').value),
+      tz_offset: parseFloat(document.getElementById('tzInput').value),
+      ayanamsa: document.getElementById('ayanInput').value,
+      target_date: document.getElementById('targetDateInput').value,
+    };
+
+    const res = await fetch(`${API}/api/v1/hora`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`API error ${res.status}: ${errBody}`);
+    }
+    horaData = await res.json();
+    document.getElementById('sectionTabsWrap').style.display = 'block';
+    renderAll();
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderAll() {
+  renderSummary();
+  renderHoraTable();
+  renderTimeline();
+  renderChaughadiya();
+  renderBestTimes();
+}
+
+// ─── Summary (above hora table) ──
+function renderSummary() {
+  // Rendered inside hora table content
+}
+
+// ─── Hora Table ──────────────────
+function renderHoraTable() {
+  const l = L();
+  const horas = horaData.horas || [];
+  const taraNames = currentLang === 'hi' ? (horaData.tara_names_hi || horaData.tara_names) : horaData.tara_names;
+
+  let html = '';
+
+  // Summary bar
+  html += `<div class="summary-bar">
+    <div class="stat-box"><div class="stat-num" style="color:var(--accent);">${escHtml(horaData.weekday_hi && currentLang==='hi' ? horaData.weekday_hi : horaData.weekday)}</div><div class="stat-label">${horaData.date}</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:var(--gold);">${escHtml(pn(horaData.day_lord))}</div><div class="stat-label">${l.dayLord}</div></div>
+    <div class="stat-box"><div class="stat-num">&#9728; ${horaData.sunrise}</div><div class="stat-label">${l.sunrise}</div></div>
+    <div class="stat-box"><div class="stat-num">&#9790; ${horaData.sunset}</div><div class="stat-label">${l.sunset}</div></div>
+    <div style="flex:1;"></div>
+    <div class="stat-box"><div class="stat-num" style="color:var(--accent);">${escHtml(horaData.birth_moon_nakshatra)}</div><div class="stat-label">${l.birthMoon}</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:var(--excellent);">${horaData.summary.excellent + horaData.summary.very_good}</div><div class="stat-label">${l.excellent}+</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:var(--bad);">${horaData.summary.poor}</div><div class="stat-label">${l.poor}</div></div>
+  </div>`;
+
+  // Table
+  html += `<div class="card"><h2>${l.tabHoraTable} — ${horaData.date}</h2>
+  <div class="hora-wrap"><table class="hora-table"><thead><tr>
+    <th>${l.horaNum}</th>
+    <th>${l.dayNight}</th>
+    <th>${l.time}</th>
+    <th>${l.lord}</th>
+    <th>${l.nakshatra}</th>
+    <th>${l.tara}</th>
+    <th>${l.bav}</th>
+    <th>${l.chaugh}</th>
+    <th>${l.score}</th>
+    <th>${l.rating}</th>
+  </tr></thead><tbody>`;
+
+  horas.forEach(h => {
+    const rowCls = `hora-${h.rating}`;
+    const dn = h.is_day ? (currentLang==='hi' ? '☀ दिन' : '☀ Day') : (currentLang==='hi' ? '☽ रात' : '☽ Night');
+
+    // Navtara
+    let taraHtml = '-';
+    if (h.navtara) {
+      const tn = h.navtara;
+      const tLabel = currentLang === 'hi' ? (tn.tara_name_hi || tn.tara_name) : tn.tara_name;
+      const tCls = tn.is_good ? 'tara-good' : 'tara-bad';
+      taraHtml = `<span class="tara-badge ${tCls}">${tn.tara}. ${escHtml(tLabel)}</span>`;
+    }
+
+    // BAV
+    let bavHtml = '-';
+    if (h.bav_score !== null && h.bav_score !== undefined) {
+      const bavColor = h.bav_score >= 5 ? 'var(--excellent)' : (h.bav_score >= 4 ? 'var(--good)' : (h.bav_score >= 3 ? 'var(--neutral)' : 'var(--bad)'));
+      bavHtml = `<span style="color:${bavColor};font-weight:700;">${h.bav_score}</span><span style="font-size:0.7rem;color:#888;"> / ${escHtml(h.bav_sign)}</span>`;
+    }
+
+    // Chaughadiya
+    let chaughHtml = '-';
+    if (h.chaughadiya) {
+      const cName = currentLang === 'hi' ? (h.chaughadiya_hi || h.chaughadiya) : h.chaughadiya;
+      const cCls = `cq-${h.chaughadiya_quality}`;
+      chaughHtml = `<span class="${cCls}">${escHtml(cName)}</span>`;
+    }
+
+    // Score bar
+    const maxScore = 5.5;
+    const pct = Math.min(100, Math.round((h.auspicious_score / maxScore) * 100));
+    const barColor = h.rating === 'excellent' ? '#1b5e20' : (h.rating === 'very_good' ? '#2e7d32' : (h.rating === 'good' ? '#66bb6a' : (h.rating === 'average' ? '#ffb300' : '#c62828')));
+
+    // Rating label
+    const rLabel = currentLang === 'hi' ? (RATING_LABELS_HI[h.rating] || h.rating) : (RATING_LABELS[h.rating] || h.rating);
+
+    // Nakshatra
+    let nakHtml = '-';
+    if (h.navtara) {
+      nakHtml = `${escHtml(h.navtara.nakshatra)} <span style="font-size:0.7rem;color:#888;">${l.pada} ${h.navtara.pada}</span>`;
+    }
+
+    html += `<tr class="${rowCls}">
+      <td style="font-weight:700;">${h.hora_num}</td>
+      <td>${dn}</td>
+      <td style="font-weight:700;white-space:nowrap;">${h.start} - ${h.end}</td>
+      <td style="font-weight:700;color:${PLANET_COLORS[h.lord] || '#333'};">${escHtml(pn(h.lord))}</td>
+      <td>${nakHtml}</td>
+      <td>${taraHtml}</td>
+      <td>${bavHtml}</td>
+      <td>${chaughHtml}</td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar-bg"><div class="score-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+        </div>
+        <span style="font-weight:700;font-size:0.8rem;margin-left:4px;">${h.auspicious_score.toFixed(1)}</span>
+      </td>
+      <td><span class="rating-badge rating-${h.rating}">${rLabel}</span></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div></div>';
+  document.getElementById('horaTableContent').innerHTML = html;
+}
+
+// ─── Visual Timeline ─────────────
+function renderTimeline() {
+  const l = L();
+  const horas = horaData.horas || [];
+
+  let html = `<div class="card"><h2>${l.tabTimeline} — ${horaData.date}</h2>`;
+
+  // Color legend
+  html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:0.8rem;">
+    <span><span class="rating-badge rating-excellent">${l.excellent}</span></span>
+    <span><span class="rating-badge rating-very_good">${l.very_good}</span></span>
+    <span><span class="rating-badge rating-good">${l.good}</span></span>
+    <span><span class="rating-badge rating-average">${l.average}</span></span>
+    <span><span class="rating-badge rating-poor">${l.poor}</span></span>
+  </div>`;
+
+  const ratingColors = {
+    excellent:'#1b5e20', very_good:'#2e7d32', good:'#66bb6a', average:'#ffb300', poor:'#c62828'
+  };
+  const ratingText = {
+    excellent:'#fff', very_good:'#fff', good:'#fff', average:'#333', poor:'#fff'
+  };
+
+  // Day timeline
+  html += `<div style="margin-bottom:6px;font-weight:700;font-size:0.9rem;">☀ ${l.day} (${horaData.sunrise} — ${horaData.sunset})</div>`;
+  html += '<div class="timeline-wrap"><div class="timeline-bar">';
+  horas.filter(h => h.is_day).forEach(h => {
+    const bg = ratingColors[h.rating] || '#999';
+    const fg = ratingText[h.rating] || '#fff';
+    html += `<div class="timeline-slot" style="flex:1;background:${bg};color:${fg};" title="${h.start}-${h.end} | ${h.lord} | Score: ${h.auspicious_score.toFixed(1)}">
+      <span class="slot-lord">${escHtml(pn(h.lord))}</span>
+      <span class="slot-time">${h.start}</span>
+    </div>`;
+  });
+  html += '</div></div>';
+
+  // Night timeline
+  html += `<div style="margin-top:16px;margin-bottom:6px;font-weight:700;font-size:0.9rem;">☽ ${l.night} (${horaData.sunset} — )</div>`;
+  html += '<div class="timeline-wrap"><div class="timeline-bar">';
+  horas.filter(h => !h.is_day).forEach(h => {
+    const bg = ratingColors[h.rating] || '#999';
+    const fg = ratingText[h.rating] || '#fff';
+    html += `<div class="timeline-slot" style="flex:1;background:${bg};color:${fg};" title="${h.start}-${h.end} | ${h.lord} | Score: ${h.auspicious_score.toFixed(1)}">
+      <span class="slot-lord">${escHtml(pn(h.lord))}</span>
+      <span class="slot-time">${h.start}</span>
+    </div>`;
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+  document.getElementById('timelineContent').innerHTML = html;
+}
+
+// ─── Chaughadiya ─────────────────
+function renderChaughadiya() {
+  const l = L();
+  const ch = horaData.chaughadiya;
+  if (!ch || ch.error) {
+    document.getElementById('chaughadiyaContent').innerHTML = '<div class="card"><p>Chaughadiya data not available.</p></div>';
+    return;
+  }
+
+  let html = `<div class="card"><h2>${l.tabChaughadiya} — ${horaData.date}</h2>
+  <div class="chaugh-grid">`;
+
+  // Day
+  html += `<div><h3 style="color:var(--accent);margin-bottom:10px;">☀ ${l.dayChaughadiya}</h3>
+  <table class="chaugh-table"><thead><tr>
+    <th>#</th><th>${l.time}</th><th>${l.chaugh}</th><th>${l.lord}</th><th>${l.quality}</th><th>${l.duration}</th>
+  </tr></thead><tbody>`;
+  (ch.day_periods || []).forEach(p => {
+    const cName = currentLang === 'hi' ? (p.name_hi || p.name) : p.name;
+    const cLord = currentLang === 'hi' ? (p.lord_hi || p.lord) : p.lord;
+    const qLabel = currentLang === 'hi' ? (l[p.quality] || p.quality) : p.quality.replace('_',' ');
+    const cCls = `cq-${p.quality}`;
+    html += `<tr>
+      <td>${p.index}</td>
+      <td style="font-weight:700;white-space:nowrap;">${p.start} - ${p.end}</td>
+      <td class="${cCls}" style="font-size:1rem;">${escHtml(cName)}</td>
+      <td>${escHtml(cLord)}</td>
+      <td class="${cCls}">${qLabel}</td>
+      <td>${p.duration_min}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+
+  // Night
+  html += `<div><h3 style="color:var(--accent);margin-bottom:10px;">☽ ${l.nightChaughadiya}</h3>
+  <table class="chaugh-table"><thead><tr>
+    <th>#</th><th>${l.time}</th><th>${l.chaugh}</th><th>${l.lord}</th><th>${l.quality}</th><th>${l.duration}</th>
+  </tr></thead><tbody>`;
+  (ch.night_periods || []).forEach(p => {
+    const cName = currentLang === 'hi' ? (p.name_hi || p.name) : p.name;
+    const cLord = currentLang === 'hi' ? (p.lord_hi || p.lord) : p.lord;
+    const qLabel = currentLang === 'hi' ? (l[p.quality] || p.quality) : p.quality.replace('_',' ');
+    const cCls = `cq-${p.quality}`;
+    html += `<tr>
+      <td>${p.index}</td>
+      <td style="font-weight:700;white-space:nowrap;">${p.start} - ${p.end}</td>
+      <td class="${cCls}" style="font-size:1rem;">${escHtml(cName)}</td>
+      <td>${escHtml(cLord)}</td>
+      <td class="${cCls}">${qLabel}</td>
+      <td>${p.duration_min}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+
+  html += '</div></div>';
+  document.getElementById('chaughadiyaContent').innerHTML = html;
+}
+
+// ─── Best Times ──────────────────
+function renderBestTimes() {
+  const l = L();
+  const summary = horaData.summary;
+
+  let html = `<div class="card"><h2>${l.bestTimesTitle}</h2>`;
+
+  // Summary counts
+  html += `<div class="summary-bar" style="margin-bottom:20px;">
+    <div class="stat-box"><div class="stat-num" style="color:#1b5e20;">${summary.excellent}</div><div class="stat-label">${l.excellent}</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:var(--good);">${summary.very_good}</div><div class="stat-label">${l.very_good}</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#66bb6a;">${summary.good}</div><div class="stat-label">${l.good}</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:var(--neutral);">${summary.average}</div><div class="stat-label">${l.average}</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:var(--bad);">${summary.poor}</div><div class="stat-label">${l.poor}</div></div>
+  </div>`;
+
+  // Best time cards
+  html += '<div class="best-grid">';
+  (summary.best_times || []).forEach((bt, idx) => {
+    const rLabel = currentLang === 'hi' ? (RATING_LABELS_HI[bt.rating] || bt.rating) : (RATING_LABELS[bt.rating] || bt.rating);
+    html += `<div class="best-card" style="border-top:4px solid ${PLANET_COLORS[bt.lord] || 'var(--gold)'};">
+      <div style="font-size:0.8rem;color:#888;">#${idx + 1}</div>
+      <div class="time-range">${bt.start} — ${bt.end}</div>
+      <div class="lord-name" style="color:${PLANET_COLORS[bt.lord] || '#333'};">${escHtml(pn(bt.lord))}</div>
+      <div><span class="rating-badge rating-${bt.rating}">${rLabel}</span></div>
+      <div style="margin-top:6px;font-size:0.85rem;font-weight:700;">Score: ${bt.score.toFixed(1)}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Recommendation
+  if (summary.best_times && summary.best_times.length > 0) {
+    const best = summary.best_times[0];
+    html += `<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #a5d6a7;border-radius:8px;font-size:0.95rem;">
+      <strong style="color:var(--excellent);">${currentLang === 'hi' ? 'सर्वश्रेष्ठ मुहूर्त' : 'Most Auspicious Time'}:</strong>
+      <span style="font-size:1.1rem;font-weight:800;margin-left:8px;">${best.start} — ${best.end}</span>
+      <span style="margin-left:8px;">(${escHtml(pn(best.lord))} ${currentLang === 'hi' ? 'होरा' : 'Hora'})</span>
+    </div>`;
+  }
+
+  html += '</div>';
+  document.getElementById('bestTimesContent').innerHTML = html;
+}
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.dob) document.getElementById('dobInput').value = p.dob;
+    if (p.time) document.getElementById('tobInput').value = p.time;
+    if (p.place) document.getElementById('placeInput').value = p.place;
+    if (p.lat) document.getElementById('latInput').value = p.lat;
+    if (p.lon) document.getElementById('lonInput').value = p.lon;
+    if (p.tz !== undefined) document.getElementById('tzInput').value = p.tz;
+    if (p.ayanamsa) document.getElementById('ayanInput').value = p.ayanamsa;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

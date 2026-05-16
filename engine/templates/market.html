@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moon Market Analysis — NSE/BSE — Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+    --green: #2e7d32;
+    --red: #c62828;
+    --grey: #757575;
+    --green-bg: #e8f5e9;
+    --red-bg: #fce4ec;
+    --grey-bg: #f5f5f5;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); flex-wrap:wrap; gap:10px; }
+  .header h1 { font-size:1.5rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; flex-wrap:wrap; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1400px; margin:0 auto; padding:20px; }
+
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:4px; font-size:1.2rem; }
+  .birth-form .subtitle { color:#666; font-size:0.95rem; margin-bottom:16px; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+  .btn-nav { padding:7px 18px; font-size:0.85rem; font-weight:600; }
+  .btn-preset { padding:6px 14px; font-size:0.8rem; font-weight:600; background:#5a3a1a; border:2px solid transparent; }
+  .btn-preset:hover { background:#7a4a2a; }
+  .btn-preset.active { background:var(--gold); color:#333; border-color:var(--accent); }
+
+  /* Two-column layout */
+  .dual-columns { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px; }
+  @media(max-width:900px) { .dual-columns { grid-template-columns:1fr; } }
+
+  .time-column { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; overflow:hidden; box-shadow:0 2px 8px var(--shadow); }
+  .time-column-header { background:var(--header-bg); color:#fff; padding:12px 16px; font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px; }
+  .time-column-header .time-label { font-size:0.85rem; opacity:0.85; font-weight:400; }
+  .time-column-body { padding:16px; }
+
+  /* Verdict badge */
+  .verdict-section { text-align:center; margin-bottom:16px; padding:16px; background:#fff; border-radius:8px; border:1px solid var(--border); }
+  .verdict-badge { display:inline-block; padding:10px 32px; border-radius:24px; font-size:1.4rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
+  .verdict-badge.bullish { background:var(--green); color:#fff; }
+  .verdict-badge.bearish { background:var(--red); color:#fff; }
+  .verdict-badge.neutral { background:var(--grey); color:#fff; }
+  .verdict-score { font-size:0.9rem; color:#555; margin-top:6px; }
+  .verdict-score .bull-count { color:var(--green); font-weight:700; }
+  .verdict-score .bear-count { color:var(--red); font-weight:700; }
+  .verdict-score .neut-count { color:var(--grey); font-weight:700; }
+
+  /* Strength bar */
+  .strength-bar-container { margin:12px 0; }
+  .strength-label { font-size:0.8rem; font-weight:600; color:var(--accent); margin-bottom:4px; }
+  .strength-bar-bg { width:100%; height:18px; background:#e0d0c0; border-radius:9px; overflow:hidden; }
+  .strength-bar-fill { height:100%; border-radius:9px; transition:width 0.5s ease; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#fff; min-width:30px; }
+  .strength-bar-fill.bullish { background:linear-gradient(90deg, #66bb6a, #2e7d32); }
+  .strength-bar-fill.bearish { background:linear-gradient(90deg, #ef5350, #c62828); }
+  .strength-bar-fill.neutral { background:linear-gradient(90deg, #bdbdbd, #757575); }
+
+  /* Moon position card */
+  .moon-card { background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:16px; border-left:4px solid var(--gold); }
+  .moon-card h4 { color:var(--accent); font-size:0.95rem; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .moon-card-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; }
+  .moon-detail { font-size:0.82rem; }
+  .moon-detail .label { font-weight:600; color:#555; }
+  .moon-detail .value { color:#222; }
+
+  /* Signal cards */
+  .signals-grid { display:flex; flex-direction:column; gap:8px; }
+  .signal-card { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e0d0c0; border-radius:6px; padding:10px 12px; }
+  .signal-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .signal-dot.bullish { background:var(--green); box-shadow:0 0 4px rgba(46,125,50,0.4); }
+  .signal-dot.bearish { background:var(--red); box-shadow:0 0 4px rgba(198,40,40,0.4); }
+  .signal-dot.neutral { background:var(--grey); box-shadow:0 0 4px rgba(117,117,117,0.3); }
+  .signal-rule { font-weight:600; font-size:0.85rem; color:#333; min-width:140px; }
+  .signal-detail { font-size:0.82rem; color:#555; flex:1; }
+  .signal-pill { display:inline-block; padding:2px 10px; border-radius:10px; font-size:0.72rem; font-weight:700; text-transform:uppercase; flex-shrink:0; }
+  .signal-pill.bullish { background:var(--green-bg); color:var(--green); }
+  .signal-pill.bearish { background:var(--red-bg); color:var(--red); }
+  .signal-pill.neutral { background:var(--grey-bg); color:var(--grey); }
+
+  /* Loading / empty state */
+  .empty-state { text-align:center; padding:60px 20px; color:#888; font-size:1rem; }
+  .empty-state .icon { font-size:3rem; margin-bottom:12px; }
+  .loading-spinner { display:inline-block; width:20px; height:20px; border:3px solid #ccc; border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-right:8px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ─── Trend Scanner ─── */
+  .trend-section { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .trend-header { margin-bottom:16px; border-bottom:2px solid var(--border); padding-bottom:10px; }
+  .trend-header h2 { color:var(--accent); font-size:1.15rem; margin-bottom:2px; }
+  .trend-subtitle { color:#666; font-size:0.85rem; }
+
+  .trend-alert { padding:12px 16px; border-radius:6px; margin-bottom:10px; display:flex; gap:12px; align-items:center; }
+  .trend-alert.change-up { background:#e8f5e9; border-left:4px solid var(--green); }
+  .trend-alert.change-down { background:#fce4ec; border-left:4px solid var(--red); }
+  .trend-alert .change-time { font-size:1.3rem; font-weight:700; min-width:60px; }
+  .trend-alert .change-arrow { font-size:1.5rem; }
+  .trend-alert .change-detail { font-size:0.85rem; color:#555; }
+  .no-changes { padding:20px; text-align:center; color:#666; font-size:1rem; background:#f5f5dc; border-radius:6px; }
+
+  .timeline-bar-wrap { margin:16px 0; overflow-x:auto; }
+  .timeline-bar { display:flex; height:40px; border-radius:6px; overflow:hidden; border:1px solid var(--border); min-width:600px; }
+  .timeline-bar .tslot { flex:1; display:flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:600; color:#fff; cursor:pointer; position:relative; border-right:1px solid rgba(0,0,0,0.1); transition:opacity 0.2s; }
+  .timeline-bar .tslot:hover { opacity:0.8; }
+  .timeline-bar .tslot.bull { background:var(--green); }
+  .timeline-bar .tslot.bear { background:var(--red); }
+  .timeline-bar .tslot.neut { background:#999; }
+  .timeline-bar .tslot.change-marker { border-left:3px solid #ff6f00; }
+  .timeline-labels { display:flex; min-width:600px; margin-top:2px; }
+  .timeline-labels span { flex:1; text-align:center; font-size:0.55rem; color:#666; }
+
+  .trend-table-wrap { overflow-x:auto; margin-top:12px; }
+  .trend-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+  .trend-table th { background:var(--table-header); color:#fff; padding:8px 6px; text-align:center; font-size:0.75rem; }
+  .trend-table td { padding:6px; text-align:center; border-bottom:1px solid #ddd; }
+  .trend-table tr:nth-child(even) { background:var(--table-alt); }
+  .trend-table tr.trend-change-row { background:#fff3e0 !important; font-weight:700; border-left:3px solid #ff6f00; }
+  .trend-table .sig-bull { color:var(--green); font-weight:700; }
+  .trend-table .sig-bear { color:var(--red); font-weight:700; }
+  .trend-table .sig-neut { color:#999; }
+
+  /* Rules Reference */
+  .rules-section { margin-top:20px; }
+  .rules-header { background:var(--header-bg); color:#fff; padding:14px 20px; border-radius:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:1rem; letter-spacing:0.5px; user-select:none; }
+  .rules-header:hover { background:#a00; }
+  .rules-header .arrow { transition:transform 0.3s; font-size:1.2rem; }
+  .rules-header .arrow.open { transform:rotate(180deg); }
+  .rules-body { display:none; background:var(--card-bg); border:2px solid var(--border); border-top:none; border-radius:0 0 8px 8px; padding:16px; }
+  .rules-body.open { display:block; }
+  .rule-group { margin-bottom:16px; }
+  .rule-group-title { font-weight:700; color:var(--accent); font-size:0.95rem; cursor:pointer; padding:8px 12px; background:#fff; border:1px solid var(--border); border-radius:6px; display:flex; justify-content:space-between; align-items:center; user-select:none; }
+  .rule-group-title:hover { background:#fff8e1; }
+  .rule-group-content { display:none; padding:10px 12px; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 6px 6px; }
+  .rule-group-content.open { display:block; }
+  .rules-table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:6px; }
+  .rules-table th { background:var(--table-header); color:#fff; padding:6px 10px; text-align:left; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; }
+  .rules-table td { padding:6px 10px; border-bottom:1px solid #e0d0c0; }
+  .rules-table tr:nth-child(even) { background:var(--table-alt); }
+  .rules-table .hi { font-size:0.75rem; color:#666; }
+  .rule-note { font-size:0.78rem; color:#555; margin-top:6px; padding:8px; background:#fff8e1; border-left:3px solid var(--gold); border-radius:0 4px 4px 0; }
+
+  .pill-sm { display:inline-block; padding:1px 8px; border-radius:8px; font-size:0.7rem; font-weight:700; text-transform:uppercase; }
+  .pill-sm.bullish { background:var(--green-bg); color:var(--green); }
+  .pill-sm.bearish { background:var(--red-bg); color:var(--red); }
+  .pill-sm.neutral { background:var(--grey-bg); color:var(--grey); }
+
+  /* Error message */
+  .error-msg { background:#fce4ec; color:#c62828; padding:12px 16px; border-radius:6px; border:1px solid #ef9a9a; margin-top:12px; font-size:0.9rem; display:none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>Moon Market Analysis</span> — NSE/BSE</h1>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas">Special Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market" class="active">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Input Form -->
+  <div class="birth-form">
+    <h2>Moon Market Analysis — NSE/BSE</h2>
+    <div class="subtitle">चन्द्र बाजार विश्लेषण</div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date</label>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="form-field">
+        <label>Session 1 Time</label>
+        <input type="time" id="time1Input" value="09:15">
+      </div>
+      <div class="form-field">
+        <label>Session 2 Time</label>
+        <input type="time" id="time2Input" value="13:15">
+      </div>
+      <div class="form-field">
+        <label>City</label>
+        <input type="text" id="cityInput" value="Mumbai" placeholder="e.g. Mumbai">
+      </div>
+      <div class="form-field">
+        <label>&nbsp;</label>
+        <button class="btn" id="analyzeBtn" onclick="doAnalyze()">Analyze</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:0.8rem;font-weight:600;color:var(--accent);margin-right:4px;">PRESET:</span>
+      <button class="btn btn-preset active" id="presetIndia" onclick="applyPreset('india')">🇮🇳 India NSE</button>
+      <button class="btn btn-preset" id="presetUS" onclick="applyPreset('us')">🇺🇸 US NYSE</button>
+      <button class="btn btn-preset" id="presetUK" onclick="applyPreset('uk')">🇬🇧 UK LSE</button>
+      <span style="width:1px;height:24px;background:var(--border);margin:0 6px;"></span>
+      <button class="btn btn-nav" onclick="shiftDate(-1)" title="Previous Day (← Arrow)">◀ Prev Day</button>
+      <button class="btn btn-nav" onclick="goToday()" title="Today">Today</button>
+      <button class="btn btn-nav" onclick="shiftDate(1)" title="Next Day (→ Arrow)">Next Day ▶</button>
+      <span style="font-size:0.75rem;color:#666;margin-left:6px;">← → arrow keys</span>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <!-- Results Area -->
+  <div id="resultsArea">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">&#x1F319;</div>
+      <div>Select a date and click <b>Analyze</b> to generate Moon-based market signals for NSE/BSE trading.</div>
+    </div>
+  </div>
+
+  <!-- Dual columns (hidden until data loads) -->
+  <div class="dual-columns" id="dualColumns" style="display:none;">
+    <div class="time-column" id="session1Col">
+      <div class="time-column-header" id="session1Header">
+        Session 1 <span class="time-label" id="session1Label">9:15 AM</span>
+      </div>
+      <div class="time-column-body" id="session1Body"></div>
+    </div>
+    <div class="time-column" id="session2Col">
+      <div class="time-column-header" id="session2Header">
+        Session 2 <span class="time-label" id="session2Label">1:15 PM</span>
+      </div>
+      <div class="time-column-body" id="session2Body"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Ardha Prahara — Intraday Trend Scanner ═══ -->
+  <div class="trend-section" id="trendSection" style="display:none;">
+    <div class="trend-header">
+      <h2>Intraday Trend Changes (अर्ध प्रहर)</h2>
+      <span class="trend-subtitle">Moon vedha trend reversals during trading hours</span>
+    </div>
+
+    <!-- Trend change alerts -->
+    <div id="trendAlerts"></div>
+
+    <!-- Visual timeline bar -->
+    <div class="timeline-bar-wrap">
+      <div class="timeline-bar" id="timelineBar"></div>
+      <div class="timeline-labels" id="timelineLabels"></div>
+    </div>
+
+    <!-- Detail table -->
+    <div class="trend-table-wrap">
+      <table class="trend-table" id="trendTable">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Signal</th>
+            <th>Bull</th>
+            <th>Bear</th>
+            <th>Strength</th>
+            <th>Moon</th>
+            <th>Nakshatra</th>
+            <th>Hora</th>
+          </tr>
+        </thead>
+        <tbody id="trendTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Rules Reference (collapsible) -->
+  <div class="rules-section">
+    <div class="rules-header" onclick="toggleRules()">
+      <span>Rules Reference — Moon Market Analysis</span>
+      <span class="arrow" id="rulesArrow">&#9660;</span>
+    </div>
+    <div class="rules-body" id="rulesBody">
+
+      <!-- Rule 1: Tithi -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 1: Tithi (Moon Phase)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Range</th><th>Signal</th></tr>
+            <tr><td>Krishna Ekadashi (K11) to Shukla Panchami (S5)</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Shukla Shashthi (S6) to Krishna Dashami (K10)</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+          <div class="rule-note">Tithi is the lunar day. The market is considered bullish from K11 through Amavasya to S5, and bearish from S6 through Purnima to K10.</div>
+        </div>
+      </div>
+
+      <!-- Rule 2: Moon Rashi -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 2: Moon Rashi (Moon Sign)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>#</th><th>Rashi</th><th>Hindi</th><th>Signal</th></tr>
+            <tr><td>1</td><td>Aries</td><td class="hi">मेष</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>2</td><td>Taurus</td><td class="hi">वृष</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>3</td><td>Gemini</td><td class="hi">मिथुन</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>4</td><td>Cancer</td><td class="hi">कर्क</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>5</td><td>Leo</td><td class="hi">सिंह</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>6</td><td>Virgo</td><td class="hi">कन्या</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>7</td><td>Libra</td><td class="hi">तुला</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>8</td><td>Scorpio</td><td class="hi">वृश्चिक</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>9</td><td>Sagittarius</td><td class="hi">धनु</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>10</td><td>Capricorn</td><td class="hi">मकर</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>11</td><td>Aquarius</td><td class="hi">कुम्भ</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>12</td><td>Pisces</td><td class="hi">मीन</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Rule 2a: Rashi Lord -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 2a: Rashi Lord Signal</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Rashi</th><th>Lord</th><th>Signal</th></tr>
+            <tr><td>Aries</td><td>Mars</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Taurus</td><td>Venus</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Gemini</td><td>Mercury</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Cancer</td><td>Moon</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Leo</td><td>Sun</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Virgo</td><td>Mercury</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Libra</td><td>Venus</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Scorpio</td><td>Mars</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Sagittarius</td><td>Jupiter</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Capricorn</td><td>Saturn</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Aquarius</td><td>Saturn</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Pisces</td><td>Jupiter</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+          <div class="rule-note">Malefic lords (Sun, Saturn, Mars, Rahu, Ketu) = Bullish. Benefic lords (Venus, Mercury, Moon, Jupiter) = Bearish.</div>
+        </div>
+      </div>
+
+      <!-- Rule 2b: Rashi Degrees -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 2b: Rashi Degrees (Degree Ranges)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Degree Range</th><th>Signal</th></tr>
+            <tr><td>0° - 6°40'</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>6°40' - 10°</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>10° - 16°40'</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>16°40' - 20°</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>20° - 26°40'</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>26°40' - 30°</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+          <div class="rule-note">The degree of Moon within its rashi is divided into alternating bullish (2-pada = 6°40') and bearish (1-pada = 3°20') ranges.</div>
+        </div>
+      </div>
+
+      <!-- Rule 2c: Navamsha -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 2c: Moon Navamsha (D9) Sign</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Navamsha Rashi</th><th>Signal</th></tr>
+            <tr><td>Aries</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Taurus</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Gemini</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Cancer</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Leo</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Virgo</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Libra</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Scorpio</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Sagittarius</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Capricorn</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Aquarius</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Pisces</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+          <div class="rule-note">Moon's Navamsha (D9) sign: Aries, Taurus, Leo, Scorpio, Capricorn = Bullish. All others = Bearish.</div>
+        </div>
+      </div>
+
+      <!-- Rule 3: Nakshatra -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 3: Nakshatra (Lunar Mansion)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>#</th><th>Nakshatra</th><th>Signal</th></tr>
+            <tr><td>1</td><td>Ashwini</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>2</td><td>Bharani</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>3</td><td>Krittika</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>4</td><td>Rohini</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>5</td><td>Mrigashira</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>6</td><td>Ardra</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>7</td><td>Punarvasu</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>8</td><td>Pushya</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>9</td><td>Ashlesha</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>10</td><td>Magha</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>11</td><td>Purva Phalguni</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>12</td><td>Uttara Phalguni</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>13</td><td>Hasta</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>14</td><td>Chitra</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>15</td><td>Swati</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>16</td><td>Vishakha</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>17</td><td>Anuradha</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>18</td><td>Jyeshtha</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>19</td><td>Mula</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>20</td><td>Purva Ashadha</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>21</td><td>Uttara Ashadha</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>22</td><td>Shravana</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>23</td><td>Dhanishtha</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>24</td><td>Shatabhisha</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>25</td><td>Purva Bhadrapada</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>26</td><td>Uttara Bhadrapada</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>27</td><td>Revati</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>28</td><td>Abhijeet</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Rule 4: Conjunction -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 4: Conjunction (Moon + Planet within 10°)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Conjunction</th><th>Signal</th></tr>
+            <tr><td>Moon + Sun</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Venus</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Moon + Mercury</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Jupiter</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Moon + Mars</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Saturn</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Rahu</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Ketu</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Moon + Uranus (Harshal)</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Pluto</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Neptune</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+          <div class="rule-note">Conjunction is checked within an orb of 10 degrees between Moon and each planet.</div>
+        </div>
+      </div>
+
+      <!-- Rule 4b: Navamsha Yuti -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 4b: Navamsha Yuti (D9 Conjunction)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Navamsha Yuti</th><th>Signal</th></tr>
+            <tr><td>Moon + Sun</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Venus</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Mercury</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Jupiter</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Mars</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Rahu</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Ketu</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Moon + Saturn</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Moon + Uranus (Harshal)</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Pluto</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Moon + Neptune</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+          <div class="rule-note">When Moon and a planet occupy the same Navamsha (D9) sign.</div>
+        </div>
+      </div>
+
+      <!-- Rule 5: Shadashtak -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 5: Shadashtak (6/8 Relationship)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Pair</th><th>Signal</th></tr>
+            <tr><td>Aries - Scorpio (1-8)</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Taurus - Libra (2-7)</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Aries - Virgo (1-6)</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Aquarius - Cancer (11-4)</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+          </table>
+          <div class="rule-note">When Moon and another planet are in 6th/8th from each other, the above pairs are bullish. All other 6/8 pairs are bearish.</div>
+        </div>
+      </div>
+
+      <!-- Rule 6: Dwidamsha -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 6: Dwidamsha (2/12 Relationship)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th colspan="2" style="text-align:center;">Bullish Pairs</th></tr>
+            <tr><td>Pisces - Aries (12-1)</td><td>Taurus - Gemini (2-3)</td></tr>
+            <tr><td>Cancer - Leo (4-5)</td><td>Virgo - Libra (6-7)</td></tr>
+            <tr><td>Scorpio - Sagittarius (8-9)</td><td>Capricorn - Aquarius (10-11)</td></tr>
+            <tr><th colspan="2" style="text-align:center;">Bearish Pairs</th></tr>
+            <tr><td>Capricorn - Sagittarius (10-9)</td><td>Pisces - Aquarius (12-11)</td></tr>
+            <tr><td>Taurus - Aries (2-1)</td><td>Cancer - Gemini (4-3)</td></tr>
+            <tr><td>Virgo - Leo (6-5)</td><td>Scorpio - Libra (8-7)</td></tr>
+          </table>
+          <div class="rule-note">When Moon and another planet are in 2nd/12th from each other, specific directional pairs determine the signal.</div>
+        </div>
+      </div>
+
+      <!-- Rule 7: Western Aspects -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 7: Western Aspects</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Aspect</th><th>Angle</th><th>Signal</th></tr>
+            <tr><td>Conjunction</td><td>0°</td><td><span class="pill-sm neutral">Neutral</span></td></tr>
+            <tr><td>Sextile</td><td>60°</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Square</td><td>90°</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Trine</td><td>120°</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Opposition</td><td>180°</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+          </table>
+          <div class="rule-note">Western aspects are checked with an orb of 8 degrees between Moon and each planet (excluding Rahu and Ketu).</div>
+        </div>
+      </div>
+
+      <!-- Rule 8: Hora -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Rule 8: Hora (Planetary Hour)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Hora Planet</th><th>Signal</th></tr>
+            <tr><td>Jupiter</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Mars</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Sun</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Venus</td><td><span class="pill-sm bullish">Bullish</span></td></tr>
+            <tr><td>Saturn</td><td><span class="pill-sm bearish">Bearish</span></td></tr>
+            <tr><td>Mercury</td><td><span class="pill-sm neutral">Neutral</span></td></tr>
+            <tr><td>Moon</td><td><span class="pill-sm neutral">Neutral</span></td></tr>
+          </table>
+          <div class="rule-note">The Hora is the planetary hour lord at the analysis time, calculated using the Chaldean order from the day lord.</div>
+        </div>
+      </div>
+
+      <!-- Exception: Sat-Moon Dwidamsha -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Exception: Saturn-Moon Dwidamsha</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <div class="rule-note">When Saturn and Moon are in a 2/12 relationship, the signal is <b>always Bullish</b> regardless of the directional pair. This overrides the standard Dwidamsha rule for this specific combination.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Miscellaneous Rules — Separate Section                     -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="rules-container" style="margin-top:24px;">
+    <div class="rules-header" onclick="toggleMiscRules(this)">
+      <span>Miscellaneous Rules — Sectors, Commodities & Quick Reference</span>
+      <span class="arrow misc-arrow">&#9660;</span>
+    </div>
+    <div class="rules-body misc-rules-body open">
+
+      <!-- Sectors and Governing Planets -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Sectors &amp; Governing Planets (Karaka Grahas)</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>#</th><th>Sector</th><th>Governing Planets</th></tr>
+            <tr><td>1</td><td>Banking – Pvt</td><td>Jupiter + Mercury</td></tr>
+            <tr><td>2</td><td>Banking – PSU/Govt</td><td>Jupiter + Sun + Venus</td></tr>
+            <tr><td>3</td><td>Financial &amp; Insurance</td><td>Jupiter + Mercury</td></tr>
+            <tr><td>4</td><td>Automobiles</td><td>Mars + Venus</td></tr>
+            <tr><td>5</td><td>Health / Pharma</td><td>Mars + Jupiter + Rahu</td></tr>
+            <tr><td>6</td><td>Oil &amp; Gas</td><td>Saturn, Moon, Rahu, Ketu, Neptune</td></tr>
+            <tr><td>7</td><td>FMCG</td><td>Mercury + Jupiter + Venus</td></tr>
+            <tr><td>8</td><td>Capital Goods</td><td>Mars</td></tr>
+            <tr><td>9</td><td>Chemical &amp; Fertilizers</td><td>Mars + Moon</td></tr>
+            <tr><td>10</td><td>Media</td><td>Mercury + Venus + Rahu</td></tr>
+            <tr><td>11</td><td>Power Sector</td><td>Sun, Rahu, Ketu</td></tr>
+            <tr><td>12</td><td>Textile</td><td>Mercury + Venus + Jupiter</td></tr>
+            <tr><td>13</td><td>Metal</td><td>Mars + Saturn</td></tr>
+            <tr><td>14</td><td>IT</td><td>Mercury + Ketu</td></tr>
+            <tr><td>15</td><td>Telecommunication</td><td>Mercury + Rahu</td></tr>
+            <tr><td>16</td><td>Real Estate</td><td>Saturn + Mars</td></tr>
+            <tr><td>17</td><td>Infrastructure</td><td>Saturn + Mars</td></tr>
+            <tr><td>18</td><td>Cement</td><td>Saturn + Mars</td></tr>
+            <tr><td>19</td><td>Iron</td><td>Saturn</td></tr>
+            <tr><td>20</td><td>Travel &amp; Tourism</td><td>Venus + Mercury</td></tr>
+            <tr><td>21</td><td>Navigation &amp; Shipping</td><td>Moon</td></tr>
+            <tr><td>22</td><td>Aviation</td><td>Mercury</td></tr>
+            <tr><td>23</td><td>Nifty</td><td>Moon + Sun</td></tr>
+            <tr><td>24</td><td>BankNifty</td><td>Moon + Jupiter + Mercury</td></tr>
+          </table>
+          <div class="rule-note">When the governing planet(s) of a sector are strong (in bullish rashi, good nakshatra, or conjunct benefics), that sector tends to perform well. Source: Sunil Dixit.</div>
+        </div>
+      </div>
+
+      <!-- Rashi-Commodity Mapping (from first image) -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          <span>Moon Rashi — Commodity / Sector Strength</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Moon Rashi</th><th>Strong Commodities / Sectors</th></tr>
+            <tr><td>Aries (मेष)</td><td>Copper, Iron, Gold, Crude Oil, Pharma, Nasdaq</td></tr>
+            <tr><td>Taurus (वृष)</td><td>Metals, Finance</td></tr>
+            <tr><td>Gemini (मिथुन)</td><td>Finance, Nasdaq</td></tr>
+            <tr><td>Cancer (कर्क)</td><td>Silver, Crude Oil</td></tr>
+            <tr><td>Leo (सिंह)</td><td>Gold</td></tr>
+            <tr><td>Virgo (कन्या)</td><td>Finance, Nasdaq</td></tr>
+            <tr><td>Libra (तुला)</td><td>Finance</td></tr>
+            <tr><td>Scorpio (वृश्चिक)</td><td>Iron, Metals, Pharma, Crude Oil</td></tr>
+            <tr><td>Sagittarius (धनु)</td><td>Finance</td></tr>
+            <tr><td>Capricorn (मकर)</td><td>Copper, Iron, Zinc, Gold, Crude Oil</td></tr>
+            <tr><td>Aquarius (कुम्भ)</td><td>Iron, Aluminium, Crude Oil, Nasdaq</td></tr>
+            <tr><td>Pisces (मीन)</td><td>Gold, Crude Oil, Pharma, Finance</td></tr>
+          </table>
+          <div class="rule-note">When Moon transits a particular rashi, the listed commodities/sectors tend to show increased activity and strength.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = window.location.origin;
+
+// ─── Market Presets ───
+const PRESETS = {
+  india: { city: 'Mumbai', time1: '09:15', time2: '13:15', label: 'India NSE/BSE' },
+  us:    { city: 'New York', time1: '09:30', time2: '13:00', label: 'US NYSE/NASDAQ' },
+  uk:    { city: 'London', time1: '08:00', time2: '12:30', label: 'UK LSE' },
+};
+let currentPreset = 'india';
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  if (!p) return;
+  currentPreset = key;
+  document.getElementById('cityInput').value = p.city;
+  document.getElementById('time1Input').value = p.time1;
+  document.getElementById('time2Input').value = p.time2;
+  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('preset' + key.charAt(0).toUpperCase() + key.slice(1));
+  if (btn) btn.classList.add('active');
+}
+
+// ─── Set default date to today ───
+function setDefaults() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById('dateInput').value = `${yyyy}-${mm}-${dd}`;
+}
+
+// ─── Format time HH:MM to 12h display ───
+function fmt12h(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+// ─── Date navigation ───
+function shiftDate(delta) {
+  const inp = document.getElementById('dateInput');
+  const d = inp.value ? new Date(inp.value) : new Date();
+  d.setDate(d.getDate() + delta);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  inp.value = `${yyyy}-${mm}-${dd}`;
+  doAnalyze();
+}
+
+function goToday() {
+  setDefaults();
+  doAnalyze();
+}
+
+// Keyboard arrow keys to shift dates
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); shiftDate(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); shiftDate(1); }
+});
+
+// ─── Load birth defaults for city ───
+(async function loadDefaults() {
+  setDefaults();
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) {
+      const d = await res.json();
+      if (d.place) document.getElementById('cityInput').value = d.place;
+    }
+  } catch (_) {}
+})();
+
+// ─── Toggle rules section ───
+function toggleRules() {
+  const body = document.getElementById('rulesBody');
+  const arrow = document.getElementById('rulesArrow');
+  body.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+function toggleMiscRules(el) {
+  const body = el.nextElementSibling;
+  const arrow = el.querySelector('.misc-arrow');
+  body.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open');
+}
+
+function toggleRuleGroup(el) {
+  const content = el.nextElementSibling;
+  const arrow = el.querySelector('.arrow');
+  content.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+// ─── Format date from yyyy-mm-dd to dd-mm-yyyy ───
+function formatDateForApi(isoDate) {
+  const parts = isoDate.split('-');
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+// ─── Main analysis ───
+async function doAnalyze() {
+  const dateVal = document.getElementById('dateInput').value;
+  const cityVal = document.getElementById('cityInput').value.trim();
+  const errEl = document.getElementById('errorMsg');
+  const btn = document.getElementById('analyzeBtn');
+
+  errEl.style.display = 'none';
+
+  if (!dateVal) {
+    errEl.textContent = 'Please select a date.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span>Analyzing...';
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('dualColumns').style.display = 'none';
+
+  try {
+    const t1 = document.getElementById('time1Input').value || '09:15';
+    const t2 = document.getElementById('time2Input').value || '13:15';
+
+    const payload = {
+      date: formatDateForApi(dateVal),
+      time1: t1,
+      time2: t2,
+      city: cityVal || 'Mumbai',
+    };
+
+    const res = await fetch(`${API}/api/v1/market/dual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error ${res.status}`);
+    }
+
+    const data = await res.json();
+    data._t1 = t1;
+    data._t2 = t2;
+    data._city = cityVal || 'Mumbai';
+    renderResults(data);
+
+    // Also run the intraday trend scan
+    loadTrendScan();
+
+  } catch (e) {
+    errEl.textContent = `Analysis failed: ${e.message}`;
+    errEl.style.display = 'block';
+    document.getElementById('emptyState').style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze';
+  }
+}
+
+// ─── Render both columns ───
+function renderResults(data) {
+  const t1Label = fmt12h(data._t1 || '09:15');
+  const t2Label = fmt12h(data._t2 || '13:15');
+  const city = data._city || '';
+  const cityTag = city ? ` (${city})` : '';
+
+  document.getElementById('session1Label').textContent = t1Label + cityTag;
+  document.getElementById('session2Label').textContent = t2Label + cityTag;
+  document.getElementById('session1Body').innerHTML = renderTimeSlot(data.session1, `Session 1 — ${t1Label}`);
+  document.getElementById('session2Body').innerHTML = renderTimeSlot(data.session2, `Session 2 — ${t2Label}`);
+  document.getElementById('dualColumns').style.display = 'grid';
+}
+
+// ─── Render a single time slot ───
+function renderTimeSlot(d, label) {
+  if (!d || d.error) {
+    return `<div class="empty-state">Error: ${d ? d.error : 'No data'}</div>`;
+  }
+
+  const score = d.score;
+  const overall = score.overall;
+
+  let html = '';
+
+  // Verdict
+  html += `<div class="verdict-section">`;
+  html += `<div class="verdict-badge ${overall}">${overall.toUpperCase()}</div>`;
+  html += `<div class="verdict-score">`;
+  html += `<span class="bull-count">${score.bullish} Bullish</span> / `;
+  html += `<span class="bear-count">${score.bearish} Bearish</span> / `;
+  html += `<span class="neut-count">${score.neutral} Neutral</span>`;
+  html += `</div>`;
+
+  // Strength bar
+  html += `<div class="strength-bar-container">`;
+  html += `<div class="strength-label">Signal Strength</div>`;
+  html += `<div class="strength-bar-bg">`;
+  const pct = Math.min(Math.max(score.strength, 5), 100);
+  html += `<div class="strength-bar-fill ${overall}" style="width:${pct}%">${score.strength}%</div>`;
+  html += `</div></div>`;
+  html += `</div>`;
+
+  // Moon position card
+  const moon = d.moon;
+  html += `<div class="moon-card">`;
+  html += `<h4>&#x1F319; Moon Position</h4>`;
+  html += `<div class="moon-card-grid">`;
+  html += moonDetail('Rashi', `${moon.sign} (${degStr(moon.degree_in_sign)})`);
+  html += moonDetail('Longitude', `${moon.longitude.toFixed(2)}°`);
+  html += moonDetail('Nakshatra', `${moon.nakshatra} (Pada ${moon.pada})`);
+  html += moonDetail('Nak. Lord', moon.nakshatra_lord);
+  html += `</div></div>`;
+
+  // Signal cards
+  html += `<div class="signals-grid">`;
+  for (const s of d.signals) {
+    html += `<div class="signal-card">`;
+    html += `<div class="signal-dot ${s.signal}"></div>`;
+    html += `<div class="signal-rule">${escHtml(s.rule)}</div>`;
+    html += `<div class="signal-detail">${escHtml(s.detail)}</div>`;
+    html += `<div class="signal-pill ${s.signal}">${s.signal}</div>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  return html;
+}
+
+function moonDetail(label, value) {
+  return `<div class="moon-detail"><span class="label">${label}:</span> <span class="value">${value}</span></div>`;
+}
+
+function degStr(deg) {
+  const d = Math.floor(deg);
+  const mFull = (deg - d) * 60;
+  const m = Math.floor(mFull);
+  const s = Math.round((mFull - m) * 60);
+  return `${d}°${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}"`;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INTRADAY TREND SCANNER (Ardha Prahara)
+// ═══════════════════════════════════════════════════════════════
+
+async function loadTrendScan() {
+  const dateVal = document.getElementById('dateInput').value;
+  const cityVal = document.getElementById('cityInput').value.trim();
+  const t1 = document.getElementById('time1Input').value || '09:15';
+  const t2 = document.getElementById('time2Input').value || '17:00';
+
+  // Use session1 start as scan start; scan always goes to market close
+  // Pick the later of t1/t2 as scan end, or default 17:00
+  const endH = Math.max(parseInt(t2.split(':')[0]), 17);
+  const scanEnd = `${String(endH).padStart(2,'0')}:00`;
+
+  if (!dateVal) return;
+
+  const section = document.getElementById('trendSection');
+  section.style.display = 'block';
+
+  try {
+    const payload = {
+      date: formatDateForApi(dateVal),
+      start_time: t1,
+      end_time: scanEnd,
+      interval: 15,
+      city: cityVal || 'Mumbai',
+    };
+
+    const res = await fetch(`${API}/api/v1/market/trends`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error ${res.status}`);
+    }
+
+    const data = await res.json();
+    renderTrendScan(data);
+
+  } catch (e) {
+    document.getElementById('trendAlerts').innerHTML =
+      `<div class="no-changes" style="color:var(--red);">Trend scan failed: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderTrendScan(data) {
+  const alertsEl = document.getElementById('trendAlerts');
+  const barEl = document.getElementById('timelineBar');
+  const labelsEl = document.getElementById('timelineLabels');
+  const tbodyEl = document.getElementById('trendTableBody');
+
+  // ── Trend change alerts ──
+  if (data.trend_changes && data.trend_changes.length > 0) {
+    let alertHtml = `<div style="font-weight:700;color:var(--accent);margin-bottom:8px;">
+      ${data.change_count} Trend Reversal${data.change_count > 1 ? 's' : ''} Detected</div>`;
+    for (const tc of data.trend_changes) {
+      const isUp = tc.to === 'bullish';
+      const cls = isUp ? 'change-up' : 'change-down';
+      const arrow = isUp ? '&#x25B2;' : '&#x25BC;';
+      const fromClr = tc.from === 'bullish' ? 'var(--green)' : tc.from === 'bearish' ? 'var(--red)' : '#999';
+      const toClr = tc.to === 'bullish' ? 'var(--green)' : tc.to === 'bearish' ? 'var(--red)' : '#999';
+
+      let rulesHtml = '';
+      if (tc.changed_rules && tc.changed_rules.length > 0) {
+        rulesHtml = '<div class="change-detail">Changed: ' +
+          tc.changed_rules.map(r =>
+            `<b>${escHtml(r.rule)}</b> (${r.from} → ${r.to})`
+          ).join(', ') + '</div>';
+      }
+
+      alertHtml += `<div class="trend-alert ${cls}">
+        <div class="change-time">${tc.time}</div>
+        <div class="change-arrow" style="color:${toClr}">${arrow}</div>
+        <div>
+          <div><span style="color:${fromClr};font-weight:700;text-transform:uppercase">${tc.from}</span>
+          → <span style="color:${toClr};font-weight:700;text-transform:uppercase">${tc.to}</span></div>
+          <div class="change-detail">Moon: ${tc.moon_sign} ${degStr(tc.moon_deg % 30)} — ${tc.moon_nak}</div>
+          ${rulesHtml}
+        </div>
+      </div>`;
+    }
+    alertsEl.innerHTML = alertHtml;
+  } else {
+    alertsEl.innerHTML = `<div class="no-changes">No trend reversals detected — signal stays
+      <b style="text-transform:uppercase">${data.timeline && data.timeline.length > 0 ? data.timeline[0].overall : '—'}</b>
+      throughout the trading session</div>`;
+  }
+
+  // ── Timeline bar ──
+  const tl = data.timeline || [];
+  // Build set of change times for marking
+  const changeTimes = new Set((data.trend_changes || []).map(c => c.time));
+
+  let barHtml = '';
+  let lblHtml = '';
+  for (let i = 0; i < tl.length; i++) {
+    const s = tl[i];
+    const cls = s.overall === 'bullish' ? 'bull' : s.overall === 'bearish' ? 'bear' : 'neut';
+    const marker = changeTimes.has(s.time) ? ' change-marker' : '';
+    const tip = `${s.time} — ${s.overall.toUpperCase()} (B:${s.bullish} R:${s.bearish}) Moon: ${s.moon_sign} ${s.moon_deg_in_sign.toFixed(1)}°`;
+    barHtml += `<div class="tslot ${cls}${marker}" title="${escHtml(tip)}">${changeTimes.has(s.time) ? '⚡' : ''}</div>`;
+    // Show label every 4th slot (every hour) or first/last
+    if (i === 0 || i === tl.length - 1 || i % 4 === 0) {
+      lblHtml += `<span>${s.time}</span>`;
+    } else {
+      lblHtml += `<span></span>`;
+    }
+  }
+  barEl.innerHTML = barHtml;
+  labelsEl.innerHTML = lblHtml;
+
+  // ── Detail table ──
+  let rowHtml = '';
+  for (const s of tl) {
+    const isChange = changeTimes.has(s.time);
+    const rowCls = isChange ? ' class="trend-change-row"' : '';
+    const sigCls = s.overall === 'bullish' ? 'sig-bull' : s.overall === 'bearish' ? 'sig-bear' : 'sig-neut';
+    rowHtml += `<tr${rowCls}>
+      <td>${isChange ? '⚡ ' : ''}${s.time}</td>
+      <td class="${sigCls}">${s.overall.toUpperCase()}</td>
+      <td style="color:var(--green)">${s.bullish}</td>
+      <td style="color:var(--red)">${s.bearish}</td>
+      <td>${s.strength.toFixed(0)}%</td>
+      <td>${s.moon_sign} ${s.moon_deg_in_sign.toFixed(1)}°</td>
+      <td>${s.moon_nak}</td>
+      <td>${s.hora}</td>
+    </tr>`;
+  }
+  tbodyEl.innerHTML = rowHtml;
+}
+</script>
+
+</body>
+</html>

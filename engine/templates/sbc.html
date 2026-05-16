@@ -1,0 +1,2012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sarvatobhadra Chakra — Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); flex-wrap:wrap; gap:10px; }
+  .header h1 { font-size:1.5rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; flex-wrap:wrap; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1200px; margin:0 auto; padding:20px; }
+
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+  .btn-sm { padding:6px 14px; font-size:0.85rem; }
+
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+  .loc-item { padding:8px 12px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #eee; }
+  .loc-item:hover { background:var(--table-alt); }
+
+  /* Toggle controls */
+  .controls { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+  .toggle-btn { padding:8px 18px; border:2px solid var(--border); border-radius:4px; cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.2s; background:var(--card-bg); color:var(--text); }
+  .toggle-btn.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .controls-label { font-weight:700; color:var(--accent); font-size:0.9rem; }
+
+  /* Day navigation */
+  .day-nav { display:flex; gap:10px; align-items:center; }
+
+  /* SBC Grid */
+  .sbc-wrapper { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; box-shadow:0 2px 8px var(--shadow); position:relative; overflow:auto; display:flex; flex-direction:column; align-items:center; }
+  .sbc-grid-container { position:relative; display:inline-block; }
+  .sbc-grid { border-collapse:collapse; }
+  .sbc-grid td {
+    width:90px; height:90px;
+    border:2px solid #5a3a1a;
+    text-align:center; vertical-align:middle;
+    font-size:0.72rem; font-weight:600;
+    position:relative;
+    background:#faf0e6;
+    padding:2px;
+    overflow:hidden;
+  }
+
+  /* Cell types */
+  .cell-nak {
+    background:linear-gradient(135deg,#fff8e1,#ffe0b2);
+    cursor:pointer;
+  }
+  .cell-nak:hover { background:linear-gradient(135deg,#ffe0b2,#ffcc80); }
+  .cell-rashi { background:linear-gradient(135deg,#e8f5e9,#c8e6c9); font-weight:700; }
+  .cell-center { background:linear-gradient(135deg,#fff3e0,#ffe0b2); font-weight:700; font-size:0.7rem; }
+  .cell-vowel { background:linear-gradient(135deg,#fce4ec,#f8bbd0); font-size:0.9rem; }
+  .cell-pada_sound { background:linear-gradient(135deg,#e3f2fd,#bbdefb); font-size:0.85rem; }
+  .cell-empty { background:#f5f5f5; }
+
+  /* Nakshatra cell layout */
+  .nak-cell { display:flex; flex-direction:column; align-items:center; justify-content:center; height:calc(100% - 10px); gap:1px; }
+  .nak-cell-side { display:flex; flex-direction:row; align-items:center; justify-content:center; height:100%; gap:3px; }
+  .nak-name { font-size:0.68rem; font-weight:700; color:#333; line-height:1.1; }
+  .nak-inner { display:flex; flex-direction:column; align-items:center; gap:1px; }
+
+  /* Padas — fixed row, always aligned 1 2 3 4 */
+  .nak-padas { display:flex; gap:3px; font-size:0.55rem; color:#888; justify-content:center; }
+  .nak-padas-vert { display:flex; flex-direction:column; gap:2px; font-size:0.55rem; color:#888; }
+  .nak-pada { background:rgba(0,0,0,0.08); padding:1px 4px; border-radius:2px; font-size:0.55rem; font-weight:600; color:#777; }
+
+  /* Planet markers — separate line from padas */
+  .planet-markers { display:flex; flex-wrap:wrap; gap:1px; justify-content:center; }
+  .planet-dot {
+    font-size:0.5rem; font-weight:700;
+    padding:1px 4px; border-radius:3px;
+    line-height:1;
+  }
+  .planet-natal {
+    color:#fff; background:rgba(50,50,50,0.85);
+  }
+  .planet-transit {
+    color:#fff; background:rgba(200,30,30,0.9);
+  }
+
+  /* Rashi cell */
+  .rashi-name { font-size:0.75rem; font-weight:700; color:#2e7d32; }
+  .rashi-hi { font-size:0.6rem; color:#558b2f; }
+
+  /* Center cell */
+  .center-vara { font-size:0.7rem; font-weight:700; color:#8B0000; }
+  .center-tithi { font-size:0.6rem; color:#555; margin-top:2px; }
+
+  /* SVG overlay for vedha lines */
+  .vedha-svg {
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    pointer-events:none; z-index:10;
+  }
+
+  /* Legend */
+  .legend { display:flex; gap:20px; flex-wrap:wrap; margin-top:16px; padding:12px; background:var(--card-bg); border:1px solid var(--border); border-radius:6px; }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:0.8rem; }
+  .legend-swatch { width:16px; height:16px; border-radius:3px; border:1px solid #999; }
+
+  /* Info panel */
+  .info-panel { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:16px; margin-top:16px; box-shadow:0 2px 8px var(--shadow); }
+  .info-panel h3 { color:var(--accent); margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:6px; }
+  .info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; }
+  .info-card { background:#fff; padding:8px 12px; border-radius:4px; border-left:3px solid var(--accent); font-size:0.8rem; }
+  .info-card .label { font-weight:700; color:var(--accent); }
+  .info-card.shubh { border-left-color:#2e7d32; background:#f1f8e9; }
+  .info-card.ashubh { border-left-color:#c62828; background:#fce4ec; }
+
+  /* Feature tabs */
+  .feature-tabs { display:flex; gap:0; margin-top:16px; flex-wrap:wrap; }
+  .feature-tab { padding:10px 20px; cursor:pointer; font-weight:600; font-size:0.85rem; border:2px solid var(--border); border-bottom:none; border-radius:6px 6px 0 0; background:var(--card-bg); color:#666; transition:all 0.2s; }
+  .feature-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .feature-content { background:var(--card-bg); border:2px solid var(--border); border-radius:0 8px 8px 8px; padding:16px; box-shadow:0 2px 8px var(--shadow); display:none; }
+  .feature-content.active { display:block; }
+
+  /* JKV highlight */
+  .cell-jkv-janma { box-shadow:inset 0 0 0 3px #4caf50 !important; }
+  .cell-jkv-karma { box-shadow:inset 0 0 0 3px #ff9800 !important; }
+  .cell-jkv-vinasha { box-shadow:inset 0 0 0 3px #f44336 !important; }
+  .cell-latta { box-shadow:inset 0 0 0 3px #9c27b0 !important; }
+  .cell-vedha-hit { box-shadow:inset 0 0 0 2px #e91e63 !important; }
+  .cell-asta-blocked { background:repeating-linear-gradient(45deg, rgba(198,40,40,0.08), rgba(198,40,40,0.08) 4px, transparent 4px, transparent 8px) !important; }
+  .asta-marker { position:absolute;top:1px;right:1px;font-size:0.4rem;color:#fff;font-weight:700;background:#c62828;padding:1px 3px;border-radius:2px;z-index:6;line-height:1; }
+
+  /* Kurma Chakra — Turtle visual */
+  .kurma-container { position:relative; width:520px; height:440px; margin:0 auto; }
+  .kurma-svg { position:absolute; top:0; left:0; width:100%; height:100%; z-index:0; }
+  .kurma-part { position:absolute; background:rgba(255,255,255,0.92); border:2px solid #8B6914; border-radius:8px; padding:4px 6px; text-align:center; z-index:1; font-size:0.65rem; min-width:70px; }
+  .kurma-part.has-planets { background:#fff8e1; border-color:#e65100; box-shadow:0 1px 4px rgba(0,0,0,0.15); }
+  .kurma-part-dir { font-weight:700; color:var(--accent); font-size:0.7rem; line-height:1.2; }
+  .kurma-part-body { font-size:0.55rem; color:#888; }
+  .kurma-part-planets { margin-top:2px; }
+  .kurma-planet { font-size:0.6rem; font-weight:700; }
+  .kurma-planet.natal { color:#1a237e; }
+  .kurma-planet.transit { color:#c62828; }
+  .kurma-title-label { position:absolute; font-size:0.5rem; color:#999; font-weight:600; text-transform:uppercase; letter-spacing:1px; z-index:2; }
+
+  /* Score badge */
+  .score-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-weight:700; font-size:0.75rem; }
+  .score-pos { background:#e8f5e9; color:#2e7d32; }
+  .score-neg { background:#fce4ec; color:#c62828; }
+  .score-zero { background:#f5f5f5; color:#666; }
+
+  /* Extra Info cells (embedded in the same table) */
+  .sbc-grid td.extra-top, .sbc-grid td.extra-bottom {
+    width:90px; height:auto; min-height:48px;
+    border:1px solid #8B6914;
+    background:linear-gradient(180deg,#fdf6e3,#f5e6c8);
+    font-size:0.55rem; font-weight:600;
+    padding:3px 2px;
+    vertical-align:middle;
+  }
+  .sbc-grid td.extra-left, .sbc-grid td.extra-right {
+    width:55px; height:90px;
+    border:1px solid #8B6914;
+    background:linear-gradient(90deg,#fdf6e3,#f5e6c8);
+    font-size:0.55rem; font-weight:600;
+    padding:2px;
+    vertical-align:middle;
+  }
+  .sbc-grid td.extra-corner {
+    width:55px; height:auto;
+    border:1px solid #8B6914;
+    background:#f5deb3;
+    padding:0;
+  }
+  /* Side cell content wrapper — rotated text */
+  .extra-side-content {
+    writing-mode:vertical-rl;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:0px; width:100%; height:100%;
+    white-space:nowrap;
+  }
+  .extra-left .extra-side-content {
+    transform:rotate(180deg);
+  }
+  /* Top/Bottom cell content wrapper — normal horizontal */
+  .extra-horiz-content {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:0px;
+  }
+  .extra-nak-name { font-size:0.55rem; color:#5a3a1a; font-weight:700; line-height:1.1; }
+  .extra-tara { font-size:0.55rem; color:#1565c0; font-weight:700; }
+  .extra-tara-name { font-size:0.45rem; color:#1565c0; }
+  .extra-jkv { font-size:0.5rem; font-weight:700; padding:0 2px; border-radius:2px; }
+  .extra-jkv-janma { background:#e8f5e9; color:#2e7d32; }
+  .extra-jkv-karma { background:#fff3e0; color:#e65100; }
+  .extra-jkv-vinasha { background:#fce4ec; color:#c62828; }
+  .extra-latta { font-size:0.45rem; color:#9c27b0; font-weight:700; }
+  .extra-upa { font-size:0.45rem; color:#e65100; font-weight:700; }
+  .extra-pada-sound { font-size:0.52rem; color:#555; }
+
+  @media(max-width:900px) {
+    .sbc-grid td.extra-top, .sbc-grid td.extra-bottom { min-height:36px; font-size:0.45rem; }
+    .sbc-grid td.extra-left, .sbc-grid td.extra-right { width:40px; font-size:0.42rem; }
+    .sbc-grid td.extra-corner { width:40px; }
+  }
+
+  /* Rules Reference */
+  .rules-section { margin-top:20px; }
+  .rules-header { background:var(--header-bg); color:#fff; padding:14px 20px; border-radius:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:1rem; letter-spacing:0.5px; }
+  .rules-header:hover { background:#a00; }
+  .rules-header .arrow { transition:transform 0.3s; font-size:1.2rem; }
+  .rules-header .arrow.open { transform:rotate(180deg); }
+  .rules-body { display:none; background:var(--card-bg); border:2px solid var(--border); border-top:none; border-radius:0 0 8px 8px; padding:16px; }
+  .rules-body.open { display:block; }
+  .rule-group { margin-bottom:16px; }
+  .rule-group-title { font-weight:700; color:var(--accent); font-size:0.95rem; cursor:pointer; padding:8px 12px; background:#fff; border:1px solid var(--border); border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
+  .rule-group-title:hover { background:#fff8e1; }
+  .rule-group-content { display:none; padding:10px 12px; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 6px 6px; }
+  .rule-group-content.open { display:block; }
+  .rules-table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:6px; }
+  .rules-table th { background:var(--table-header); color:#fff; padding:6px 10px; text-align:left; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; }
+  .rules-table td { padding:6px 10px; border-bottom:1px solid #e0d0c0; }
+  .rules-table tr:nth-child(even) { background:var(--table-alt); }
+  .rules-table .hi { font-size:0.75rem; color:#666; }
+  .rule-note { font-size:0.78rem; color:#555; margin-top:6px; padding:8px; background:#fff8e1; border-left:3px solid var(--gold); border-radius:0 4px 4px 0; }
+  .rule-formula { font-family:monospace; font-size:0.8rem; background:#f5f5f5; padding:4px 8px; border-radius:4px; display:inline-block; margin:2px 0; }
+
+  @media(max-width:900px) {
+    .sbc-grid td { width:60px; height:60px; font-size:0.6rem; }
+    .nak-name { font-size:0.55rem; }
+    .nak-padas { font-size:0.45rem; }
+    .planet-dot { font-size:0.45rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>SBC</span> Sarvatobhadra Chakra</h1>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas">Special Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc" class="active">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth + Transit Form -->
+  <div class="birth-form">
+    <h2>Birth & Transit Details</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Birth Date</label>
+        <input type="date" id="birthDate">
+      </div>
+      <div class="form-field">
+        <label>Birth Time</label>
+        <input type="time" id="birthTime" value="23:10">
+      </div>
+      <div class="form-field loc-auto">
+        <label>Birth City</label>
+        <input type="text" id="birthCity" placeholder="Type city..." autocomplete="off">
+        <div class="loc-dropdown" id="cityDrop"></div>
+      </div>
+      <div class="form-field">
+        <label>Transit Date</label>
+        <input type="date" id="transitDate">
+      </div>
+      <div class="form-field">
+        <label>Transit Time</label>
+        <input type="time" id="transitTime" value="12:00">
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanamsa">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">Krishnamurti</option>
+        </select>
+      </div>
+      <button class="btn" id="calcBtn" onclick="fetchSBC()">Generate SBC</button>
+    </div>
+    <div class="form-row">
+      <div class="day-nav">
+        <button class="btn btn-sm" onclick="shiftDay(-1)">&#9664; Prev Day</button>
+        <button class="btn btn-sm" onclick="setToday()">Today</button>
+        <button class="btn btn-sm" onclick="shiftDay(1)">Next Day &#9654;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toggle Controls -->
+  <div class="controls">
+    <span class="controls-label">Show:</span>
+    <button class="toggle-btn active" id="togNatal" onclick="toggleLayer('natal')">Natal Planets</button>
+    <button class="toggle-btn active" id="togTransit" onclick="toggleLayer('transit')">Transit Planets</button>
+    <button class="toggle-btn active" id="togVedha" onclick="toggleLayer('vedha')">Vedha Lines</button>
+    <button class="toggle-btn active" id="togPadas" onclick="toggleLayer('padas')">Pada Numbers</button>
+    <button class="toggle-btn" id="togJkv" onclick="toggleLayer('jkv')">JKV Nakshatras</button>
+    <button class="toggle-btn" id="togLatta" onclick="toggleLayer('latta')">Graha Latta</button>
+    <button class="toggle-btn" id="togUpagraha" onclick="toggleLayer('upagraha')">Upagrahas</button>
+    <button class="toggle-btn" id="togExtra" onclick="toggleLayer('extra')">Extra Info</button>
+    <button class="toggle-btn" id="togAstadisha" onclick="toggleLayer('astadisha')">Asta Disha</button>
+  </div>
+
+  <!-- SBC Grid -->
+  <div class="sbc-wrapper" id="sbcWrapper">
+    <div class="sbc-grid-container" id="gridContainer">
+      <table class="sbc-grid" id="sbcGrid">
+        <tbody id="sbcBody"></tbody>
+      </table>
+      <svg class="vedha-svg" id="vedhaSvg"></svg>
+    </div>
+    <p style="text-align:center;color:#888;padding:40px;font-size:1.1rem;" id="emptyMsg">
+      Enter birth details and click "Generate SBC" to view the Sarvatobhadra Chakra.
+    </p>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend" id="legendBox" style="display:none;">
+    <div class="legend-item"><div class="legend-swatch" style="background:linear-gradient(135deg,#fff8e1,#ffe0b2);"></div> Nakshatra</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);"></div> Rashi</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);"></div> Vara / Tithi</div>
+    <div class="legend-item"><span class="planet-dot planet-natal">Su</span> Natal</div>
+    <div class="legend-item"><span class="planet-dot planet-transit">Su</span> Transit</div>
+    <div class="legend-item"><svg width="30" height="16"><line x1="0" y1="8" x2="30" y2="8" stroke="#2e7d32" stroke-width="2" stroke-dasharray="6,3"/></svg> Shubh Vedha</div>
+    <div class="legend-item"><svg width="30" height="16"><line x1="0" y1="8" x2="30" y2="8" stroke="#c62828" stroke-width="2" stroke-dasharray="6,3"/></svg> Ashubh Vedha</div>
+    <div class="legend-item"><div class="legend-swatch" style="box-shadow:inset 0 0 0 3px #4caf50;background:#fff;"></div> Janma</div>
+    <div class="legend-item"><div class="legend-swatch" style="box-shadow:inset 0 0 0 3px #ff9800;background:#fff;"></div> Karma</div>
+    <div class="legend-item"><div class="legend-swatch" style="box-shadow:inset 0 0 0 3px #f44336;background:#fff;"></div> Vinasha</div>
+    <div class="legend-item"><div class="legend-swatch" style="box-shadow:inset 0 0 0 3px #9c27b0;background:#fff;"></div> Latta Target</div>
+    <div class="legend-item"><span style="font-size:0.7rem;font-weight:700;color:#1565c0;background:#e3f2fd;padding:2px 6px;border-radius:3px;">3 Vipat</span> Tarabala</div>
+    <div class="legend-item"><span class="extra-jkv extra-jkv-janma" style="padding:2px 6px;">J</span><span class="extra-jkv extra-jkv-karma" style="padding:2px 6px;">K</span><span class="extra-jkv extra-jkv-vinasha" style="padding:2px 6px;">V</span> JKV</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:repeating-linear-gradient(45deg, rgba(198,40,40,0.15), rgba(198,40,40,0.15) 4px, #fff 4px, #fff 8px);border:1px solid #c62828;"></div> Asta Disha (Blocked)</div>
+  </div>
+
+  <!-- Feature Tabs -->
+  <div id="featureTabs" style="display:none;">
+    <div class="feature-tabs">
+      <div class="feature-tab active" onclick="showFeatureTab('positions')">Positions</div>
+      <div class="feature-tab" onclick="showFeatureTab('vedhaHits')">Vedha Analysis</div>
+      <div class="feature-tab" onclick="showFeatureTab('grahaBala')">Graha Bala</div>
+      <div class="feature-tab" onclick="showFeatureTab('lattaTab')">Graha Latta</div>
+      <div class="feature-tab" onclick="showFeatureTab('upagrahaTab')">Upagrahas</div>
+      <div class="feature-tab" onclick="showFeatureTab('kurmaTab')">Kurma Chakra</div>
+      <div class="feature-tab" onclick="showFeatureTab('prashnaTab')">Prashna</div>
+    </div>
+
+    <!-- Positions Tab -->
+    <div class="feature-content active" id="tab-positions">
+      <h3>Natal Planets</h3>
+      <div id="natalInfo" class="info-grid"></div>
+      <h3 style="margin-top:14px;">Transit Planets</h3>
+      <div id="transitInfo" class="info-grid"></div>
+    </div>
+
+    <!-- Vedha Analysis Tab -->
+    <div class="feature-content" id="tab-vedhaHits">
+      <h3>Vedha Hit Analysis</h3>
+      <p style="font-size:0.8rem;color:#666;margin-bottom:10px;">Transit planets affecting natal positions, varas, tithis, and rashis.</p>
+      <div id="vedhaHitsGrid" class="info-grid"></div>
+    </div>
+
+    <!-- Graha Bala Tab -->
+    <div class="feature-content" id="tab-grahaBala">
+      <h3>Graha Bala (Planet Strength)</h3>
+      <p style="font-size:0.8rem;color:#666;margin-bottom:10px;">SBC-based strength scores for transit planets.</p>
+      <div id="grahaBalaGrid" class="info-grid"></div>
+    </div>
+
+    <!-- Graha Latta Tab -->
+    <div class="feature-content" id="tab-lattaTab">
+      <h3>Graha Latta (Planet Kicks)</h3>
+      <p style="font-size:0.8rem;color:#666;margin-bottom:10px;">Each planet kicks a specific nakshatra from its position, causing harm to that nakshatra.</p>
+      <div id="lattaGrid" class="info-grid"></div>
+    </div>
+
+    <!-- Upagraha Tab -->
+    <div class="feature-content" id="tab-upagrahaTab">
+      <h3>Upagrahas (Sub-planets)</h3>
+      <p style="font-size:0.8rem;color:#666;margin-bottom:10px;">Shadow sub-planets calculated from Sun's position.</p>
+      <div id="upagrahaGrid" class="info-grid"></div>
+    </div>
+
+    <!-- Kurma Chakra Tab -->
+    <div class="feature-content" id="tab-kurmaTab">
+      <h3>कूर्म चक्र — Kurma Chakra (Cosmic Turtle)</h3>
+      <p style="font-size:0.8rem;color:#666;margin-bottom:6px;">Nakshatra-to-body-part mapping. Turtle faces East. <span style="color:#1a237e;font-weight:700;">■ Natal</span> &nbsp; <span style="color:#c62828;font-weight:700;">■ Transit</span></p>
+      <div id="kurmaChakraVis" style="display:flex;justify-content:center;"></div>
+    </div>
+
+    <!-- Prashna Tab -->
+    <div class="feature-content" id="tab-prashnaTab">
+      <h3>SBC Prashna Analysis</h3>
+      <p style="font-size:0.8rem;color:#666;margin-bottom:10px;">Horary analysis based on the query moment's SBC.</p>
+      <div id="prashnaInfo"></div>
+    </div>
+  </div>
+
+  <!-- Rules Reference Section -->
+  <div class="rules-section">
+    <div class="rules-header" onclick="toggleRules()">
+      SBC Rules Reference (सर्वतोभद्र चक्र नियम)
+      <span class="arrow" id="rulesArrow">&#9660;</span>
+    </div>
+    <div class="rules-body" id="rulesBody">
+
+      <!-- 1. Vedha Speed Rules -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          1. Vedha Direction Rules (वेध दिशा नियम) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Planet</th><th>Normal (Direct)</th><th>Ati-chari (Fast)</th><th>Vakri (Retrograde)</th></tr>
+            <tr><td><b>Sun</b> <span class="hi">सूर्य</span></td><td colspan="3" style="text-align:center;">Always 3-Way: Front + Left (Vama) + Right (Dakshina)</td></tr>
+            <tr><td><b>Moon</b> <span class="hi">चन्द्र</span></td><td colspan="3" style="text-align:center;">Always 3-Way: Front + Left (Vama) + Right (Dakshina)</td></tr>
+            <tr><td><b>Rahu</b> <span class="hi">राहु</span></td><td colspan="3" style="text-align:center;">Always 3-Way: Front + Left (Vama) + Right (Dakshina)</td></tr>
+            <tr><td><b>Ketu</b> <span class="hi">केतु</span></td><td colspan="3" style="text-align:center;">Always 3-Way: Front + Left (Vama) + Right (Dakshina)</td></tr>
+            <tr><td><b>Mars</b> <span class="hi">मंगल</span></td><td>Front (Sammukh) → opposite nak only</td><td>Left Diagonal (Vama)</td><td>Right Diagonal (Dakshina)</td></tr>
+            <tr><td><b>Mercury</b> <span class="hi">बुध</span></td><td>Front (Sammukh) → opposite nak only</td><td>Left Diagonal (Vama)</td><td>Right Diagonal (Dakshina)</td></tr>
+            <tr><td><b>Jupiter</b> <span class="hi">गुरु</span></td><td>Front (Sammukh) → opposite nak only</td><td>Left Diagonal (Vama)</td><td>Right Diagonal (Dakshina)</td></tr>
+            <tr><td><b>Venus</b> <span class="hi">शुक्र</span></td><td>Front (Sammukh) → opposite nak only</td><td>Left Diagonal (Vama)</td><td>Right Diagonal (Dakshina)</td></tr>
+            <tr><td><b>Saturn</b> <span class="hi">शनि</span></td><td>Front (Sammukh) → opposite nak only</td><td>Left Diagonal (Vama)</td><td>Right Diagonal (Dakshina)</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Ati-chari threshold:</b> Speed &gt; 150% of average daily motion.<br>
+            <b>Front vedha (Shloka 17):</b> Sammukh vedha hits only the ONE nakshatra directly opposite on the border, not the entire straight line.<br>
+            <b>Left/Right:</b> Direction is from the planet's own perspective facing inward toward the center of the grid (Vama = planet's left, Dakshina = planet's right).
+          </div>
+          <table class="rules-table" style="margin-top:10px;">
+            <tr><th>Planet</th><th>Avg Speed (°/day)</th><th>Ati-chari Threshold (°/day)</th></tr>
+            <tr><td>Sun</td><td>0.9856</td><td>Always 3-way</td></tr>
+            <tr><td>Moon</td><td>13.1764</td><td>Always 3-way</td></tr>
+            <tr><td>Mars</td><td>0.5240</td><td>0.7860</td></tr>
+            <tr><td>Mercury</td><td>1.3833</td><td>2.0750</td></tr>
+            <tr><td>Jupiter</td><td>0.0831</td><td>0.1247</td></tr>
+            <tr><td>Venus</td><td>1.2000</td><td>1.8000</td></tr>
+            <tr><td>Saturn</td><td>0.0335</td><td>0.0503</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Shubh/Ashubh -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          2. Shubh / Ashubh Classification (शुभ / अशुभ वर्गीकरण) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Planet</th><th>Nature</th><th>Vedha Effect</th></tr>
+            <tr><td><b>Jupiter</b> <span class="hi">गुरु</span></td><td style="color:#2e7d32;font-weight:700;">Shubh (शुभ)</td><td>Benefic vedha — protective, auspicious</td></tr>
+            <tr><td><b>Venus</b> <span class="hi">शुक्र</span></td><td style="color:#2e7d32;font-weight:700;">Shubh (शुभ)</td><td>Benefic vedha — prosperity, comfort</td></tr>
+            <tr><td><b>Mercury</b> <span class="hi">बुध</span></td><td style="color:#2e7d32;font-weight:700;">Shubh (शुभ)</td><td>Benefic vedha — intellect, gains</td></tr>
+            <tr><td><b>Moon (Waxing)</b> <span class="hi">शुक्ल चन्द्र</span></td><td style="color:#2e7d32;font-weight:700;">Shubh (शुभ)</td><td>Benefic vedha — mental peace</td></tr>
+            <tr><td><b>Moon (Waning)</b> <span class="hi">कृष्ण चन्द्र</span></td><td style="color:#c62828;font-weight:700;">Ashubh (अशुभ)</td><td>Malefic vedha — mental unrest</td></tr>
+            <tr><td><b>Sun</b> <span class="hi">सूर्य</span></td><td style="color:#c62828;font-weight:700;">Ashubh (अशुभ)</td><td>Malefic vedha — authority pressure</td></tr>
+            <tr><td><b>Mars</b> <span class="hi">मंगल</span></td><td style="color:#c62828;font-weight:700;">Ashubh (अशुभ)</td><td>Malefic vedha — conflict, injury</td></tr>
+            <tr><td><b>Saturn</b> <span class="hi">शनि</span></td><td style="color:#c62828;font-weight:700;">Ashubh (अशुभ)</td><td>Malefic vedha — delays, sorrow</td></tr>
+            <tr><td><b>Rahu</b> <span class="hi">राहु</span></td><td style="color:#c62828;font-weight:700;">Ashubh (अशुभ)</td><td>Malefic vedha — confusion, deception</td></tr>
+            <tr><td><b>Ketu</b> <span class="hi">केतु</span></td><td style="color:#c62828;font-weight:700;">Ashubh (अशुभ)</td><td>Malefic vedha — separation, loss</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Moon phase rule:</b> Waxing Moon (Shukla Paksha, tithi 1-15) = Shubh. Waning Moon (Krishna Paksha, tithi 16-30) = Ashubh.<br>
+            Green vedha lines = Shubh planet. Red vedha lines = Ashubh planet.
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Graha Latta -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          3. Graha Latta — Planet Kicks (ग्रह लत्ता) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Planet</th><th>Kick Direction</th><th>Count</th><th>Meaning</th></tr>
+            <tr><td><b>Sun</b> <span class="hi">सूर्य</span></td><td>Backward ←</td><td>12th nakshatra behind</td><td>Harm from authority, govt</td></tr>
+            <tr><td><b>Mars</b> <span class="hi">मंगल</span></td><td>Backward ←</td><td>3rd nakshatra behind</td><td>Accidents, aggression</td></tr>
+            <tr><td><b>Saturn</b> <span class="hi">शनि</span></td><td>Backward ←</td><td>8th nakshatra behind</td><td>Chronic issues, delays</td></tr>
+            <tr><td><b>Rahu</b> <span class="hi">राहु</span></td><td>Backward ←</td><td>9th nakshatra behind</td><td>Sudden troubles, deception</td></tr>
+            <tr><td><b>Ketu</b> <span class="hi">केतु</span></td><td>Backward ←</td><td>9th nakshatra behind</td><td>Spiritual upheaval, loss</td></tr>
+            <tr><td><b>Jupiter</b> <span class="hi">गुरु</span></td><td>Forward →</td><td>6th nakshatra ahead</td><td>Blessings, fortune</td></tr>
+            <tr><td><b>Venus</b> <span class="hi">शुक्र</span></td><td>Forward →</td><td>7th nakshatra ahead</td><td>Comfort, relationships</td></tr>
+            <tr><td><b>Mercury</b> <span class="hi">बुध</span></td><td>Forward →</td><td>5th nakshatra ahead</td><td>Intellect, communication</td></tr>
+            <tr><td><b>Moon</b> <span class="hi">चन्द्र</span></td><td>Forward →</td><td>22nd nakshatra ahead</td><td>Emotional impact</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Rule:</b> Backward kicks (malefics) harm the kicked nakshatra. Forward kicks (benefics) can be mild or beneficial.<br>
+            Counted in the 28-nakshatra cycle including Abhijit. If your Janma/Karma/Vinasha nakshatra gets kicked by a malefic, effects are stronger.
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Janma-Karma-Vinasha -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          4. Janma-Karma-Vinasha Nakshatras (जन्म-कर्म-विनाश) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Nakshatra</th><th>Position</th><th>Significance</th></tr>
+            <tr><td><b>Janma (जन्म)</b></td><td>1st from birth Moon nakshatra</td><td>Birth nakshatra — most sensitive. Transit vedha here affects health, mind, overall wellbeing.</td></tr>
+            <tr><td><b>Karma (कर्म)</b></td><td>10th from birth Moon nakshatra</td><td>Action nakshatra — governs career, profession, public image. Vedha here affects work and reputation.</td></tr>
+            <tr><td><b>Vinasha (विनाश)</b></td><td>19th from birth Moon nakshatra</td><td>Destruction nakshatra — most dangerous. Malefic vedha here causes serious harm, loss, or downfall.</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Calculation:</b> Count forward from birth Moon's nakshatra in the 28-nakshatra system (including Abhijit).<br>
+            <span class="rule-formula">Janma = Moon_Nak[0] | Karma = Moon_Nak[+9] | Vinasha = Moon_Nak[+18]</span><br>
+            These three nakshatras are highlighted on the grid: <span style="color:#4caf50;font-weight:700;">Green</span> = Janma, <span style="color:#ff9800;font-weight:700;">Orange</span> = Karma, <span style="color:#f44336;font-weight:700;">Red</span> = Vinasha.
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Upagraha Formulas -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          5. Upagraha Calculation (उपग्रह गणना) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Upagraha</th><th>Formula</th><th>Nature</th></tr>
+            <tr><td><b>Dhuma</b> <span class="hi">धूम</span></td><td><span class="rule-formula">Sun + 133°20'</span></td><td>Malefic — smoke, obscuration</td></tr>
+            <tr><td><b>Vyatipata</b> <span class="hi">व्यतीपात</span></td><td><span class="rule-formula">360° - Dhuma</span></td><td>Malefic — calamity</td></tr>
+            <tr><td><b>Parivesha</b> <span class="hi">परिवेश</span></td><td><span class="rule-formula">Vyatipata + 180°</span></td><td>Malefic — halo effect</td></tr>
+            <tr><td><b>Chapa</b> <span class="hi">चाप / इन्द्रचाप</span></td><td><span class="rule-formula">360° - Parivesha</span></td><td>Malefic — bow/rainbow</td></tr>
+            <tr><td><b>Upaketu</b> <span class="hi">उपकेतु</span></td><td><span class="rule-formula">Chapa + 16°40'</span></td><td>Malefic — similar to Ketu</td></tr>
+          </table>
+          <div class="rule-note">
+            All upagrahas are derived from the Sun's sidereal longitude. They are all malefic sub-planets used in SBC for additional vedha analysis.
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Tithi Groups -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          6. Tithi Groups (तिथि वर्ग) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Group</th><th>Tithis</th><th>Grid Cell</th><th>Nature</th></tr>
+            <tr><td><b>Nanda</b> <span class="hi">नन्दा</span></td><td>1, 6, 11 (Pratipada, Shashthi, Ekadashi)</td><td>Sun/Tue cell (3,4)</td><td>Auspicious</td></tr>
+            <tr><td><b>Bhadra</b> <span class="hi">भद्रा</span></td><td>2, 7, 12 (Dwitiya, Saptami, Dwadashi)</td><td>Mon/Wed cell (4,5)</td><td>Auspicious</td></tr>
+            <tr><td><b>Jaya</b> <span class="hi">जया</span></td><td>3, 8, 13 (Tritiya, Ashtami, Trayodashi)</td><td>Thu cell (5,4)</td><td>Very Auspicious</td></tr>
+            <tr><td><b>Rikta</b> <span class="hi">रिक्ता</span></td><td>4, 9, 14 (Chaturthi, Navami, Chaturdashi)</td><td>Fri cell (4,3)</td><td>Inauspicious</td></tr>
+            <tr><td><b>Poorna</b> <span class="hi">पूर्णा</span></td><td>5, 10, 15 (Panchami, Dashami, Purnima/Amavasya)</td><td>Sat cell (4,4)</td><td>Auspicious</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Calculation:</b> <span class="rule-formula">Tithi = floor((Moon_lon - Sun_lon) mod 360 / 12) + 1</span><br>
+            Tithi number mod 15 gives the group. Each group occupies a fixed cell in the SBC center, shared with a weekday.
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Kurma Chakra -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          7. Kurma Chakra — Body Part Mapping (कूर्म चक्र) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Direction</th><th>Nakshatras</th><th>Body Part</th></tr>
+            <tr><td><b>East (पूर्व)</b></td><td>Ashwini, Bharani, Revati</td><td>Head, Neck</td></tr>
+            <tr><td><b>SE (आग्नेय)</b></td><td>Krittika, Vishakha, Anuradha</td><td>Right shoulder, side, hip</td></tr>
+            <tr><td><b>South (दक्षिण)</b></td><td>Rohini, Mrigashira, Hasta, Chitra, P.Ashadha</td><td>Right legs, thigh</td></tr>
+            <tr><td><b>SW (नैऋत्य)</b></td><td>Swati, Mula</td><td>Right flank, foot</td></tr>
+            <tr><td><b>West (पश्चिम)</b></td><td>Magha, P.Phalguni, U.Phalguni, Jyeshtha</td><td>Tail</td></tr>
+            <tr><td><b>NW (वायव्य)</b></td><td>Ashlesha, U.Ashadha, Shatabhisha</td><td>Left hip, flank, foot</td></tr>
+            <tr><td><b>North (उत्तर)</b></td><td>Punarvasu, Pushya, Shravana, Dhanishtha</td><td>Left legs</td></tr>
+            <tr><td><b>NE (ईशान)</b></td><td>Ardra, P.Bhadrapada, U.Bhadrapada</td><td>Left shoulder, thigh, side</td></tr>
+            <tr><td><b>Center (मध्य)</b></td><td>Abhijit</td><td>Heart</td></tr>
+          </table>
+          <div class="rule-note">
+            The Kurma (turtle) faces East. Planets occupying nakshatras in a direction affect that body part and the corresponding geographical direction for mundane predictions.
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. Graha Bala Scoring -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          8. Graha Bala Scoring (ग्रह बल) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Factor</th><th>Points</th><th>Condition</th></tr>
+            <tr><td>Direct Motion</td><td style="color:#2e7d32;font-weight:700;">+1</td><td>Planet is in direct motion (not retrograde)</td></tr>
+            <tr><td>Retrograde</td><td style="color:#c62828;font-weight:700;">-1</td><td>Planet is retrograde (vakri)</td></tr>
+            <tr><td>Fast Speed</td><td style="color:#2e7d32;font-weight:700;">+1</td><td>Speed &gt; 120% of average daily motion</td></tr>
+            <tr><td>Slow Speed</td><td style="color:#c62828;font-weight:700;">-1</td><td>Speed &lt; 50% of average daily motion</td></tr>
+            <tr><td>Benefic Vedha on Natal</td><td style="color:#2e7d32;font-weight:700;">+N</td><td>Shubh planet vedhas N natal positions</td></tr>
+            <tr><td>Malefic Vedha on Natal</td><td style="color:#c62828;font-weight:700;">-N</td><td>Ashubh planet vedhas N natal positions</td></tr>
+          </table>
+          <div class="rule-note">
+            Higher positive score = stronger benefic influence. Negative score = planet is causing more harm. Score of 0 = neutral.
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. Prashna Rules -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          9. SBC Prashna — Horary Rules (प्रश्न नियम) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Factor</th><th>How Evaluated</th></tr>
+            <tr><td><b>Vara Lord</b></td><td>Lord of the weekday at the time of query (Sun=Sunday, Moon=Monday, etc.)</td></tr>
+            <tr><td><b>Tithi Nature</b></td><td>Nanda/Bhadra/Poorna = auspicious, Jaya = very auspicious, Rikta = inauspicious</td></tr>
+            <tr><td><b>Moon Nakshatra</b></td><td>Transit Moon's nakshatra — if vedha'd by malefics, unfavorable</td></tr>
+            <tr><td><b>Overall Verdict</b></td><td>Count shubh hits vs ashubh hits on all natal positions. More shubh = favorable, more ashubh = unfavorable.</td></tr>
+          </table>
+          <div class="rule-note">
+            Prashna (horary) analysis uses the SBC at the exact query moment. The balance of shubh and ashubh vedha on natal positions, combined with the vara, tithi, and Moon nakshatra status, determines whether the answer is favorable or unfavorable.
+          </div>
+        </div>
+      </div>
+
+      <!-- 10. Surya Bindu -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          10. Surya Bindu — Sun's Sensitive Points (सूर्य बिन्दु) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Bindu Component</th><th>Derived From</th><th>SBC Cell</th><th>Vedha Effect</th></tr>
+            <tr><td><b>Sun's Nakshatra</b> <span class="hi">सूर्य नक्षत्र</span></td><td>Natal Sun's nakshatra position</td><td>The nakshatra cell where natal Sun is placed on the border</td><td>Transit vedha here affects vitality, self-confidence, authority</td></tr>
+            <tr><td><b>Sun's Rashi</b> <span class="hi">सूर्य राशि</span></td><td>Natal Sun's zodiac sign</td><td>The rashi cell on the inner border matching Sun's sign</td><td>Transit vedha here affects social status, government matters</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Surya Bindu</b> (सूर्य बिन्दु) represents the Sun's sensitive points on the SBC grid. These are derived from the natal Sun's position — its nakshatra and rashi. When transit planets (especially malefics like Saturn, Rahu, Mars) create vedha on Surya Bindu cells, the native faces challenges related to authority, career, health (vitality), government dealings, and father-related matters.<br>
+            <b>Benefic vedha</b> (Jupiter, Venus, Mercury) on Surya Bindu brings promotions, recognition, improved health, and government favor.<br>
+            <b>Malefic vedha</b> (Saturn, Mars, Rahu, Ketu) on Surya Bindu causes authority conflicts, demotion, health issues, and government troubles.
+          </div>
+          <div id="suryaBinduInfo" style="margin-top:10px;padding:10px;background:#fff8e1;border:1px solid #f9a825;border-radius:6px;font-size:0.8rem;display:none;">
+            <!-- Dynamically filled -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 11. Chandra Bindu -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          11. Chandra Bindu — Moon's Sensitive Points (चन्द्र बिन्दु) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Bindu Component</th><th>Derived From</th><th>SBC Cell</th><th>Vedha Effect</th></tr>
+            <tr><td><b>Moon's Nakshatra (Janma)</b> <span class="hi">जन्म नक्षत्र</span></td><td>Natal Moon's nakshatra — the birth star</td><td>The nakshatra cell where natal Moon is placed on the border</td><td>Most sensitive point — vedha here affects mind, health, overall wellbeing</td></tr>
+            <tr><td><b>Moon's Rashi</b> <span class="hi">चन्द्र राशि</span></td><td>Natal Moon's zodiac sign (Janma Rashi)</td><td>The rashi cell on the inner border matching Moon's sign</td><td>Vedha here affects emotional state, domestic life, mother</td></tr>
+            <tr><td><b>Birth Tithi Group</b> <span class="hi">जन्म तिथि</span></td><td>Tithi at birth (Nanda/Bhadra/Jaya/Rikta/Poorna)</td><td>The tithi cell in the center of the grid</td><td>Vedha here affects timing of events, auspiciousness</td></tr>
+            <tr><td><b>Birth Vara</b> <span class="hi">जन्म वार</span></td><td>Weekday of birth</td><td>The vara cell in the center of the grid</td><td>Vedha here affects daily rhythms, work patterns</td></tr>
+            <tr><td><b>Janma Akshar</b> <span class="hi">जन्म अक्षर</span></td><td>First sound/letter of the native's name (from Moon's nakshatra pada)</td><td>The vowel/pada cell on the grid</td><td>Vedha here directly targets the native's identity</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Chandra Bindu</b> (चन्द्र बिन्दु) is the PRIMARY reference in SBC analysis. It represents all the sensitive points derived from the natal Moon. The Moon's nakshatra (Janma Nakshatra) is the single most important cell in the entire SBC for any native.<br>
+            <b>Key principle:</b> Any transit planet that vedhas even ONE Chandra Bindu cell creates an effect on the native. The more Chandra Bindu cells that are vedha'd simultaneously, the stronger the effect.<br>
+            <b>Benefic vedha</b> on Chandra Bindu = mental peace, good health, prosperity, auspicious events.<br>
+            <b>Malefic vedha</b> on Chandra Bindu = mental unrest, health issues, obstacles, inauspicious events.<br>
+            <b>Note:</b> Chandra Bindu has more components than Surya Bindu because the Moon governs the mind (manas), which is central to all human experience in Vedic astrology.
+          </div>
+          <div id="chandraBinduInfo" style="margin-top:10px;padding:10px;background:#e3f2fd;border:1px solid #1565c0;border-radius:6px;font-size:0.8rem;display:none;">
+            <!-- Dynamically filled -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 12. Asta Disha -->
+      <div class="rule-group">
+        <div class="rule-group-title" onclick="toggleRuleGroup(this)">
+          12. Asta Disha — Combust Directions (अस्त दिशा) <span>&#9660;</span>
+        </div>
+        <div class="rule-group-content">
+          <table class="rules-table">
+            <tr><th>Planet</th><th>Direction Ruled</th><th>Combustion Threshold</th><th>When Combust</th></tr>
+            <tr><td><b>Sun</b> <span class="hi">सूर्य</span></td><td>East (पूर्व)</td><td>—</td><td>Sun is never combust (it causes combustion)</td></tr>
+            <tr><td><b>Moon</b> <span class="hi">चन्द्र</span></td><td>Northwest (वायव्य)</td><td>Within 12° of Sun</td><td>NW direction blocked — avoid travel/new ventures in NW</td></tr>
+            <tr><td><b>Mars</b> <span class="hi">मंगल</span></td><td>South (दक्षिण)</td><td>Within 17° of Sun</td><td>South direction blocked — avoid southward travel</td></tr>
+            <tr><td><b>Mercury</b> <span class="hi">बुध</span></td><td>North (उत्तर)</td><td>Within 14° (12° if Rx)</td><td>North direction blocked — avoid northward travel</td></tr>
+            <tr><td><b>Jupiter</b> <span class="hi">गुरु</span></td><td>Northeast (ईशान)</td><td>Within 11° of Sun</td><td>NE direction blocked — avoid pilgrimages/education in NE</td></tr>
+            <tr><td><b>Venus</b> <span class="hi">शुक्र</span></td><td>Southeast (आग्नेय)</td><td>Within 10° (8° if Rx)</td><td>SE direction blocked — avoid SE travel/relationships</td></tr>
+            <tr><td><b>Saturn</b> <span class="hi">शनि</span></td><td>West (पश्चिम)</td><td>Within 15° of Sun</td><td>West direction blocked — avoid westward travel</td></tr>
+            <tr><td><b>Rahu</b> <span class="hi">राहु</span></td><td>Southwest (नैऋत्य)</td><td>—</td><td>Rahu/Ketu are shadow planets — not combust by Sun</td></tr>
+            <tr><td><b>Ketu</b> <span class="hi">केतु</span></td><td>—</td><td>—</td><td>Rahu/Ketu are shadow planets — not combust by Sun</td></tr>
+          </table>
+          <div class="rule-note">
+            <b>Asta Disha (अस्त दिशा)</b> means "set/blocked direction." When a planet is combust (asta) — too close to the Sun — the direction it rules becomes inauspicious. The native should <b>not travel</b> in that direction, nor start new ventures associated with that direction.<br>
+            <b>Combustion (Asta):</b> A planet is combust when it is within the specified degree range of the Sun in longitude. The planet's rays are overpowered by the Sun, making it powerless.<br>
+            <b>Retrograde exception:</b> Mercury and Venus have slightly tighter combustion ranges when retrograde because they are closer to Earth and appear brighter.<br>
+            <b>Practical use:</b> Before travel or starting a new venture, check Asta Disha. If the direction you need to travel is blocked by a combust planet, either wait until the planet moves away from the Sun, or choose an alternate route/timing.
+          </div>
+          <div id="astaDishaInfo" style="margin-top:10px;padding:10px;background:#fce4ec;border:1px solid #c62828;border-radius:6px;font-size:0.8rem;display:none;">
+            <!-- Dynamically filled -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let SBC_DATA = null;
+let SHOW = { natal: true, transit: true, vedha: true, padas: true, jkv: false, latta: false, upagraha: false, extra: false, astadisha: false };
+let CITY_LAT = null, CITY_LON = null, CITY_TZ = null;
+
+const PLANET_ABBR = {
+  Sun:"Su", Moon:"Mo", Mars:"Ma", Mercury:"Me", Jupiter:"Ju",
+  Venus:"Ve", Saturn:"Sa", Rahu:"Ra", Ketu:"Ke", Asc:"As"
+};
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener("DOMContentLoaded", function() {
+  // Set default dates
+  const today = new Date();
+  document.getElementById("transitDate").value = today.toISOString().slice(0,10);
+  document.getElementById("birthDate").value = "1992-09-23";
+  document.getElementById("birthTime").value = "23:10";
+
+  // Load birth defaults
+  fetch("/api/v1/birth-defaults")
+    .then(r => r.json())
+    .then(d => {
+      if (d.date) {
+        const parts = d.date.split("-");
+        if (parts[0].length === 4) document.getElementById("birthDate").value = d.date;
+        else document.getElementById("birthDate").value = parts[2]+"-"+parts[1]+"-"+parts[0];
+      }
+      if (d.time) document.getElementById("birthTime").value = d.time;
+      if (d.city) {
+        document.getElementById("birthCity").value = d.city;
+        CITY_LAT = d.latitude; CITY_LON = d.longitude; CITY_TZ = d.tz_offset;
+      }
+    }).catch(()=>{});
+
+  // City autocomplete
+  let cityTimeout;
+  document.getElementById("birthCity").addEventListener("input", function() {
+    clearTimeout(cityTimeout);
+    const q = this.value.trim();
+    if (q.length < 2) { document.getElementById("cityDrop").style.display = "none"; return; }
+    cityTimeout = setTimeout(() => {
+      fetch("/api/v1/city/search?q="+encodeURIComponent(q))
+        .then(r=>r.json()).then(cities => {
+          const dd = document.getElementById("cityDrop");
+          dd.innerHTML = "";
+          if (!cities.length) { dd.style.display = "none"; return; }
+          cities.slice(0,8).forEach(c => {
+            const div = document.createElement("div");
+            div.className = "loc-item";
+            div.textContent = c.display || (c.name+", "+c.country);
+            div.onclick = () => {
+              document.getElementById("birthCity").value = c.name;
+              CITY_LAT = c.latitude; CITY_LON = c.longitude; CITY_TZ = c.tz_offset;
+              dd.style.display = "none";
+            };
+            dd.appendChild(div);
+          });
+          dd.style.display = "block";
+        }).catch(()=>{});
+    }, 300);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// DAY NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function shiftDay(delta) {
+  const el = document.getElementById("transitDate");
+  const d = new Date(el.value);
+  d.setDate(d.getDate() + delta);
+  el.value = d.toISOString().slice(0,10);
+  if (SBC_DATA) fetchSBC();
+}
+function setToday() {
+  document.getElementById("transitDate").value = new Date().toISOString().slice(0,10);
+  if (SBC_DATA) fetchSBC();
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOGGLE LAYERS
+// ═══════════════════════════════════════════════════════════
+function toggleLayer(layer) {
+  SHOW[layer] = !SHOW[layer];
+  const btn = document.getElementById("tog" + layer.charAt(0).toUpperCase() + layer.slice(1));
+  btn.classList.toggle("active", SHOW[layer]);
+  if (SBC_DATA) renderSBC(SBC_DATA);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FETCH SBC DATA
+// ═══════════════════════════════════════════════════════════
+function fetchSBC() {
+  const bd = document.getElementById("birthDate").value;
+  const bt = document.getElementById("birthTime").value;
+  const td = document.getElementById("transitDate").value;
+  const ttime = document.getElementById("transitTime").value || "12:00";
+  const city = document.getElementById("birthCity").value.trim();
+  const ayanamsa = document.getElementById("ayanamsa").value;
+
+  if (!bd || !bt || !td) { alert("Please fill birth date, time, and transit date."); return; }
+
+  // Convert dates to DD-MM-YYYY
+  const bdParts = bd.split("-");
+  const birthStr = bdParts[2]+"-"+bdParts[1]+"-"+bdParts[0];
+  const tdParts = td.split("-");
+  const transitStr = tdParts[2]+"-"+tdParts[1]+"-"+tdParts[0];
+
+  const payload = {
+    date: birthStr,
+    time: bt,
+    target_date: transitStr,
+    target_time: ttime,
+    ayanamsa: ayanamsa,
+    latitude: CITY_LAT || 23.1765,
+    longitude: CITY_LON || 75.7885,
+    tz_offset: CITY_TZ || 5.5,
+  };
+  if (city) payload.city = city;
+
+  document.getElementById("calcBtn").disabled = true;
+  document.getElementById("calcBtn").textContent = "Loading...";
+
+  fetch("/api/v1/sbc", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload),
+  })
+  .then(r => { if (!r.ok) throw new Error("API error "+r.status); return r.json(); })
+  .then(data => {
+    SBC_DATA = data;
+    // Debug: log vedha version and each planet's vedha type
+    console.log("[SBC] Vedha version:", data._vedha_version || "OLD/CACHED");
+    (data.vedha_lines || []).forEach(vl => {
+      console.log("[SBC] " + vl.planet + ": vedha_type=" + vl.vedha_type + " speed=" + vl.speed + " retro=" + vl.retrograde + " targets=" + vl.targets.length);
+    });
+    renderSBC(data);
+    document.getElementById("emptyMsg").style.display = "none";
+    document.getElementById("legendBox").style.display = "flex";
+    document.getElementById("featureTabs").style.display = "block";
+  })
+  .catch(e => { alert("Error: "+e.message); })
+  .finally(() => {
+    document.getElementById("calcBtn").disabled = false;
+    document.getElementById("calcBtn").textContent = "Generate SBC";
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER SBC
+// ═══════════════════════════════════════════════════════════
+function renderSBC(data) {
+  const grid = data.grid;
+  const tbody = document.getElementById("sbcBody");
+  tbody.innerHTML = "";
+  const extraOn = SHOW.extra;
+
+  // Build planet placement maps
+  const natalMap = {};  // "r,c" → [planet_obj, ...]
+  const transitMap = {};
+  if (SHOW.natal) {
+    (data.natal_planets || []).forEach(p => {
+      const key = p.row+","+p.col;
+      if (!natalMap[key]) natalMap[key] = [];
+      natalMap[key].push(p);
+    });
+  }
+  if (SHOW.transit) {
+    (data.transit_planets || []).forEach(p => {
+      const key = p.row+","+p.col;
+      if (!transitMap[key]) transitMap[key] = [];
+      transitMap[key].push(p);
+    });
+  }
+
+  // ── Extra: build lookup maps for border nakshatras ──
+  // Top row: grid cols 1-7 → nak indices
+  const topNakMap = {1:2, 2:3, 3:4, 4:5, 5:6, 6:7, 7:8};
+  // Bottom row: grid cols 7→1 → nak indices
+  const botNakMap = {7:16, 6:17, 5:18, 4:19, 3:20, 2:21, 1:22};
+  // Right col: grid rows 1-7 → nak indices
+  const rightNakMap = {1:9, 2:10, 3:11, 4:12, 5:13, 6:14, 7:15};
+  // Left col: grid rows 7→1 → nak indices
+  const leftNakMap = {7:23, 6:24, 5:25, 4:26, 3:27, 2:0, 1:1};
+
+  // ── Extra top row ──
+  if (extraOn) {
+    const topTr = document.createElement("tr");
+    // Left corner
+    const lcTd = document.createElement("td");
+    lcTd.className = "extra-corner";
+    topTr.appendChild(lcTd);
+    for (let c = 0; c < 9; c++) {
+      const td = document.createElement("td");
+      if (c >= 1 && c <= 7 && topNakMap[c] !== undefined) {
+        td.className = "extra-top";
+        td.innerHTML = '<div class="extra-horiz-content">' + buildExtraCellHtml(topNakMap[c], data) + '</div>';
+      } else {
+        td.className = "extra-corner";
+      }
+      topTr.appendChild(td);
+    }
+    // Right corner
+    const rcTd = document.createElement("td");
+    rcTd.className = "extra-corner";
+    topTr.appendChild(rcTd);
+    tbody.appendChild(topTr);
+  }
+
+  // ── Main 9 grid rows ──
+  for (let r = 0; r < 9; r++) {
+    const tr = document.createElement("tr");
+
+    // Extra left cell
+    if (extraOn) {
+      const ltd = document.createElement("td");
+      if (r >= 1 && r <= 7 && leftNakMap[r] !== undefined) {
+        ltd.className = "extra-left";
+        ltd.innerHTML = '<div class="extra-side-content">' + buildExtraCellHtml(leftNakMap[r], data) + '</div>';
+      } else {
+        ltd.className = "extra-corner";
+      }
+      tr.appendChild(ltd);
+    }
+
+    for (let c = 0; c < 9; c++) {
+      const td = document.createElement("td");
+      const cell = grid[r][c];
+      td.className = "cell-" + cell.type;
+      td.id = "cell-"+r+"-"+c;
+
+      const key = r+","+c;
+      let html = "";
+
+      if (cell.type === "nakshatra") {
+        const isLeft = (c === 0);
+        const isRight = (c === 8);
+        const isVert = isLeft || isRight;
+
+        // Collect all planets for this cell
+        const np = natalMap[key] || [];
+        const tp = transitMap[key] || [];
+        let planetsHtml = '';
+        if (np.length || tp.length) {
+          planetsHtml = '<div class="planet-markers">';
+          np.forEach(pl => {
+            const abbr = PLANET_ABBR[pl.planet] || pl.planet.slice(0,2);
+            planetsHtml += '<span class="planet-dot planet-natal" title="Natal '+pl.planet+' P'+pl.pada+'">'+abbr+'</span>';
+          });
+          tp.forEach(pl => {
+            const abbr = PLANET_ABBR[pl.planet] || pl.planet.slice(0,2);
+            planetsHtml += '<span class="planet-dot planet-transit" title="Transit '+pl.planet+' P'+pl.pada+'">'+abbr+'</span>';
+          });
+          planetsHtml += '</div>';
+        }
+
+        if (isVert) {
+          html += '<div class="nak-cell-side">';
+          if (isRight && SHOW.padas) {
+            html += '<div class="nak-padas-vert">';
+            for (let pi = 1; pi <= 4; pi++) html += '<span class="nak-pada">'+pi+'</span>';
+            html += '</div>';
+          }
+          html += '<div class="nak-inner"><div class="nak-name">'+cell.short+'</div>'+planetsHtml+'</div>';
+          if (isLeft && SHOW.padas) {
+            html += '<div class="nak-padas-vert">';
+            for (let pi = 4; pi >= 1; pi--) html += '<span class="nak-pada">'+pi+'</span>';
+            html += '</div>';
+          }
+          html += '</div>';
+        } else {
+          html += '<div class="nak-cell">';
+          html += '<div class="nak-name">'+cell.short+'</div>';
+          html += planetsHtml;
+          if (SHOW.padas) {
+            html += '<div class="nak-padas">';
+            for (let pi = 1; pi <= 4; pi++) html += '<span class="nak-pada">'+pi+'</span>';
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+      }
+      else if (cell.type === "rashi") {
+        html += '<div class="rashi-name">'+cell.short+'</div>';
+        html += '<div class="rashi-hi">'+cell.name_hi+'</div>';
+      }
+      else if (cell.type === "center") {
+        let varaText = cell.vara || "";
+        if (cell.vara2) varaText += "/"+cell.vara2;
+        html += '<div class="center-vara">'+varaText+'</div>';
+        if (cell.tithi) {
+          const tithiNums = {
+            "Nanda":"1, 6, 11","Bhadra":"2, 7, 12","Jaya":"3, 8, 13",
+            "Rikta":"4, 9, 14","Poorna":"5, 10, 15"
+          };
+          const tithiHi = {
+            "Nanda":"नन्दा","Bhadra":"भद्रा","Jaya":"जया","Rikta":"रिक्ता","Poorna":"पूर्णा"
+          };
+          html += '<div class="center-tithi">'+cell.tithi+'</div>';
+          html += '<div style="font-size:0.5rem;color:#666;line-height:1.1;">'+(tithiHi[cell.tithi]||"")+'</div>';
+          html += '<div style="font-size:0.52rem;color:#1565c0;font-weight:700;margin-top:1px;">'+(tithiNums[cell.tithi]||"")+'</div>';
+        }
+      }
+      else if (cell.type === "vowel") {
+        html += '<div style="font-size:1.1rem;">'+cell.display+'</div>';
+      }
+      else if (cell.type === "pada_sound") {
+        html += '<div style="font-size:1rem;">'+cell.display+'</div>';
+      }
+
+      td.innerHTML = html;
+      tr.appendChild(td);
+    }
+
+    // Extra right cell
+    if (extraOn) {
+      const rtd = document.createElement("td");
+      if (r >= 1 && r <= 7 && rightNakMap[r] !== undefined) {
+        rtd.className = "extra-right";
+        rtd.innerHTML = '<div class="extra-side-content">' + buildExtraCellHtml(rightNakMap[r], data) + '</div>';
+      } else {
+        rtd.className = "extra-corner";
+      }
+      tr.appendChild(rtd);
+    }
+
+    tbody.appendChild(tr);
+  }
+
+  // ── Extra bottom row ──
+  if (extraOn) {
+    const botTr = document.createElement("tr");
+    // Left corner
+    const lcTd = document.createElement("td");
+    lcTd.className = "extra-corner";
+    botTr.appendChild(lcTd);
+    for (let c = 0; c < 9; c++) {
+      const td = document.createElement("td");
+      if (c >= 1 && c <= 7 && botNakMap[c] !== undefined) {
+        td.className = "extra-bottom";
+        td.innerHTML = '<div class="extra-horiz-content">' + buildExtraCellHtml(botNakMap[c], data) + '</div>';
+      } else {
+        td.className = "extra-corner";
+      }
+      botTr.appendChild(td);
+    }
+    // Right corner
+    const rcTd = document.createElement("td");
+    rcTd.className = "extra-corner";
+    botTr.appendChild(rcTd);
+    tbody.appendChild(botTr);
+  }
+
+  // Draw vedha lines
+  drawVedhaLines(data);
+
+  // Apply grid highlights (JKV, Latta, Upagraha markers)
+  applyGridHighlights(data);
+
+  // Render info panels
+  renderInfoPanels(data);
+}
+
+// ═══════════════════════════════════════════════════════════
+// VEDHA LINES (SVG overlay) — shubh/ashubh colored
+// ═══════════════════════════════════════════════════════════
+function drawVedhaLines(data) {
+  const svg = document.getElementById("vedhaSvg");
+  svg.innerHTML = "";
+
+  if (!SHOW.vedha || !data.vedha_lines) return;
+
+  const containerRect = document.getElementById("gridContainer").getBoundingClientRect();
+  svg.setAttribute("width", containerRect.width);
+  svg.setAttribute("height", containerRect.height);
+  svg.setAttribute("viewBox", "0 0 "+containerRect.width+" "+containerRect.height);
+
+  const vedhaStyles = {
+    "3way":  { width: 2.0, opacity: 0.5, dash: "6,3" },
+    "front": { width: 1.5, opacity: 0.6, dash: "none" },
+    "left":  { width: 1.8, opacity: 0.5, dash: "2,3" },
+    "right": { width: 1.8, opacity: 0.5, dash: "8,3,2,3" },
+  };
+
+  data.vedha_lines.forEach(vl => {
+    const fromCell = document.getElementById("cell-"+vl.from.row+"-"+vl.from.col);
+    if (!fromCell) return;
+    const fromRect = fromCell.getBoundingClientRect();
+    const fx = fromRect.left + fromRect.width/2 - containerRect.left;
+    const fy = fromRect.top + fromRect.height/2 - containerRect.top;
+
+    // Shubh = green, Ashubh = red
+    const color = (vl.nature === "shubh") ? "#2e7d32" : "#c62828";
+    const style = vedhaStyles[vl.vedha_type] || vedhaStyles["3way"];
+
+    vl.targets.forEach(t => {
+      const toCell = document.getElementById("cell-"+t.row+"-"+t.col);
+      if (!toCell) return;
+      const toRect = toCell.getBoundingClientRect();
+      const tx = toRect.left + toRect.width/2 - containerRect.left;
+      const ty = toRect.top + toRect.height/2 - containerRect.top;
+
+      const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+      line.setAttribute("x1", fx); line.setAttribute("y1", fy);
+      line.setAttribute("x2", tx); line.setAttribute("y2", ty);
+      line.setAttribute("stroke", color);
+      line.setAttribute("stroke-width", style.width);
+      line.setAttribute("stroke-opacity", style.opacity);
+      if (style.dash !== "none") line.setAttribute("stroke-dasharray", style.dash);
+      svg.appendChild(line);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// GRID HIGHLIGHTS (JKV, Latta, Upagraha)
+// ═══════════════════════════════════════════════════════════
+function applyGridHighlights(data) {
+  // Clear all highlights first
+  document.querySelectorAll(".cell-jkv-janma,.cell-jkv-karma,.cell-jkv-vinasha,.cell-latta").forEach(el => {
+    el.classList.remove("cell-jkv-janma","cell-jkv-karma","cell-jkv-vinasha","cell-latta");
+  });
+
+  // JKV highlights
+  if (SHOW.jkv && data.jkv) {
+    ["janma","karma","vinasha"].forEach(k => {
+      const j = data.jkv[k];
+      if (j && j.row !== null) {
+        const cell = document.getElementById("cell-"+j.row+"-"+j.col);
+        if (cell) cell.classList.add("cell-jkv-"+k);
+      }
+    });
+  }
+
+  // Latta highlights
+  if (SHOW.latta && data.graha_latta) {
+    data.graha_latta.forEach(l => {
+      if (l.kicked_row !== null) {
+        const cell = document.getElementById("cell-"+l.kicked_row+"-"+l.kicked_col);
+        if (cell) cell.classList.add("cell-latta");
+      }
+    });
+  }
+
+  // Upagraha markers on grid
+  if (SHOW.upagraha && data.upagrahas) {
+    data.upagrahas.forEach(u => {
+      if (u.row !== null) {
+        const cell = document.getElementById("cell-"+u.row+"-"+u.col);
+        if (cell) {
+          let marker = cell.querySelector(".upagraha-marker");
+          if (!marker) {
+            marker = document.createElement("div");
+            marker.className = "upagraha-marker";
+            marker.style.cssText = "position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:0.45rem;color:#fff;font-weight:700;background:#9c27b0;padding:1px 3px;border-radius:2px;z-index:5;white-space:nowrap;line-height:1;";
+            cell.appendChild(marker);
+          }
+          marker.textContent += (marker.textContent ? " " : "") + u.name.slice(0,3);
+        }
+      }
+    });
+  }
+
+  // Asta Disha overlay
+  document.querySelectorAll(".cell-asta-blocked").forEach(el => el.classList.remove("cell-asta-blocked"));
+  document.querySelectorAll(".asta-marker").forEach(el => el.remove());
+  if (SHOW.astadisha && data.transit_planets) {
+    const blocked = calcAstaDisha(data.transit_planets);
+    applyAstaDishaOverlay(blocked);
+    renderAstaDishaInfo(blocked);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// FEATURE TABS
+// ═══════════════════════════════════════════════════════════
+function showFeatureTab(tabId) {
+  document.querySelectorAll(".feature-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".feature-content").forEach(c => c.classList.remove("active"));
+  document.getElementById("tab-"+tabId).classList.add("active");
+  // Find and activate the clicked tab button
+  document.querySelectorAll(".feature-tab").forEach(t => {
+    if (t.getAttribute("onclick").includes(tabId)) t.classList.add("active");
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// INFO PANELS — all tabs
+// ═══════════════════════════════════════════════════════════
+function renderInfoPanels(data) {
+  // Positions tab
+  const natalDiv = document.getElementById("natalInfo");
+  const transitDiv = document.getElementById("transitInfo");
+  const vedhaMap = {};
+  (data.vedha_lines || []).forEach(vl => { vedhaMap[vl.planet] = vl; });
+
+  let nh = '';
+  (data.natal_planets || []).forEach(p => {
+    const retro = p.retrograde ? " (R)" : "";
+    nh += '<div class="info-card"><span class="label">'+p.planet+retro+'</span><br>'
+      + p.nakshatra + ' P'+p.pada + '<br>'
+      + p.sign + ' ' + (p.longitude%30).toFixed(1) + '&deg;</div>';
+  });
+  natalDiv.innerHTML = nh;
+
+  // Transit summary bar: weekday, tithi, moon phase
+  let summaryHtml = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:0.82rem;">';
+  summaryHtml += '<div style="padding:5px 12px;background:#fff;border-radius:4px;border:1px solid #ddd;"><b>Vara:</b> '+(data.transit_weekday||"")+'</div>';
+  summaryHtml += '<div style="padding:5px 12px;background:#fff;border-radius:4px;border:1px solid #ddd;"><b>Tithi:</b> '+(data.transit_tithi_group||"")+' (#'+(data.transit_tithi_num||"")+')</div>';
+  const moonWaxing = data.moon_waxing;
+  const pakshaColor = moonWaxing ? "#2e7d32" : "#c62828";
+  const pakshaText = moonWaxing ? "Shukla Paksha (शुक्ल) — Moon is Shubh" : "Krishna Paksha (कृष्ण) — Moon is Ashubh";
+  summaryHtml += '<div style="padding:5px 12px;background:'+(moonWaxing?"#f1f8e9":"#fce4ec")+';border-radius:4px;border:1px solid '+pakshaColor+';color:'+pakshaColor+';font-weight:700;">'+pakshaText+'</div>';
+  summaryHtml += '</div>';
+
+  let th = summaryHtml;
+  (data.transit_planets || []).forEach(p => {
+    const retro = p.retrograde ? " (R)" : "";
+    const vInfo = vedhaMap[p.planet];
+    const vtNames = {"3way":"3-Way","front":"Front","left":"Left (Ati-chari)","right":"Right (Retro)"};
+    let vedhaLabel = "";
+    if (vInfo) {
+      vedhaLabel = '<br><span style="color:#555;font-size:0.7rem;">'+( vtNames[vInfo.vedha_type]||"?")
+        +' | '+(vInfo.nature==="shubh"?"<b style=color:#2e7d32>Shubh</b>":"<b style=color:#c62828>Ashubh</b>")
+        +' | '+(p.speed||0).toFixed(4)+'&deg;/d</span>';
+    }
+    // Moon gets special paksha label
+    let moonExtra = "";
+    if (p.planet === "Moon") {
+      moonExtra = '<br><span style="font-size:0.7rem;font-weight:700;color:'+pakshaColor+';">'+(moonWaxing?"Shukla — Shubh":"Krishna — Ashubh")+'</span>';
+    }
+    th += '<div class="info-card"><span class="label" style="color:#c62828;">'+p.planet+retro+'</span><br>'
+      + p.nakshatra + ' P'+p.pada + '<br>'
+      + p.sign + ' ' + (p.longitude%30).toFixed(1) + '&deg;' + vedhaLabel + moonExtra + '</div>';
+  });
+  transitDiv.innerHTML = th;
+
+  // Vedha Hits tab
+  renderVedhaHits(data);
+
+  // Graha Bala tab
+  renderGrahaBala(data);
+
+  // Graha Latta tab
+  renderGrahaLatta(data);
+
+  // Upagraha tab
+  renderUpagrahas(data);
+
+  // Kurma tab
+  renderKurma(data);
+
+  // Prashna tab
+  renderPrashna(data);
+
+  // Bindu info in rules section
+  renderSuryaBindu(data);
+  renderChandraBindu(data);
+
+  // Asta Disha info in rules section (always show if data available)
+  if (data.transit_planets) {
+    const blocked = calcAstaDisha(data.transit_planets);
+    renderAstaDishaInfo(blocked);
+  }
+}
+
+function renderVedhaHits(data) {
+  const div = document.getElementById("vedhaHitsGrid");
+  if (!data.vedha_hits || !data.vedha_hits.length) {
+    div.innerHTML = '<p style="color:#888;">No vedha hits detected.</p>';
+    return;
+  }
+  let h = '';
+  data.vedha_hits.forEach(hit => {
+    const cls = hit.nature === "shubh" ? "shubh" : "ashubh";
+    const icon = hit.nature === "shubh" ? "+" : "-";
+    const typeLabel = {planet:"Planet",vara:"Vara",tithi:"Tithi",rashi:"Rashi"}[hit.target_type] || "";
+    h += '<div class="info-card '+cls+'">'
+      + '<span class="label">'+hit.transit_planet+' → '+hit.natal_target+'</span><br>'
+      + '<span style="font-size:0.75rem;">'+typeLabel+' vedha ('+hit.nature+')</span></div>';
+  });
+  div.innerHTML = h;
+}
+
+function renderGrahaBala(data) {
+  const div = document.getElementById("grahaBalaGrid");
+  if (!data.graha_bala || !data.graha_bala.length) {
+    div.innerHTML = '<p style="color:#888;">No data.</p>';
+    return;
+  }
+  let h = '';
+  data.graha_bala.forEach(gb => {
+    const cls = gb.score > 0 ? "score-pos" : (gb.score < 0 ? "score-neg" : "score-zero");
+    const sign = gb.score > 0 ? "+" : "";
+    h += '<div class="info-card">'
+      + '<span class="label">'+gb.planet+'</span> '
+      + '<span class="score-badge '+cls+'">'+sign+gb.score+'</span><br>'
+      + '<span style="font-size:0.7rem;color:#666;">'+gb.factors.join(", ")+'</span></div>';
+  });
+  div.innerHTML = h;
+}
+
+function renderGrahaLatta(data) {
+  const div = document.getElementById("lattaGrid");
+  if (!data.graha_latta || !data.graha_latta.length) {
+    div.innerHTML = '<p style="color:#888;">No latta data.</p>';
+    return;
+  }
+  let h = '';
+  data.graha_latta.forEach(l => {
+    h += '<div class="info-card ashubh">'
+      + '<span class="label">'+l.planet+'</span> '+l.label_hi+'<br>'
+      + '<span style="font-size:0.75rem;">From <b>'+l.planet_nak+'</b> kicks <b>'+l.kick_count+'</b> '+l.direction+'</span><br>'
+      + '<span style="font-size:0.8rem;font-weight:700;color:#9c27b0;">→ '+l.kicked_nak+'</span></div>';
+  });
+  div.innerHTML = h;
+}
+
+function renderUpagrahas(data) {
+  const div = document.getElementById("upagrahaGrid");
+  if (!data.upagrahas || !data.upagrahas.length) {
+    div.innerHTML = '<p style="color:#888;">No upagraha data.</p>';
+    return;
+  }
+  let h = '';
+  data.upagrahas.forEach(u => {
+    h += '<div class="info-card" style="border-left-color:#9c27b0;">'
+      + '<span class="label" style="color:#9c27b0;">'+u.name+'</span><br>'
+      + u.nakshatra + ' P'+u.pada+'<br>'
+      + u.sign + ' ' + (u.longitude%30).toFixed(1) + '&deg;</div>';
+  });
+  div.innerHTML = h;
+}
+
+function renderKurma(data) {
+  if (!data.kurma) return;
+  const vis = document.getElementById("kurmaChakraVis");
+  if (!vis) return;
+
+  // Merge natal + transit into direction groups
+  const byDir = {};
+  (data.kurma.natal || []).forEach(i => {
+    if (!byDir[i.direction]) byDir[i.direction] = {natal:[], transit:[], bodies:new Set()};
+    byDir[i.direction].natal.push(i);
+    byDir[i.direction].bodies.add(i.body_part);
+  });
+  (data.kurma.transit || []).forEach(i => {
+    if (!byDir[i.direction]) byDir[i.direction] = {natal:[], transit:[], bodies:new Set()};
+    byDir[i.direction].transit.push(i);
+    byDir[i.direction].bodies.add(i.body_part);
+  });
+
+  // Direction labels and body part descriptions
+  const dirMeta = {
+    "E":  {label:"E पूर्व", hi:"शिर (Head)", bodySum:"Head, Neck"},
+    "SE": {label:"SE आग्नेय", hi:"दक्षिण कन्धा", bodySum:"Right shoulder, side, hip"},
+    "S":  {label:"S दक्षिण", hi:"दक्षिण पाद", bodySum:"Right legs, thigh"},
+    "SW": {label:"SW नैऋत्य", hi:"दक्षिण पार्श्व", bodySum:"Right flank, foot"},
+    "W":  {label:"W पश्चिम", hi:"पुच्छ (Tail)", bodySum:"Tail"},
+    "NW": {label:"NW वायव्य", hi:"वाम पार्श्व", bodySum:"Left hip, flank, foot"},
+    "N":  {label:"N उत्तर", hi:"वाम पाद", bodySum:"Left legs"},
+    "NE": {label:"NE ईशान", hi:"वाम कन्धा", bodySum:"Left shoulder, thigh, side"},
+    "C":  {label:"Center मध्य", hi:"हृदय (Heart)", bodySum:"Heart"}
+  };
+
+  // Turtle body SVG + positioned HTML parts
+  // Layout: turtle facing RIGHT (East)
+  // Width 540, Height 420
+  const W = 540, H = 420;
+  const cx = W/2, cy = H/2;
+
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" style="width:'+W+'px;height:'+H+'px;">';
+
+  // Shell (body ellipse)
+  svg += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="140" ry="120" fill="#e8d5b0" stroke="#8B6914" stroke-width="2.5"/>';
+  // Shell pattern (hexagonal lines)
+  svg += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="95" ry="80" fill="none" stroke="#c4a86a" stroke-width="1" stroke-dasharray="8,4"/>';
+  svg += '<line x1="'+(cx-60)+'" y1="'+(cy-90)+'" x2="'+(cx-60)+'" y2="'+(cy+90)+'" stroke="#c4a86a" stroke-width="0.8"/>';
+  svg += '<line x1="'+(cx+60)+'" y1="'+(cy-90)+'" x2="'+(cx+60)+'" y2="'+(cy+90)+'" stroke="#c4a86a" stroke-width="0.8"/>';
+  svg += '<line x1="'+(cx-140)+'" y1="'+cy+'" x2="'+(cx+140)+'" y2="'+cy+'" stroke="#c4a86a" stroke-width="0.8"/>';
+
+  // Head (East) — right side, oval
+  svg += '<ellipse cx="'+(cx+185)+'" cy="'+cy+'" rx="42" ry="32" fill="#d4c4a0" stroke="#8B6914" stroke-width="2"/>';
+  // Eyes
+  svg += '<circle cx="'+(cx+200)+'" cy="'+(cy-10)+'" r="3" fill="#333"/>';
+  svg += '<circle cx="'+(cx+200)+'" cy="'+(cy+10)+'" r="3" fill="#333"/>';
+
+  // Tail (West) — left side, triangle-ish
+  svg += '<polygon points="'+(cx-185)+','+cy+' '+(cx-155)+','+(cy-12)+' '+(cx-155)+','+(cy+12)+'" fill="#d4c4a0" stroke="#8B6914" stroke-width="2"/>';
+
+  // Front right leg (SE) — bottom-right
+  svg += '<ellipse cx="'+(cx+95)+'" cy="'+(cy+145)+'" rx="28" ry="40" fill="#d4c4a0" stroke="#8B6914" stroke-width="2" transform="rotate(20,'+(cx+95)+','+(cy+145)+')"/>';
+  // Front left leg (NE) — top-right
+  svg += '<ellipse cx="'+(cx+95)+'" cy="'+(cy-145)+'" rx="28" ry="40" fill="#d4c4a0" stroke="#8B6914" stroke-width="2" transform="rotate(-20,'+(cx+95)+','+(cy-145)+')"/>';
+  // Hind right leg (SW) — bottom-left
+  svg += '<ellipse cx="'+(cx-95)+'" cy="'+(cy+145)+'" rx="28" ry="40" fill="#d4c4a0" stroke="#8B6914" stroke-width="2" transform="rotate(-20,'+(cx-95)+','+(cy+145)+')"/>';
+  // Hind left leg (NW) — top-left
+  svg += '<ellipse cx="'+(cx-95)+'" cy="'+(cy-145)+'" rx="28" ry="40" fill="#d4c4a0" stroke="#8B6914" stroke-width="2" transform="rotate(20,'+(cx-95)+','+(cy-145)+')"/>';
+
+  // Direction labels on the turtle body
+  const dirPos = {
+    "E":  {x: cx+170, y: cy-26},
+    "W":  {x: cx-182, y: cy-16},
+    "N":  {x: cx, y: cy-128},
+    "S":  {x: cx, y: cy+118},
+    "NE": {x: cx+82, y: cy-152},
+    "SE": {x: cx+82, y: cy+134},
+    "NW": {x: cx-108, y: cy-152},
+    "SW": {x: cx-108, y: cy+134},
+    "C":  {x: cx, y: cy-8}
+  };
+
+  svg += '</svg>';
+
+  // Build the container with SVG + positioned part boxes
+  let html = '<div class="kurma-container" style="width:'+W+'px;height:'+H+'px;">';
+  html += svg;
+
+  // Part positions for HTML overlays (x, y relative to container)
+  const partPos = {
+    "E":  {x: cx+148, y: cy-18, w:80},
+    "W":  {x: cx-230, y: cy-22, w:80},
+    "S":  {x: cx-40, y: cy+108, w:85},
+    "N":  {x: cx-40, y: cy-155, w:85},
+    "SE": {x: cx+60, y: cy+120, w:85},
+    "NE": {x: cx+60, y: cy-170, w:85},
+    "SW": {x: cx-150, y: cy+120, w:85},
+    "NW": {x: cx-150, y: cy-170, w:85},
+    "C":  {x: cx-42, y: cy-25, w:88}
+  };
+
+  const allDirs = ["E","NE","N","NW","W","SW","S","SE","C"];
+  allDirs.forEach(d => {
+    const pos = partPos[d];
+    const meta = dirMeta[d];
+    const info = byDir[d] || {natal:[], transit:[], bodies:new Set()};
+    const hasPlanets = info.natal.length > 0 || info.transit.length > 0;
+
+    html += '<div class="kurma-part'+(hasPlanets?" has-planets":"")+'" style="left:'+pos.x+'px;top:'+pos.y+'px;min-width:'+pos.w+'px;">';
+    html += '<div class="kurma-part-dir">'+meta.label+'</div>';
+    html += '<div class="kurma-part-body">'+meta.hi+'</div>';
+
+    if (hasPlanets) {
+      html += '<div class="kurma-part-planets">';
+      info.natal.forEach(p => {
+        html += '<div class="kurma-planet natal">'+p.planet+'</div>';
+      });
+      info.transit.forEach(p => {
+        html += '<div class="kurma-planet transit">'+p.planet+'</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+
+  html += '</div>';
+  vis.innerHTML = html;
+}
+
+function renderPrashna(data) {
+  const div = document.getElementById("prashnaInfo");
+  if (!data.prashna) { div.innerHTML = '<p style="color:#888;">No prashna data.</p>'; return; }
+  const p = data.prashna;
+  const overallColors = {favorable:"#2e7d32",unfavorable:"#c62828",neutral:"#ff9800"};
+  const overallLabels = {favorable:"Favorable (शुभ)",unfavorable:"Unfavorable (अशुभ)",neutral:"Neutral (मध्यम)"};
+
+  let h = '<div class="info-grid">';
+  h += '<div class="info-card"><span class="label">Vara Lord</span><br>'+p.vara_lord+'</div>';
+  h += '<div class="info-card"><span class="label">Tithi Group</span><br>'+p.tithi_group+' ('+p.tithi_nature+')</div>';
+  h += '<div class="info-card"><span class="label">Moon Nakshatra</span><br>'+p.moon_nakshatra
+    + (p.moon_vedha_by.length ? '<br><span style="color:#c62828;font-size:0.7rem;">Vedha by: '+p.moon_vedha_by.join(", ")+'</span>' : '')
+    + '</div>';
+  h += '<div class="info-card"><span class="label">Shubh / Ashubh Hits</span><br>'
+    + '<span style="color:#2e7d32;font-weight:700;">'+p.shubh_hits+' Shubh</span> | '
+    + '<span style="color:#c62828;font-weight:700;">'+p.ashubh_hits+' Ashubh</span></div>';
+  h += '<div class="info-card" style="border-left-color:'+(overallColors[p.overall]||"#666")+';">'
+    + '<span class="label">Overall</span><br>'
+    + '<b style="color:'+(overallColors[p.overall]||"#666")+';font-size:1rem;">'+(overallLabels[p.overall]||p.overall)+'</b></div>';
+  h += '</div>';
+
+  // JKV info
+  if (data.jkv && data.jkv.janma) {
+    h += '<h4 style="margin-top:14px;color:var(--accent);">Janma-Karma-Vinasha Nakshatras</h4>';
+    h += '<div class="info-grid">';
+    h += '<div class="info-card" style="border-left-color:#4caf50;"><span class="label" style="color:#4caf50;">Janma (जन्म)</span><br>'+data.jkv.janma.name+'</div>';
+    h += '<div class="info-card" style="border-left-color:#ff9800;"><span class="label" style="color:#ff9800;">Karma (कर्म)</span><br>'+data.jkv.karma.name+'</div>';
+    h += '<div class="info-card" style="border-left-color:#f44336;"><span class="label" style="color:#f44336;">Vinasha (विनाश)</span><br>'+data.jkv.vinasha.name+'</div>';
+    h += '</div>';
+  }
+
+  // Transit info
+  h += '<h4 style="margin-top:14px;color:var(--accent);">Transit Summary</h4>';
+  h += '<div class="info-grid">';
+  h += '<div class="info-card"><span class="label">Transit Date</span><br>'+(data.transit_date||"")+'</div>';
+  h += '<div class="info-card"><span class="label">Weekday</span><br>'+(data.transit_weekday||"")+'</div>';
+  h += '<div class="info-card"><span class="label">Tithi</span><br>'+(data.transit_tithi_group||"")+' (#'+(data.transit_tithi_num||"")+')</div>';
+  h += '<div class="info-card"><span class="label">Moon Phase</span><br>'+(data.moon_waxing ? "Shukla Paksha (Waxing)" : "Krishna Paksha (Waning)")+'</div>';
+  h += '</div>';
+
+  div.innerHTML = h;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SURYA BINDU & CHANDRA BINDU
+// ═══════════════════════════════════════════════════════════
+
+const RASHI_NAMES_EN = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
+const RASHI_NAMES_HI = ["मेष","वृष","मिथुन","कर्क","सिंह","कन्या","तुला","वृश्चिक","धनु","मकर","कुम्भ","मीन"];
+
+function renderSuryaBindu(data) {
+  const div = document.getElementById("suryaBinduInfo");
+  if (!div) return;
+  if (!data.natal_planets) { div.style.display = "none"; return; }
+
+  let sunP = null;
+  for (const p of data.natal_planets) {
+    if (p.planet === "Sun") { sunP = p; break; }
+  }
+  if (!sunP) { div.style.display = "none"; return; }
+
+  // Find vedha hits on Sun's bindu cells
+  const sunVedha = [];
+  if (data.vedha_hits) {
+    for (const vh of data.vedha_hits) {
+      // Check if vedha hits Sun's nakshatra cell or Sun's rashi cell
+      if (vh.row === sunP.row && vh.col === sunP.col) {
+        sunVedha.push(vh);
+      }
+    }
+  }
+
+  // Find sign index for rashi display
+  const signIdx = RASHI_NAMES_EN.indexOf(sunP.sign);
+  const signHi = signIdx >= 0 ? RASHI_NAMES_HI[signIdx] : "";
+
+  let h = '<b style="color:#e65100;">☉ Surya Bindu for this chart:</b><br>';
+  h += '<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:0.78rem;">';
+  h += '<tr style="background:#fff3e0;"><th style="padding:4px 8px;text-align:left;border:1px solid #f9a825;">Component</th><th style="padding:4px 8px;text-align:left;border:1px solid #f9a825;">Value</th><th style="padding:4px 8px;text-align:left;border:1px solid #f9a825;">Grid Position</th></tr>';
+  h += '<tr><td style="padding:4px 8px;border:1px solid #ffe0b2;"><b>Sun Nakshatra</b></td><td style="padding:4px 8px;border:1px solid #ffe0b2;">' + sunP.nakshatra + ' (Pada ' + sunP.pada + ')</td><td style="padding:4px 8px;border:1px solid #ffe0b2;">Row ' + sunP.row + ', Col ' + sunP.col + '</td></tr>';
+  h += '<tr><td style="padding:4px 8px;border:1px solid #ffe0b2;"><b>Sun Rashi</b></td><td style="padding:4px 8px;border:1px solid #ffe0b2;">' + sunP.sign + (signHi ? ' (' + signHi + ')' : '') + '</td><td style="padding:4px 8px;border:1px solid #ffe0b2;">Inner border rashi cell</td></tr>';
+  h += '</table>';
+
+  // Show vedha on Surya Bindu
+  if (sunVedha.length > 0) {
+    h += '<div style="margin-top:8px;"><b>Transit Vedha on Surya Bindu:</b></div>';
+    h += '<table style="width:100%;border-collapse:collapse;margin-top:4px;font-size:0.75rem;">';
+    h += '<tr style="background:#fff3e0;"><th style="padding:3px 6px;border:1px solid #f9a825;">Transit Planet</th><th style="padding:3px 6px;border:1px solid #f9a825;">Nature</th><th style="padding:3px 6px;border:1px solid #f9a825;">Target</th><th style="padding:3px 6px;border:1px solid #f9a825;">Effect</th></tr>';
+    for (const vh of sunVedha) {
+      const isShubh = vh.nature === "shubh";
+      const clr = isShubh ? "#2e7d32" : "#c62828";
+      const effect = isShubh ? "Benefic — authority boost, recognition" : "Malefic — authority troubles, health stress";
+      h += '<tr><td style="padding:3px 6px;border:1px solid #ffe0b2;color:'+clr+';font-weight:700;">' + vh.transit_planet + '</td>';
+      h += '<td style="padding:3px 6px;border:1px solid #ffe0b2;color:'+clr+';">' + (isShubh ? "शुभ Shubh" : "अशुभ Ashubh") + '</td>';
+      h += '<td style="padding:3px 6px;border:1px solid #ffe0b2;">' + (vh.natal_target || sunP.nakshatra) + '</td>';
+      h += '<td style="padding:3px 6px;border:1px solid #ffe0b2;">' + effect + '</td></tr>';
+    }
+    h += '</table>';
+  } else {
+    h += '<div style="margin-top:6px;color:#666;">No transit vedha currently hitting Surya Bindu nakshatra cell.</div>';
+  }
+
+  div.innerHTML = h;
+  div.style.display = "block";
+}
+
+function renderChandraBindu(data) {
+  const div = document.getElementById("chandraBinduInfo");
+  if (!div) return;
+  if (!data.natal_planets) { div.style.display = "none"; return; }
+
+  let moonP = null;
+  for (const p of data.natal_planets) {
+    if (p.planet === "Moon") { moonP = p; break; }
+  }
+  if (!moonP) { div.style.display = "none"; return; }
+
+  const signIdx = RASHI_NAMES_EN.indexOf(moonP.sign);
+  const signHi = signIdx >= 0 ? RASHI_NAMES_HI[signIdx] : "";
+
+  // Birth tithi and vara from prashna/transit data
+  const birthTithi = data.birth_tithi_group || "—";
+  const birthVara = data.birth_vara || "—";
+  // Janma akshar (first pada sound of Moon's nakshatra pada)
+  const moonNakPadas = NAK_PADA_SOUNDS[moonP.nakshatra];
+  const janmaAkshar = moonNakPadas ? (moonNakPadas[moonP.pada - 1] || moonNakPadas[0]) : "—";
+
+  // Find vedha hits on Moon's bindu cells
+  const moonVedha = [];
+  if (data.vedha_hits) {
+    for (const vh of data.vedha_hits) {
+      if (vh.row === moonP.row && vh.col === moonP.col) {
+        moonVedha.push(vh);
+      }
+    }
+  }
+
+  let h = '<b style="color:#0d47a1;">☽ Chandra Bindu for this chart:</b><br>';
+  h += '<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:0.78rem;">';
+  h += '<tr style="background:#e3f2fd;"><th style="padding:4px 8px;text-align:left;border:1px solid #1565c0;">Component</th><th style="padding:4px 8px;text-align:left;border:1px solid #1565c0;">Value</th><th style="padding:4px 8px;text-align:left;border:1px solid #1565c0;">Grid Position</th></tr>';
+  h += '<tr><td style="padding:4px 8px;border:1px solid #bbdefb;"><b>Moon Nakshatra (Janma)</b></td><td style="padding:4px 8px;border:1px solid #bbdefb;">' + moonP.nakshatra + ' (Pada ' + moonP.pada + ')</td><td style="padding:4px 8px;border:1px solid #bbdefb;">Row ' + moonP.row + ', Col ' + moonP.col + '</td></tr>';
+  h += '<tr><td style="padding:4px 8px;border:1px solid #bbdefb;"><b>Moon Rashi (Janma Rashi)</b></td><td style="padding:4px 8px;border:1px solid #bbdefb;">' + moonP.sign + (signHi ? ' (' + signHi + ')' : '') + '</td><td style="padding:4px 8px;border:1px solid #bbdefb;">Inner border rashi cell</td></tr>';
+  h += '<tr><td style="padding:4px 8px;border:1px solid #bbdefb;"><b>Janma Akshar</b></td><td style="padding:4px 8px;border:1px solid #bbdefb;">' + janmaAkshar + '</td><td style="padding:4px 8px;border:1px solid #bbdefb;">Vowel/Pada sound cell</td></tr>';
+  h += '<tr><td style="padding:4px 8px;border:1px solid #bbdefb;"><b>Birth Tithi Group</b></td><td style="padding:4px 8px;border:1px solid #bbdefb;">' + birthTithi + '</td><td style="padding:4px 8px;border:1px solid #bbdefb;">Center tithi cell</td></tr>';
+  h += '<tr><td style="padding:4px 8px;border:1px solid #bbdefb;"><b>Birth Vara</b></td><td style="padding:4px 8px;border:1px solid #bbdefb;">' + birthVara + '</td><td style="padding:4px 8px;border:1px solid #bbdefb;">Center vara cell</td></tr>';
+  h += '</table>';
+
+  // Show vedha on Chandra Bindu
+  if (moonVedha.length > 0) {
+    h += '<div style="margin-top:8px;"><b>Transit Vedha on Chandra Bindu (Janma Nakshatra):</b></div>';
+    h += '<table style="width:100%;border-collapse:collapse;margin-top:4px;font-size:0.75rem;">';
+    h += '<tr style="background:#e3f2fd;"><th style="padding:3px 6px;border:1px solid #1565c0;">Transit Planet</th><th style="padding:3px 6px;border:1px solid #1565c0;">Nature</th><th style="padding:3px 6px;border:1px solid #1565c0;">Target</th><th style="padding:3px 6px;border:1px solid #1565c0;">Effect</th></tr>';
+    for (const vh of moonVedha) {
+      const isShubh = vh.nature === "shubh";
+      const clr = isShubh ? "#2e7d32" : "#c62828";
+      const effect = isShubh ? "Benefic — mental peace, good health, prosperity" : "Malefic — mental unrest, health issues, obstacles";
+      h += '<tr><td style="padding:3px 6px;border:1px solid #bbdefb;color:'+clr+';font-weight:700;">' + vh.transit_planet + '</td>';
+      h += '<td style="padding:3px 6px;border:1px solid #bbdefb;color:'+clr+';">' + (isShubh ? "शुभ Shubh" : "अशुभ Ashubh") + '</td>';
+      h += '<td style="padding:3px 6px;border:1px solid #bbdefb;">' + (vh.natal_target || moonP.nakshatra) + '</td>';
+      h += '<td style="padding:3px 6px;border:1px solid #bbdefb;">' + effect + '</td></tr>';
+    }
+    h += '</table>';
+  } else {
+    h += '<div style="margin-top:6px;color:#666;">No transit vedha currently hitting Chandra Bindu (Janma Nakshatra) cell.</div>';
+  }
+
+  div.innerHTML = h;
+  div.style.display = "block";
+}
+
+// ═══════════════════════════════════════════════════════════
+// ASTA DISHA (COMBUST DIRECTIONS)
+// ═══════════════════════════════════════════════════════════
+
+// Planet → direction mapping
+const PLANET_DIRECTION = {
+  "Moon": "NW", "Mars": "S", "Mercury": "N",
+  "Jupiter": "NE", "Venus": "SE", "Saturn": "W"
+};
+const DIR_LABELS = {
+  "E":"East पूर्व","SE":"Southeast आग्नेय","S":"South दक्षिण","SW":"Southwest नैऋत्य",
+  "W":"West पश्चिम","NW":"Northwest वायव्य","N":"North उत्तर","NE":"Northeast ईशान"
+};
+
+// Combustion thresholds in degrees from Sun
+const COMBUSTION_THRESHOLDS = {
+  "Moon": {normal: 12, retro: 12},
+  "Mars": {normal: 17, retro: 17},
+  "Mercury": {normal: 14, retro: 12},
+  "Jupiter": {normal: 11, retro: 11},
+  "Venus": {normal: 10, retro: 8},
+  "Saturn": {normal: 15, retro: 15}
+};
+
+// SBC grid cells for each direction (Kurma Chakra mapping)
+// Based on the 9x9 grid positions
+const DIR_CELLS = {
+  "E":  [[0,1],[0,7],[1,0],[1,8],[8,1],[8,7]],  // East border nakshatras: Ashwini, Bharani, Revati
+  "SE": [[0,2],[0,3],[7,5],[7,6]],                // SE: Krittika, Vishakha, Anuradha
+  "S":  [[0,4],[0,5],[1,7],[6,1],[7,1],[7,2],[7,3]], // South: Rohini, Mrigashira, Hasta, Chitra, P.Ashadha
+  "SW": [[5,7],[6,7]],                            // SW: Swati, Mula
+  "W":  [[3,8],[4,8],[5,8],[6,8]],                // West: Magha, P.Phalguni, U.Phalguni, Jyeshtha
+  "NW": [[7,8],[8,6],[8,5]],                      // NW: Ashlesha, U.Ashadha, Shatabhisha
+  "N":  [[8,2],[8,3],[8,4]],                      // North: Punarvasu, Pushya, Shravana, Dhanishtha
+  "NE": [[1,1],[8,8],[7,7]]                       // NE: Ardra, P.Bhadrapada, U.Bhadrapada
+};
+
+function calcAstaDisha(transitPlanets) {
+  // Find Sun's longitude
+  let sunLon = null;
+  for (const p of transitPlanets) {
+    if (p.planet === "Sun") { sunLon = p.longitude; break; }
+  }
+  if (sunLon === null) return [];
+
+  const blocked = [];
+  for (const p of transitPlanets) {
+    const thresh = COMBUSTION_THRESHOLDS[p.planet];
+    if (!thresh) continue;
+    const diff = Math.abs(((p.longitude - sunLon) % 360 + 540) % 360 - 180);
+    const limit = p.retrograde ? thresh.retro : thresh.normal;
+    if (diff <= limit) {
+      const dir = PLANET_DIRECTION[p.planet];
+      blocked.push({
+        planet: p.planet,
+        direction: dir,
+        dirLabel: DIR_LABELS[dir],
+        distance: Math.round(diff * 100) / 100,
+        threshold: limit,
+        retrograde: p.retrograde
+      });
+    }
+  }
+  return blocked;
+}
+
+function applyAstaDishaOverlay(blocked) {
+  // Get all blocked directions
+  const blockedDirs = new Set(blocked.map(b => b.direction));
+
+  // Map direction to SBC grid rows/cols based on Kurma Chakra
+  // The SBC grid border maps:
+  // Top row (row 0): cols 1-7 = East/NE nakshatras
+  // Bottom row (row 8): cols 1-7 = NW/N/West nakshatras
+  // Right col (col 8): rows 1-7 = SE/S nakshatras
+  // Left col (col 0): rows 1-7 = W/SW nakshatras
+  // Using Kurma direction mapping to border cells
+
+  // Simplified: map each Kurma direction to the grid quadrant
+  const dirToCells = {
+    "E":  [[0,1],[0,7],[1,0],[1,8]],      // Ashwini(left-1), Ashlesha(top-7), Bharani(left-0→row1), Revati(left mapped)
+    "NE": [[1,1],[7,7],[8,8]],
+    "N":  [[8,2],[8,3],[8,4],[8,5]],
+    "NW": [[7,0],[8,0],[8,1]],
+    "W":  [[3,0],[4,0],[5,0],[6,0]],
+    "SW": [[6,8],[5,8]],
+    "S":  [[0,3],[0,4],[0,5],[3,8],[4,8]],
+    "SE": [[0,2],[0,6],[1,8],[2,8]]
+  };
+
+  for (const dir of blockedDirs) {
+    const planetName = blocked.find(b => b.direction === dir)?.planet || "";
+    // Highlight the rashi cells associated with this direction in the center
+    // And mark border cells in that quadrant
+    // Use a simpler approach: highlight based on row/col quadrants
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const cell = document.getElementById("cell-"+r+"-"+c);
+        if (!cell) continue;
+        let isInDir = false;
+
+        // Map grid regions to compass directions
+        if (dir === "N" && r >= 6 && c >= 2 && c <= 6) isInDir = true;
+        if (dir === "S" && r <= 2 && c >= 2 && c <= 6) isInDir = true;
+        if (dir === "E" && c <= 2 && r >= 2 && r <= 6) isInDir = true;
+        if (dir === "W" && c >= 6 && r >= 2 && r <= 6) isInDir = true;
+        if (dir === "NE" && r >= 6 && c <= 2) isInDir = true;
+        if (dir === "NW" && r >= 6 && c >= 6) isInDir = true;
+        if (dir === "SE" && r <= 2 && c <= 2) isInDir = true;
+        if (dir === "SW" && r <= 2 && c >= 6) isInDir = true;
+
+        if (isInDir) {
+          cell.classList.add("cell-asta-blocked");
+          // Add small marker only on corner/edge cell of that region
+          if ((dir === "N" && r === 7 && c === 4) ||
+              (dir === "S" && r === 1 && c === 4) ||
+              (dir === "E" && r === 4 && c === 1) ||
+              (dir === "W" && r === 4 && c === 7) ||
+              (dir === "NE" && r === 7 && c === 1) ||
+              (dir === "NW" && r === 7 && c === 7) ||
+              (dir === "SE" && r === 1 && c === 1) ||
+              (dir === "SW" && r === 1 && c === 7)) {
+            const mk = document.createElement("div");
+            mk.className = "asta-marker";
+            mk.textContent = "✕ " + planetName.slice(0,3);
+            cell.appendChild(mk);
+          }
+        }
+      }
+    }
+  }
+}
+
+function renderAstaDishaInfo(blocked) {
+  const div = document.getElementById("astaDishaInfo");
+  if (!div) return;
+
+  if (blocked.length === 0) {
+    div.innerHTML = '<b style="color:#2e7d32;">✓ No Asta Disha — all directions are open.</b><br><span style="font-size:0.75rem;color:#666;">No planet is currently combust, so no direction is blocked for travel or new ventures.</span>';
+    div.style.display = "block";
+    div.style.background = "#e8f5e9";
+    div.style.borderColor = "#2e7d32";
+    return;
+  }
+
+  let h = '<b style="color:#c62828;">⚠ Asta Disha — Blocked Directions:</b><br>';
+  h += '<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:0.78rem;">';
+  h += '<tr style="background:#fce4ec;"><th style="padding:4px 8px;text-align:left;border:1px solid #c62828;">Planet (Combust)</th><th style="padding:4px 8px;text-align:left;border:1px solid #c62828;">Blocked Direction</th><th style="padding:4px 8px;text-align:left;border:1px solid #c62828;">Distance from Sun</th><th style="padding:4px 8px;text-align:left;border:1px solid #c62828;">Threshold</th></tr>';
+  for (const b of blocked) {
+    h += '<tr>';
+    h += '<td style="padding:4px 8px;border:1px solid #f8bbd0;font-weight:700;color:#c62828;">' + b.planet + (b.retrograde ? ' (Rx)' : '') + '</td>';
+    h += '<td style="padding:4px 8px;border:1px solid #f8bbd0;font-weight:700;">' + b.dirLabel + '</td>';
+    h += '<td style="padding:4px 8px;border:1px solid #f8bbd0;">' + b.distance + '°</td>';
+    h += '<td style="padding:4px 8px;border:1px solid #f8bbd0;">' + b.threshold + '°</td>';
+    h += '</tr>';
+  }
+  h += '</table>';
+
+  // Travel advice
+  const dirNames = blocked.map(b => b.dirLabel.split(" ")[0]).join(", ");
+  h += '<div style="margin-top:8px;padding:8px;background:#fff3e0;border-radius:4px;font-size:0.75rem;">';
+  h += '<b>Travel Advice:</b> Avoid travelling towards <b>' + dirNames + '</b> direction(s). ';
+  h += 'Do not start new ventures, journeys, or important tasks in blocked directions. ';
+  h += 'Wait for the combust planet(s) to move away from the Sun before proceeding.';
+  h += '</div>';
+
+  div.innerHTML = h;
+  div.style.display = "block";
+  div.style.background = "#fce4ec";
+  div.style.borderColor = "#c62828";
+}
+
+// ═══════════════════════════════════════════════════════════
+// RULES REFERENCE TOGGLES
+// ═══════════════════════════════════════════════════════════
+function toggleRules() {
+  const body = document.getElementById("rulesBody");
+  const arrow = document.getElementById("rulesArrow");
+  body.classList.toggle("open");
+  arrow.classList.toggle("open");
+}
+function toggleRuleGroup(el) {
+  const content = el.nextElementSibling;
+  content.classList.toggle("open");
+  const arrow = el.querySelector("span");
+  if (arrow) arrow.textContent = content.classList.contains("open") ? "▲" : "▼";
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXTRA INFO ROWS/COLUMNS
+// ═══════════════════════════════════════════════════════════
+
+// 28 Nakshatras in order (same as core/sbc.py NAKSHATRAS_28)
+const NAKS_28 = [
+  "Ashwini","Bharani","Krittika","Rohini","Mrigashira",
+  "Ardra","Punarvasu","Pushya","Ashlesha",
+  "Magha","Purva Phalguni","Uttara Phalguni","Hasta",
+  "Chitra","Swati","Vishakha","Anuradha","Jyeshtha",
+  "Mula","Purva Ashadha","Uttara Ashadha","Abhijit",
+  "Shravana","Dhanishtha","Shatabhisha",
+  "Purva Bhadrapada","Uttara Bhadrapada","Revati"
+];
+// Short display names
+const NAKS_28_SHORT = [
+  "Ashw","Bhar","Krit","Rohi","Mrig",
+  "Ardr","Puna","Push","Ashl",
+  "Magh","P.Ph","U.Ph","Hast",
+  "Chit","Swat","Vish","Anur","Jyes",
+  "Mula","P.As","U.As","Abhi",
+  "Shra","Dhan","Shat","P.Bh","U.Bh","Reva"
+];
+
+// Navtara names (1-9 repeating cycle)
+const TARA_NAMES = ["Janma","Sampat","Vipat","Kshema","Pratyari","Sadhaka","Vadha","Mitra","Ati-Mitra"];
+const TARA_COLORS = ["#c62828","#2e7d32","#c62828","#2e7d32","#c62828","#2e7d32","#c62828","#2e7d32","#2e7d32"];
+
+// Pada sounds for each nakshatra
+const NAK_PADA_SOUNDS = {
+  "Ashwini":["चू","चे","चो","ला"],"Bharani":["ली","लू","ले","लो"],
+  "Krittika":["अ","ई","उ","ए"],"Rohini":["ओ","वा","वी","वू"],
+  "Mrigashira":["वे","वो","का","की"],"Ardra":["कू","घ","ङ","छ"],
+  "Punarvasu":["के","को","हा","ही"],"Pushya":["हू","हे","हो","डा"],
+  "Ashlesha":["डी","डू","डे","डो"],"Magha":["मा","मी","मू","मे"],
+  "Purva Phalguni":["मो","टा","टी","टू"],"Uttara Phalguni":["टे","टो","पा","पी"],
+  "Hasta":["पू","ष","ण","ठ"],"Chitra":["पे","पो","रा","री"],
+  "Swati":["रू","रे","रो","ता"],"Vishakha":["ती","तू","ते","तो"],
+  "Anuradha":["ना","नी","नू","ने"],"Jyeshtha":["नो","या","यी","यू"],
+  "Mula":["ये","यो","भा","भी"],"Purva Ashadha":["भू","धा","फा","ढा"],
+  "Uttara Ashadha":["भे","भो","जा","जी"],"Abhijit":["ज्यू","जे","जो","घा"],
+  "Shravana":["खी","खू","खे","खो"],"Dhanishtha":["गा","गी","गू","गे"],
+  "Shatabhisha":["गो","सा","सी","सू"],"Purva Bhadrapada":["से","सो","दा","दी"],
+  "Uttara Bhadrapada":["दू","थ","झ","ञ"],"Revati":["दे","दो","चा","ची"]
+};
+
+function buildExtraCellHtml(nakIdx, data) {
+  const nakName = NAKS_28[nakIdx];
+  let h = '';
+
+  // 1. Nakshatra short name
+  h += '<div class="extra-nak-name">' + (NAKS_28_SHORT[nakIdx] || nakName) + '</div>';
+
+  // 2. Pada sounds
+  const padas = NAK_PADA_SOUNDS[nakName];
+  if (padas) {
+    h += '<div class="extra-pada-sound">' + padas.join(" ") + '</div>';
+  }
+
+  // 3. Tarabala (from birth Moon nakshatra) — 27-nak cycle, skip Abhijit
+  // Abhijit (index 21) gets no Tarabala
+  if (nakIdx !== 21) {
+    // Build 27-nak order excluding Abhijit
+    const NAKS_27 = [];
+    for (let i = 0; i < 28; i++) { if (i !== 21) NAKS_27.push(i); }
+    // Find birth Moon position in 27-nak array
+    let birthMoon27 = -1;
+    if (data.natal_planets) {
+      for (const np of data.natal_planets) {
+        if (np.planet === "Moon") {
+          for (let i = 0; i < NAKS_28.length; i++) {
+            if (NAKS_28[i] === np.nakshatra) {
+              birthMoon27 = NAKS_27.indexOf(i);
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+    // Find current nak position in 27-nak array
+    const cur27 = NAKS_27.indexOf(nakIdx);
+    if (birthMoon27 >= 0 && cur27 >= 0) {
+      const dist = ((cur27 - birthMoon27) % 27 + 27) % 27;
+      const taraNum = (dist % 9) + 1;
+      const taraName = TARA_NAMES[taraNum - 1];
+      const taraColor = TARA_COLORS[taraNum - 1];
+      h += '<div class="extra-tara" style="color:'+taraColor+';">' + taraNum + '</div>';
+      h += '<div class="extra-tara-name" style="color:'+taraColor+';">' + taraName + '</div>';
+    }
+  }
+
+  // 4. JKV labels
+  if (data.jkv) {
+    if (data.jkv.janma && data.jkv.janma.nak_index === nakIdx) {
+      h += '<div class="extra-jkv extra-jkv-janma">J</div>';
+    }
+    if (data.jkv.karma && data.jkv.karma.nak_index === nakIdx) {
+      h += '<div class="extra-jkv extra-jkv-karma">K</div>';
+    }
+    if (data.jkv.vinasha && data.jkv.vinasha.nak_index === nakIdx) {
+      h += '<div class="extra-jkv extra-jkv-vinasha">V</div>';
+    }
+  }
+
+  // 5. Graha Latta — which planet kicks this nakshatra
+  if (data.graha_latta) {
+    data.graha_latta.forEach(l => {
+      if (l.kicked_nak_idx === nakIdx) {
+        const abbr = PLANET_ABBR[l.planet] || l.planet.slice(0,2);
+        h += '<div class="extra-latta">L:' + abbr + '</div>';
+      }
+    });
+  }
+
+  // 6. Upagrahas at this nakshatra
+  if (data.upagrahas) {
+    data.upagrahas.forEach(u => {
+      // Find nak index for this upagraha
+      for (let i = 0; i < NAKS_28.length; i++) {
+        if (NAKS_28[i] === u.nakshatra && i === nakIdx) {
+          h += '<div class="extra-upa">' + u.name.slice(0,3) + '</div>';
+          break;
+        }
+      }
+    });
+  }
+
+  return h;
+}
+
+// Resize handler for vedha lines
+window.addEventListener("resize", function() {
+  if (SBC_DATA) drawVedhaLines(SBC_DATA);
+});
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    // SBC uses type="date" (YYYY-MM-DD) — convert from DD-MM-YYYY
+    if (p.dob) {
+      const parts = p.dob.split('-');
+      if (parts.length === 3) {
+        document.getElementById('birthDate').value = parts[2] + '-' + parts[1] + '-' + parts[0];
+      }
+    }
+    if (p.time) document.getElementById('birthTime').value = p.time;
+    if (p.place) document.getElementById('birthCity').value = p.place;
+    if (p.ayanamsa) document.getElementById('ayanamsa').value = p.ayanamsa;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --green: #228B22;
+    --red: #B22222;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ─── Header ──────────────────────────── */
+  .header {
+    background: var(--header-bg);
+    color: var(--header-text);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .header h1 {
+    font-size: 1.6rem;
+    letter-spacing: 1px;
+  }
+  .header h1 span { color: var(--gold); }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+  }
+  .header-right .clock { font-weight: 600; }
+
+  /* ─── Date bar ────────────────────────── */
+  .date-bar {
+    background: var(--card-bg);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--border);
+  }
+  .date-bar label { font-weight: 600; color: var(--accent); }
+  .date-bar input, .date-bar select {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background: #fff;
+  }
+  .date-bar button {
+    padding: 8px 20px;
+    background: var(--header-bg);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+  .date-bar button:hover { background: #a00; }
+
+  /* ─── Main content ────────────────────── */
+  .container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ─── Panchang card ───────────────────── */
+  .panchang-card {
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .panchang-card h2 {
+    color: var(--accent);
+    margin-bottom: 16px;
+    font-size: 1.3rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+  }
+  .panchang-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .panchang-item {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+  .panchang-item .label {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .panchang-item .value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-top: 4px;
+  }
+
+  /* ─── Event cards grid ────────────────── */
+  .events-title {
+    text-align: center;
+    color: var(--accent);
+    font-size: 1.4rem;
+    margin: 24px 0 16px;
+    font-weight: 700;
+  }
+  .events-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .event-card {
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+  }
+  .event-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px var(--shadow);
+  }
+  .event-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .event-card-header {
+    background: var(--header-bg);
+    color: #fff;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .event-card-header .icon { font-size: 1.3rem; }
+  .event-card-body {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    color: #555;
+    min-height: 50px;
+  }
+  .event-card-body .stat {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* ─── Data table ──────────────────────── */
+  .data-section {
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .data-section h2 {
+    color: var(--accent);
+    margin-bottom: 16px;
+    font-size: 1.2rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  th {
+    background: var(--table-header);
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #ddd;
+  }
+  tr:nth-child(even) td { background: var(--table-alt); }
+  tr:hover td { background: #ffe4b5; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .badge-retro { background: #ff6b6b; color: #fff; }
+  .badge-direct { background: #51cf66; color: #fff; }
+  .badge-combust { background: #ff922b; color: #fff; }
+  .badge-clear { background: #69db7c; color: #fff; }
+  .badge-war { background: #e03131; color: #fff; }
+  .badge-parallel { background: #7950f2; color: #fff; }
+  .badge-north { background: #339af0; color: #fff; }
+  .badge-south { background: #f06595; color: #fff; }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.1rem;
+    color: var(--accent);
+  }
+  .loading::after {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Range Explorer ───────────────────── */
+  .range-controls {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .range-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .range-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .range-field label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .range-field input, .range-field select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background: #fff;
+    min-width: 160px;
+  }
+  .range-btn {
+    padding: 10px 32px;
+    background: var(--header-bg);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: background 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .range-btn:hover { background: #a00; }
+  .range-btn:disabled { background: #999; cursor: not-allowed; }
+
+  .range-summary {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .range-summary-item {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 16px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .range-summary-item .rs-label { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+  .range-summary-item .rs-value { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+
+  .range-table-wrap {
+    max-height: 600px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  /* ─── Footer ──────────────────────────── */
+  .footer {
+    text-align: center;
+    padding: 16px;
+    color: #fff;
+    font-size: 0.8rem;
+    background: var(--header-bg);
+    margin-top: 40px;
+  }
+
+  /* ─── Responsive ──────────────────────── */
+  @media (max-width: 768px) {
+    .header { flex-direction: column; gap: 8px; }
+    .date-bar { flex-direction: column; }
+    .panchang-grid { grid-template-columns: repeat(2, 1fr); }
+    .events-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>&#9788;</span> Vedic Astrology Engine</h1>
+  <div class="header-right">
+    <a href="/" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;background:var(--gold);color:#333;font-weight:600;font-size:0.9rem;">Daily Panchang</a>
+    <a href="/kundali" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">Kundali</a>
+    <a href="/dasha" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">Dasha</a>
+    <a href="/ashtakavarga" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">Ashtakavarga</a>
+    <a href="/special-lagnas" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">Special Lagnas</a>
+    <a href="/nakshatra" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">Nakshatra</a>
+    <a href="/hora" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">Hora</a>
+    <a href="/sbc" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">SBC</a>
+    <a href="/market" style="color:#fff;text-decoration:none;padding:6px 16px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;font-size:0.9rem;">Market</a>
+    <span class="clock" id="clock"></span>
+  </div>
+</div>
+
+<div class="date-bar">
+  <label>Date:</label>
+  <input type="text" id="dateInput" placeholder="DD-MM-YYYY" maxlength="10" style="width:120px;" />
+  <label>City:</label>
+  <div style="position:relative;display:inline-block;">
+    <input type="text" id="cityInput" placeholder="Type city name..." autocomplete="off" value="Mumbai" style="width:200px;" />
+    <div id="citySuggestions" style="position:absolute;top:100%;left:0;width:100%;max-height:250px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 4px 4px;display:none;z-index:999;box-shadow:0 4px 8px var(--shadow);"></div>
+  </div>
+  <label>TZ:</label>
+  <input type="text" id="tzInput" value="5.5" style="width:60px;text-align:center;" readonly title="Auto-set from city" />
+  <label>Ayanamsa:</label>
+  <select id="ayanamsaSelect">
+    <option value="lahiri" selected>Lahiri</option>
+    <option value="raman">Raman</option>
+    <option value="krishnamurti">KP (Krishnamurti)</option>
+  </select>
+  <button onclick="loadAllData()">Load Data</button>
+</div>
+
+<div class="container">
+
+  <!-- Panchang Section -->
+  <div class="panchang-card">
+    <h2>&#9788; Daily Panchang</h2>
+    <div class="panchang-grid" id="panchangGrid">
+      <div class="loading">Loading Panchang...</div>
+    </div>
+  </div>
+
+  <!-- Planetary Positions Table -->
+  <div class="data-section" id="positionsSection">
+    <h2>&#9795; Planetary Positions — Transit Planets</h2>
+    <div id="positionsTable"><div class="loading">Loading positions...</div></div>
+  </div>
+
+  <!-- Astrological Events Cards -->
+  <div class="events-title">Astrological Events</div>
+  <div class="events-grid" id="eventsGrid"></div>
+
+  <!-- Detail section for selected event -->
+  <div class="data-section" id="eventDetail" style="display:none;">
+    <h2 id="eventDetailTitle">Event Detail</h2>
+    <div id="eventDetailContent"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Date Range Explorer — Search events across years       -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="data-section" id="rangeExplorer" style="margin-top:32px;">
+    <h2>&#128269; Date Range Explorer — Search Events Across Years</h2>
+    <p style="color:#666;font-size:0.85rem;margin-bottom:16px;">
+      Select a planet and event type to find all occurrences between any two dates (2022–2089).
+    </p>
+
+    <div class="range-controls">
+      <div class="range-row">
+        <div class="range-field">
+          <label>From Date</label>
+          <input type="text" id="rangeStart" value="23-03-2022" placeholder="DD-MM-YYYY" maxlength="10" />
+        </div>
+        <div class="range-field">
+          <label>To Date</label>
+          <input type="text" id="rangeEnd" value="23-03-2089" placeholder="DD-MM-YYYY" maxlength="10" />
+        </div>
+        <div class="range-field">
+          <label>Planet</label>
+          <select id="rangePlanet">
+            <option value="all">All Planets</option>
+            <option value="Sun">Sun</option>
+            <option value="Moon">Moon</option>
+            <option value="Mars">Mars</option>
+            <option value="Mercury" selected>Mercury</option>
+            <option value="Jupiter">Jupiter</option>
+            <option value="Venus">Venus</option>
+            <option value="Saturn">Saturn</option>
+            <option value="Rahu">Rahu</option>
+            <option value="Ketu">Ketu</option>
+          </select>
+        </div>
+        <div class="range-field">
+          <label>Event Type</label>
+          <select id="rangeEvent">
+            <option value="retrograde_periods">Retrograde Periods</option>
+            <option value="combustion_periods">Combustion Periods</option>
+            <option value="sign_transit">Sign Transits (Rashi Change)</option>
+            <option value="nakshatra_transit">Nakshatra Changes</option>
+            <option value="ecliptic_crossings">Ecliptic Crossings</option>
+            <option value="graha_yuddha">Graha Yuddha Events</option>
+            <option value="all_transits">All Planets Sign Changes</option>
+          </select>
+        </div>
+      </div>
+      <div class="range-row" style="margin-top:12px;">
+        <button class="range-btn" onclick="searchRange()">Search</button>
+        <span id="rangeStatus" style="margin-left:16px;color:var(--accent);font-size:0.9rem;"></span>
+      </div>
+    </div>
+
+    <div id="rangeResults" style="margin-top:20px;"></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Powered by Swiss Ephemeris &middot; Sidereal Calculations
+</div>
+
+<script>
+const API = '';  // same origin
+
+// ─── State ──────────────────────────────
+let currentData = {};
+let selectedEvent = null;
+let selectedCity = { name: 'Mumbai', latitude: 19.0760, longitude: 72.8777, tz_offset: 5.5 };
+let citySearchTimer = null;
+
+// ─── Date format helpers ────────────────
+function toIndianDate(d) {
+  // Date object or ISO string → DD-MM-YYYY
+  if (typeof d === 'string') {
+    // If already DD-MM-YYYY, return as-is
+    if (/^\d{2}-\d{2}-\d{4}$/.test(d)) return d;
+    // YYYY-MM-DD → DD-MM-YYYY
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      const [y, m, dd] = d.split('-');
+      return `${dd}-${m}-${y}`;
+    }
+    return d;
+  }
+  if (d instanceof Date) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  }
+  return d;
+}
+
+function toISODate(d) {
+  // DD-MM-YYYY → YYYY-MM-DD (for API calls that need it)
+  if (/^\d{2}-\d{2}-\d{4}$/.test(d)) {
+    const [dd, mm, yyyy] = d.split('-');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return d; // already ISO
+}
+
+// ─── Init ───────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('dateInput').value = toIndianDate(new Date());
+  updateClock();
+  setInterval(updateClock, 1000);
+  setupCityAutocomplete();
+  loadAllData();
+});
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-IN', { hour12: true }) + '  ' +
+    now.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// ─── City Autocomplete ──────────────────
+function setupCityAutocomplete() {
+  const input = document.getElementById('cityInput');
+  const dropdown = document.getElementById('citySuggestions');
+
+  input.addEventListener('input', () => {
+    clearTimeout(citySearchTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { dropdown.style.display = 'none'; return; }
+    citySearchTimer = setTimeout(() => fetchCitySuggestions(q), 250);
+  });
+
+  input.addEventListener('focus', () => {
+    const q = input.value.trim();
+    if (q.length >= 2) fetchCitySuggestions(q);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#cityInput') && !e.target.closest('#citySuggestions')) {
+      dropdown.style.display = 'none';
+    }
+  });
+}
+
+async function fetchCitySuggestions(q) {
+  const dropdown = document.getElementById('citySuggestions');
+  try {
+    // Try local DB first
+    const localRes = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+    const localData = await localRes.json();
+    if (localData.results && localData.results.length > 0) {
+      renderCityResults(localData.results.map(c => ({
+        display: c.display, name: c.name, lat: c.latitude, lon: c.longitude, tz: c.tz_offset,
+      })));
+      return;
+    }
+    // Fallback to Nominatim (OpenStreetMap) for global coverage
+    const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`);
+    const nData = await nRes.json();
+    if (nData && nData.length > 0) {
+      const results = nData.map(r => {
+        const parts = [];
+        if (r.address) {
+          if (r.address.city || r.address.town || r.address.village || r.address.hamlet) parts.push(r.address.city || r.address.town || r.address.village || r.address.hamlet);
+          if (r.address.state) parts.push(r.address.state);
+          if (r.address.country) parts.push(r.address.country);
+        }
+        const display = parts.length > 0 ? parts.join(', ') : r.display_name.split(',').slice(0,3).join(',');
+        return { display, name: parts[0] || r.display_name.split(',')[0], lat: parseFloat(r.lat), lon: parseFloat(r.lon), tz: null };
+      });
+      renderCityResults(results);
+    } else {
+      dropdown.innerHTML = '<div style="padding:8px 12px;color:#888;font-size:0.85rem;">No results found</div>';
+      dropdown.style.display = 'block';
+    }
+  } catch (e) {
+    dropdown.style.display = 'none';
+  }
+}
+
+window._cityResults = [];
+function renderCityResults(results) {
+  window._cityResults = results;
+  const dropdown = document.getElementById('citySuggestions');
+  dropdown.innerHTML = results.map((c, i) => {
+    const tzStr = c.tz !== null ? `UTC${c.tz>=0?'+':''}${c.tz}` : '';
+    return `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.9rem;"
+         onmouseover="this.style.background='#ffe4b5'" onmouseout="this.style.background='#fff'"
+         onclick="selectCity(${i})">
+      <strong>${c.display}</strong>
+      ${tzStr ? `<span style="color:#888;font-size:0.8rem;margin-left:8px;">${tzStr}</span>` : '<span style="color:#aaa;font-size:0.75rem;margin-left:8px;">via OpenStreetMap</span>'}
+    </div>`;
+  }).join('');
+  dropdown.style.display = 'block';
+}
+
+function selectCity(idx) {
+  const c = window._cityResults[idx];
+  const tz = c.tz !== null ? c.tz : Math.round(c.lon / 15 * 2) / 2;
+  selectedCity = { name: c.name, latitude: c.lat, longitude: c.lon, tz_offset: tz };
+  document.getElementById('cityInput').value = c.name;
+  document.getElementById('tzInput').value = tz;
+  document.getElementById('citySuggestions').style.display = 'none';
+}
+
+function getParams() {
+  const dateStr = document.getElementById('dateInput').value;
+  const ayanamsa = document.getElementById('ayanamsaSelect').value;
+  const tz = parseFloat(document.getElementById('tzInput').value) || selectedCity.tz_offset;
+  return {
+    date: dateStr,
+    time: '06:00',
+    latitude: selectedCity.latitude,
+    longitude: selectedCity.longitude,
+    tz_offset: tz,
+    ayanamsa,
+  };
+}
+
+async function apiCall(endpoint, body) {
+  const res = await fetch(API + endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// ─── Load all data ──────────────────────
+async function loadAllData() {
+  const p = getParams();
+
+  // Load panchang, positions, and all events in parallel
+  const [panchang, positions, retrograde, combustion, aspects, lunarAspects, parallels, ecliptic, yuddha] =
+    await Promise.all([
+      apiCall('/api/v1/panchang', p).catch(e => null),
+      apiCall('/api/v1/positions', p).catch(e => null),
+      apiCall('/api/v1/retrograde', { date: p.date, tz_offset: p.tz_offset, ayanamsa: p.ayanamsa }).catch(e => null),
+      apiCall('/api/v1/combustion', { date: p.date, tz_offset: p.tz_offset, ayanamsa: p.ayanamsa }).catch(e => null),
+      apiCall('/api/v1/aspects', { date: p.date, tz_offset: p.tz_offset, ayanamsa: p.ayanamsa }).catch(e => null),
+      apiCall('/api/v1/lunar-aspects', { date: p.date, tz_offset: p.tz_offset, ayanamsa: p.ayanamsa }).catch(e => null),
+      apiCall('/api/v1/parallels', { date: p.date, tz_offset: p.tz_offset, ayanamsa: p.ayanamsa }).catch(e => null),
+      apiCall('/api/v1/ecliptic', { date: p.date, tz_offset: p.tz_offset, ayanamsa: p.ayanamsa }).catch(e => null),
+      apiCall('/api/v1/graha-yuddha', { date: p.date, tz_offset: p.tz_offset, ayanamsa: p.ayanamsa }).catch(e => null),
+    ]);
+
+  currentData = { panchang, positions, retrograde, combustion, aspects, lunarAspects, parallels, ecliptic, yuddha };
+
+  renderPanchang(panchang);
+  renderPositions(positions);
+  renderEventCards();
+}
+
+// ─── Render Panchang ────────────────────
+function renderPanchang(data) {
+  const grid = document.getElementById('panchangGrid');
+  if (!data) { grid.innerHTML = '<p>Could not load Panchang data.</p>'; return; }
+
+  const items = [
+    { label: 'Weekday (Vara)', value: data.weekday },
+    { label: 'Tithi', value: data.tithi_full || data.tithi },
+    { label: 'Nakshatra', value: `${data.nakshatra} (${data.nakshatra_lord})` },
+    { label: 'Yoga', value: data.yoga },
+    { label: 'Karana', value: data.karana },
+    { label: 'Sunrise', value: data.sunrise || 'N/A' },
+    { label: 'Sunset', value: data.sunset || 'N/A' },
+    { label: 'Moonrise', value: data.moonrise || 'N/A' },
+  ];
+
+  grid.innerHTML = items.map(i => `
+    <div class="panchang-item">
+      <div class="label">${i.label}</div>
+      <div class="value">${i.value}</div>
+    </div>
+  `).join('');
+}
+
+// ─── Render Positions ───────────────────
+function renderPositions(data) {
+  const container = document.getElementById('positionsTable');
+  if (!data || !data.planets) { container.innerHTML = '<p>Could not load positions.</p>'; return; }
+
+  const retroData = currentData.retrograde;
+  const combData = currentData.combustion;
+
+  let html = `<table>
+    <tr>
+      <th>Planet</th>
+      <th>Sign</th>
+      <th>Degree</th>
+      <th>Nakshatra</th>
+      <th>Pada</th>
+      <th>Nak Lord</th>
+      <th>Speed (°/day)</th>
+      <th>Status</th>
+    </tr>`;
+
+  data.planets.filter(p => p.planet !== 'Ascendant').forEach(p => {
+    const isRetro = p.retrograde;
+    const combPlanet = combData?.planets?.find(c => c.planet === p.planet);
+    const isCombust = combPlanet?.combust || false;
+
+    let badges = '';
+    if (isRetro) badges += '<span class="badge badge-retro">R</span> ';
+    if (isCombust) badges += '<span class="badge badge-combust">C</span> ';
+    if (!isRetro && !isCombust) badges += '<span class="badge badge-direct">D</span> ';
+
+    html += `<tr>
+      <td><strong>${p.planet}</strong></td>
+      <td>${p.sign}</td>
+      <td>${p.degree_display}</td>
+      <td>${p.nakshatra}</td>
+      <td>${p.nakshatra_pada}</td>
+      <td>${p.nakshatra_lord}</td>
+      <td>${p.speed.toFixed(4)}</td>
+      <td>${badges}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  html += '<p style="margin-top:8px;font-size:0.8rem;color:#888;"><span class="badge badge-retro">R</span> Retrograde &nbsp; <span class="badge badge-combust">C</span> Combust &nbsp; <span class="badge badge-direct">D</span> Direct</p>';
+  container.innerHTML = html;
+}
+
+// ─── Event Cards ────────────────────────
+const EVENT_DEFS = [
+  {
+    id: 'combustion', title: 'Planets Combustion', icon: '☀️',
+    getStat: () => {
+      const d = currentData.combustion;
+      return d ? `${d.combust_count} planet(s) combust` : '—';
+    },
+    render: renderCombustionDetail,
+  },
+  {
+    id: 'retrograde', title: 'Planets Retrograde', icon: '↺',
+    getStat: () => {
+      const d = currentData.retrograde;
+      return d ? `${d.retrograde_count} planet(s) retrograde` : '—';
+    },
+    render: renderRetrogradeDetail,
+  },
+  {
+    id: 'transit', title: 'Planets Transit', icon: '➡️',
+    getStat: () => {
+      const d = currentData.positions;
+      if (!d || !d.ascendant) return 'Sign & Nakshatra positions';
+      return `Lagna: ${d.ascendant.sign} ${d.ascendant.degree_display}`;
+    },
+    render: renderTransitDetail,
+  },
+  {
+    id: 'positions', title: 'Planetary Positions', icon: '🪐',
+    getStat: () => {
+      const d = currentData.positions;
+      if (!d) return '—';
+      const count = d.planets.filter(p => p.planet !== 'Ascendant').length;
+      return `${count} planets computed`;
+    },
+    render: renderPositionsDetail,
+  },
+  {
+    id: 'aspects', title: 'Planets Mutual Aspects', icon: '🔗',
+    getStat: () => {
+      const d = currentData.aspects;
+      return d ? `${d.total_aspects} aspects, ${d.mutual_count} mutual` : '—';
+    },
+    render: renderAspectsDetail,
+  },
+  {
+    id: 'lunarAspects', title: 'Lunar Aspects', icon: '🌙',
+    getStat: () => {
+      const d = currentData.lunarAspects;
+      return d ? `${d.total_aspects} lunar aspects` : '—';
+    },
+    render: renderLunarDetail,
+  },
+  {
+    id: 'parallels', title: 'Planets Mutual Parallel', icon: '⫽',
+    getStat: () => {
+      const d = currentData.parallels;
+      return d ? `${d.total} parallel(s) found` : '—';
+    },
+    render: renderParallelsDetail,
+  },
+  {
+    id: 'ecliptic', title: 'Planets Ecliptic Crossings', icon: '🌐',
+    getStat: () => {
+      const d = currentData.ecliptic;
+      return d ? `${d.near_ecliptic_count} near ecliptic` : '—';
+    },
+    render: renderEclipticDetail,
+  },
+  {
+    id: 'yuddha', title: 'Graha Yuddha', icon: '⚔️',
+    getStat: () => {
+      const d = currentData.yuddha;
+      return d ? (d.is_yuddha_day ? `${d.war_count} war(s) active!` : 'No wars today') : '—';
+    },
+    render: renderYuddhaDetail,
+  },
+];
+
+function renderEventCards() {
+  const grid = document.getElementById('eventsGrid');
+  grid.innerHTML = EVENT_DEFS.map(ev => `
+    <div class="event-card ${selectedEvent === ev.id ? 'active' : ''}" onclick="selectEvent('${ev.id}')">
+      <div class="event-card-header">
+        <span class="icon">${ev.icon}</span> ${ev.title}
+      </div>
+      <div class="event-card-body">
+        <div class="stat">${ev.getStat()}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectEvent(id) {
+  selectedEvent = id;
+  renderEventCards();
+
+  const ev = EVENT_DEFS.find(e => e.id === id);
+  if (!ev) return;
+
+  const section = document.getElementById('eventDetail');
+  section.style.display = 'block';
+  document.getElementById('eventDetailTitle').textContent = ev.icon + ' ' + ev.title;
+  ev.render();
+  section.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ─── Detail Renderers ───────────────────
+
+function renderCombustionDetail() {
+  const d = currentData.combustion;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  let html = `<p>Sun at: <strong>${d.sun_position}</strong></p>
+  <table><tr><th>Planet</th><th>Status</th><th>Distance from Sun</th><th>Combustion Orb</th><th>Sign</th><th>Degree</th><th>Retrograde</th></tr>`;
+
+  d.planets.forEach(p => {
+    const badge = p.combust ? '<span class="badge badge-combust">COMBUST</span>' : '<span class="badge badge-clear">CLEAR</span>';
+    html += `<tr>
+      <td><strong>${p.planet}</strong></td>
+      <td>${badge}</td>
+      <td>${p.distance_from_sun.toFixed(2)}°</td>
+      <td>${p.combustion_orb}°</td>
+      <td>${p.sign}</td>
+      <td>${p.degree.toFixed(2)}°</td>
+      <td>${p.retrograde ? 'Yes' : 'No'}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+function renderRetrogradeDetail() {
+  const d = currentData.retrograde;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  let html = `<table><tr><th>Planet</th><th>Status</th><th>Speed (°/day)</th><th>Sign</th><th>Degree</th><th>Nakshatra</th></tr>`;
+  d.planets.forEach(p => {
+    const badge = p.retrograde ? '<span class="badge badge-retro">RETROGRADE</span>' : '<span class="badge badge-direct">DIRECT</span>';
+    html += `<tr>
+      <td><strong>${p.planet}</strong></td>
+      <td>${badge}</td>
+      <td>${p.speed.toFixed(4)}</td>
+      <td>${p.sign}</td>
+      <td>${p.degree.toFixed(2)}°</td>
+      <td>${p.nakshatra}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+function renderTransitDetail() {
+  const d = currentData.positions;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  // Ascendant banner
+  let html = '';
+  if (d.ascendant) {
+    const a = d.ascendant;
+    html += `<div style="background:#fff3cd;border:2px solid var(--gold);border-radius:8px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <div style="font-size:1.1rem;font-weight:700;color:var(--accent);">⬆ Ascendant (Lagna)</div>
+      <div><span style="color:#888;font-size:0.8rem;">SIGN</span><br><strong>${a.sign}</strong> <span style="color:#888;">(${a.sign_lord})</span></div>
+      <div><span style="color:#888;font-size:0.8rem;">DEGREE</span><br><strong>${a.degree_display}</strong></div>
+      <div><span style="color:#888;font-size:0.8rem;">NAKSHATRA</span><br><strong>${a.nakshatra}</strong> Pada ${a.nakshatra_pada}</div>
+      <div><span style="color:#888;font-size:0.8rem;">NAK LORD</span><br><strong>${a.nakshatra_lord}</strong></div>
+      <div><span style="color:#888;font-size:0.8rem;">LONGITUDE</span><br><strong>${a.longitude.toFixed(4)}°</strong></div>
+    </div>`;
+  }
+
+  html += `<p>Current sign and nakshatra placement for each planet:</p>
+  <table><tr><th>Planet</th><th>Sign</th><th>Sign Lord</th><th>Nakshatra</th><th>Pada</th><th>Nak Lord</th><th>Longitude</th></tr>`;
+  d.planets.filter(p => p.planet !== 'Ascendant').forEach(p => {
+    html += `<tr>
+      <td><strong>${p.planet}</strong></td>
+      <td>${p.sign}</td>
+      <td>${p.sign_lord}</td>
+      <td>${p.nakshatra}</td>
+      <td>${p.nakshatra_pada}</td>
+      <td>${p.nakshatra_lord}</td>
+      <td>${p.longitude.toFixed(4)}°</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+function renderPositionsDetail() {
+  const d = currentData.positions;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  let html = `<table><tr><th>Planet</th><th>Longitude</th><th>Latitude</th><th>Speed</th><th>Degree Display</th><th>Retrograde</th></tr>`;
+  d.planets.filter(p => p.planet !== 'Ascendant').forEach(p => {
+    html += `<tr>
+      <td><strong>${p.planet}</strong></td>
+      <td>${p.longitude.toFixed(4)}°</td>
+      <td>${p.latitude.toFixed(4)}°</td>
+      <td>${p.speed.toFixed(6)}°/day</td>
+      <td>${p.degree_display}</td>
+      <td>${p.retrograde ? '<span class="badge badge-retro">R</span>' : '<span class="badge badge-direct">D</span>'}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+function renderAspectsDetail() {
+  const d = currentData.aspects;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  let html = `<p><strong>${d.total_aspects}</strong> aspects found, <strong>${d.mutual_count}</strong> mutual.</p>`;
+
+  if (d.mutual_aspects.length) {
+    html += `<h3 style="margin:12px 0 8px;color:var(--accent);">Mutual Aspects</h3>
+    <table><tr><th>Planet 1</th><th>Aspect 1</th><th>Planet 2</th><th>Aspect 2</th></tr>`;
+    d.mutual_aspects.forEach(m => {
+      html += `<tr><td>${m.planet_1}</td><td>${m.aspect_1}</td><td>${m.planet_2}</td><td>${m.aspect_2}</td></tr>`;
+    });
+    html += '</table>';
+  }
+
+  html += `<h3 style="margin:16px 0 8px;color:var(--accent);">All Aspects</h3>
+  <table><tr><th>Aspecting</th><th>Aspect</th><th>Aspected</th><th>Distance</th><th>Signs</th></tr>`;
+  d.aspects.forEach(a => {
+    html += `<tr>
+      <td>${a.aspecting_planet}</td>
+      <td>${a.aspect_name}</td>
+      <td>${a.aspected_planet}</td>
+      <td>${a.actual_distance}°</td>
+      <td>${a.aspecting_sign} → ${a.aspected_sign}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+function renderLunarDetail() {
+  const d = currentData.lunarAspects;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  let html = `<p>Moon in <strong>${d.moon_position.sign}</strong> at ${d.moon_position.degree}° — Nakshatra: <strong>${d.moon_position.nakshatra}</strong>, Pada ${d.moon_position.pada}</p>
+  <table><tr><th>Planet</th><th>Aspect</th><th>Orb</th><th>Status</th><th>Planet Sign</th><th>Planet Nakshatra</th></tr>`;
+  d.aspects.forEach(a => {
+    html += `<tr>
+      <td>${a.planet}</td>
+      <td>${a.aspect}</td>
+      <td>${a.orb}°</td>
+      <td>${a.status}</td>
+      <td>${a.planet_sign} ${a.planet_degree}°</td>
+      <td>${a.planet_nakshatra}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+function renderParallelsDetail() {
+  const d = currentData.parallels;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  let html = `<h3 style="margin-bottom:8px;color:var(--accent);">Planet Declinations</h3>
+  <table><tr><th>Planet</th><th>Declination</th><th>Direction</th><th>Sign</th></tr>`;
+  d.declinations.forEach(p => {
+    const badge = p.direction === 'North' ? 'badge-north' : 'badge-south';
+    html += `<tr><td>${p.planet}</td><td>${p.declination}°</td><td><span class="badge ${badge}">${p.direction}</span></td><td>${p.sign}</td></tr>`;
+  });
+  html += '</table>';
+
+  if (d.parallels.length) {
+    html += `<h3 style="margin:16px 0 8px;color:var(--accent);">Parallels & Contra-Parallels</h3>
+    <table><tr><th>Planet 1</th><th>Planet 2</th><th>Type</th><th>Orb</th><th>Effect</th></tr>`;
+    d.parallels.forEach(p => {
+      const badge = p.type === 'Parallel' ? 'badge-parallel' : 'badge-war';
+      html += `<tr><td>${p.planet_1}</td><td>${p.planet_2}</td><td><span class="badge ${badge}">${p.type}</span></td><td>${p.orb}°</td><td>${p.effect}</td></tr>`;
+    });
+    html += '</table>';
+  } else {
+    html += '<p>No parallels or contra-parallels found today.</p>';
+  }
+  el.innerHTML = html;
+}
+
+function renderEclipticDetail() {
+  const d = currentData.ecliptic;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  let html = `<table><tr><th>Planet</th><th>Latitude</th><th>Hemisphere</th><th>Sign</th><th>Degree</th><th>Near Ecliptic</th></tr>`;
+  d.planets.forEach(p => {
+    const badge = p.hemisphere === 'North' ? 'badge-north' : 'badge-south';
+    html += `<tr>
+      <td>${p.planet}</td>
+      <td>${p.latitude}°</td>
+      <td><span class="badge ${badge}">${p.hemisphere}</span></td>
+      <td>${p.sign}</td>
+      <td>${p.degree.toFixed(2)}°</td>
+      <td>${p.near_crossing ? '⚡ YES' : 'No'}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+function renderYuddhaDetail() {
+  const d = currentData.yuddha;
+  const el = document.getElementById('eventDetailContent');
+  if (!d) { el.innerHTML = '<p>No data.</p>'; return; }
+
+  if (!d.is_yuddha_day) {
+    el.innerHTML = '<p>No Graha Yuddha (Planetary War) active today. Planets are not within 1° of each other.</p>';
+    return;
+  }
+
+  let html = `<p><span class="badge badge-war">WAR ACTIVE</span> ${d.war_count} planetary war(s) today!</p>
+  <table><tr><th>Planet 1</th><th>Planet 2</th><th>Distance</th><th>Sign</th><th>Winner</th><th>Description</th></tr>`;
+  d.wars.forEach(w => {
+    html += `<tr>
+      <td>${w.planet_1} (lat: ${w.latitude_1}°)</td>
+      <td>${w.planet_2} (lat: ${w.latitude_2}°)</td>
+      <td>${w.distance}°</td>
+      <td>${w.sign}</td>
+      <td><strong>${w.winner}</strong></td>
+      <td>${w.description}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Date Range Explorer
+// ═══════════════════════════════════════════════════════════
+
+// Show/hide planet selector based on event type
+document.getElementById('rangeEvent').addEventListener('change', function() {
+  const planetSel = document.getElementById('rangePlanet');
+  if (this.value === 'all_transits' || this.value === 'graha_yuddha') {
+    planetSel.value = 'all';
+    planetSel.disabled = true;
+  } else {
+    planetSel.disabled = false;
+  }
+});
+
+async function searchRange() {
+  const startDate = document.getElementById('rangeStart').value;
+  const endDate = document.getElementById('rangeEnd').value;
+  const planet = document.getElementById('rangePlanet').value;
+  const eventType = document.getElementById('rangeEvent').value;
+  const ayanamsa = document.getElementById('ayanamsaSelect').value;
+  const tz = parseFloat(document.getElementById('tzInput').value) || selectedCity.tz_offset;
+
+  const statusEl = document.getElementById('rangeStatus');
+  const resultsEl = document.getElementById('rangeResults');
+  const btn = document.querySelector('.range-btn');
+
+  // Validate
+  if (!startDate || !endDate) {
+    statusEl.textContent = 'Please select both dates.';
+    return;
+  }
+  if (eventType !== 'all_transits' && eventType !== 'graha_yuddha' && planet === 'all') {
+    statusEl.textContent = 'Please select a specific planet for this event type.';
+    return;
+  }
+
+  // Warn for very large ranges for per-planet queries
+  const daysDiff = (new Date(toISODate(endDate)) - new Date(toISODate(startDate))) / 86400000;
+
+  btn.disabled = true;
+  statusEl.innerHTML = '<span class="loading" style="padding:0;">Searching...</span>';
+  resultsEl.innerHTML = '';
+
+  try {
+    let data;
+    let endpoint;
+    let body;
+
+    switch (eventType) {
+      case 'retrograde_periods':
+        endpoint = '/api/v1/retrograde/periods';
+        body = { planet, start_date: startDate, end_date: endDate, tz_offset: tz, ayanamsa };
+        data = await apiCall(endpoint, body);
+        renderRetroRange(data, planet);
+        break;
+
+      case 'combustion_periods':
+        endpoint = '/api/v1/combustion/periods';
+        body = { planet, start_date: startDate, end_date: endDate, tz_offset: tz, ayanamsa };
+        data = await apiCall(endpoint, body);
+        renderCombustionRange(data, planet);
+        break;
+
+      case 'sign_transit':
+        endpoint = '/api/v1/transit/sign';
+        body = { planet, start_date: startDate, end_date: endDate, tz_offset: tz, ayanamsa };
+        data = await apiCall(endpoint, body);
+        renderSignTransitRange(data, planet);
+        break;
+
+      case 'nakshatra_transit':
+        endpoint = '/api/v1/transit/nakshatra';
+        body = { planet, start_date: startDate, end_date: endDate, tz_offset: tz, ayanamsa };
+        data = await apiCall(endpoint, body);
+        renderNakTransitRange(data, planet);
+        break;
+
+      case 'ecliptic_crossings':
+        endpoint = '/api/v1/ecliptic/crossings';
+        body = { start_date: startDate, end_date: endDate, tz_offset: tz, ayanamsa };
+        data = await apiCall(endpoint, body);
+        renderEclipticRange(data, planet);
+        break;
+
+      case 'graha_yuddha':
+        endpoint = '/api/v1/graha-yuddha/events';
+        body = { start_date: startDate, end_date: endDate, tz_offset: tz, ayanamsa };
+        data = await apiCall(endpoint, body);
+        renderYuddhaRange(data);
+        break;
+
+      case 'all_transits':
+        endpoint = '/api/v1/transit';
+        body = { start_date: startDate, end_date: endDate, tz_offset: tz, ayanamsa };
+        data = await apiCall(endpoint, body);
+        renderAllTransitsRange(data);
+        break;
+    }
+
+    statusEl.textContent = 'Done!';
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + err.message;
+    resultsEl.innerHTML = `<p style="color:red;">Failed to fetch data. For very large date ranges (67 years), try a smaller window (5-10 years at a time) as the server needs time to compute.</p>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Range Renderers ──────────────────────
+
+function renderRetroRange(data, planet) {
+  const el = document.getElementById('rangeResults');
+  if (!data || !data.length) {
+    el.innerHTML = `<p>${planet} has no retrograde periods in this range (Sun and Moon never go retrograde).</p>`;
+    return;
+  }
+
+  let html = `
+    <div class="range-summary">
+      <div class="range-summary-item"><div class="rs-label">Planet</div><div class="rs-value">${planet}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Total Retrogrades</div><div class="rs-value">${data.length}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Avg Duration</div><div class="rs-value">${Math.round(data.reduce((s,d) => s + d.duration_days, 0) / data.length)} days</div></div>
+    </div>
+    <div class="range-table-wrap"><table>
+    <tr><th>#</th><th>Start Date</th><th>End Date</th><th>Duration (days)</th><th>Start Sign</th><th>End Sign</th></tr>`;
+
+  data.forEach((r, i) => {
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${toIndianDate(r.start)}</td>
+      <td>${toIndianDate(r.end)}</td>
+      <td>${r.duration_days}</td>
+      <td>${r.start_sign}</td>
+      <td>${r.end_sign}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table></div>';
+}
+
+function renderCombustionRange(data, planet) {
+  const el = document.getElementById('rangeResults');
+  if (!data || !data.length) {
+    el.innerHTML = `<p>${planet} has no combustion periods in this range (Sun, Rahu, Ketu cannot be combust).</p>`;
+    return;
+  }
+
+  let html = `
+    <div class="range-summary">
+      <div class="range-summary-item"><div class="rs-label">Planet</div><div class="rs-value">${planet}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Total Combustions</div><div class="rs-value">${data.length}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Avg Duration</div><div class="rs-value">${Math.round(data.reduce((s,d) => s + d.duration_days, 0) / data.length)} days</div></div>
+    </div>
+    <div class="range-table-wrap"><table>
+    <tr><th>#</th><th>Start Date</th><th>End Date</th><th>Duration (days)</th></tr>`;
+
+  data.forEach((r, i) => {
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${toIndianDate(r.start)}</td>
+      <td>${toIndianDate(r.end)}</td>
+      <td>${r.duration_days}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table></div>';
+}
+
+function renderSignTransitRange(data, planet) {
+  const el = document.getElementById('rangeResults');
+  if (!data || !data.length) {
+    el.innerHTML = `<p>No sign changes found for ${planet} in this range.</p>`;
+    return;
+  }
+
+  let html = `
+    <div class="range-summary">
+      <div class="range-summary-item"><div class="rs-label">Planet</div><div class="rs-value">${planet}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Total Sign Changes</div><div class="rs-value">${data.length}</div></div>
+    </div>
+    <div class="range-table-wrap"><table>
+    <tr><th>#</th><th>Date</th><th>From Sign</th><th>To Sign</th><th>Degree</th><th>Nakshatra</th><th>Retro</th></tr>`;
+
+  data.forEach((r, i) => {
+    const retro = r.retrograde ? '<span class="badge badge-retro">R</span>' : '';
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${toIndianDate(r.date)}</td>
+      <td>${r.from_sign}</td>
+      <td><strong>${r.to_sign}</strong></td>
+      <td>${r.degree.toFixed(2)}°</td>
+      <td>${r.nakshatra}</td>
+      <td>${retro}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table></div>';
+}
+
+function renderNakTransitRange(data, planet) {
+  const el = document.getElementById('rangeResults');
+  if (!data || !data.length) {
+    el.innerHTML = `<p>No nakshatra changes found for ${planet} in this range.</p>`;
+    return;
+  }
+
+  let html = `
+    <div class="range-summary">
+      <div class="range-summary-item"><div class="rs-label">Planet</div><div class="rs-value">${planet}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Total Nak Changes</div><div class="rs-value">${data.length}</div></div>
+    </div>
+    <div class="range-table-wrap"><table>
+    <tr><th>#</th><th>Date</th><th>From Nakshatra</th><th>To Nakshatra</th><th>Sign</th><th>Degree</th></tr>`;
+
+  data.forEach((r, i) => {
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${toIndianDate(r.date)}</td>
+      <td>${r.from_nakshatra}</td>
+      <td><strong>${r.to_nakshatra}</strong></td>
+      <td>${r.sign}</td>
+      <td>${r.degree.toFixed(2)}°</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table></div>';
+}
+
+function renderEclipticRange(data, planet) {
+  const el = document.getElementById('rangeResults');
+  let crossings = data.chronological || [];
+
+  // Filter by planet if specific one selected
+  if (planet !== 'all') {
+    crossings = crossings.filter(c => c.planet === planet);
+  }
+
+  if (!crossings.length) {
+    el.innerHTML = `<p>No ecliptic crossings found${planet !== 'all' ? ' for ' + planet : ''} in this range.</p>`;
+    return;
+  }
+
+  let html = `
+    <div class="range-summary">
+      <div class="range-summary-item"><div class="rs-label">Total Crossings</div><div class="rs-value">${crossings.length}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Ascending</div><div class="rs-value">${crossings.filter(c => c.type === 'Ascending').length}</div></div>
+      <div class="range-summary-item"><div class="rs-label">Descending</div><div class="rs-value">${crossings.filter(c => c.type === 'Descending').length}</div></div>
+    </div>
+    <div class="range-table-wrap"><table>
+    <tr><th>#</th><th>Date</th><th>Planet</th><th>Type</th><th>Sign</th><th>Degree</th><th>Nakshatra</th></tr>`;
+
+  crossings.forEach((r, i) => {
+    const badge = r.type === 'Ascending' ? 'badge-north' : 'badge-south';
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${toIndianDate(r.date)}</td>
+      <td><strong>${r.planet}</strong></td>
+      <td><span class="badge ${badge}">${r.type}</span></td>
+      <td>${r.sign}</td>
+      <td>${r.degree.toFixed(2)}°</td>
+      <td>${r.nakshatra}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table></div>';
+}
+
+function renderYuddhaRange(data) {
+  const el = document.getElementById('rangeResults');
+  if (!data || !data.length) {
+    el.innerHTML = '<p>No Graha Yuddha events found in this range.</p>';
+    return;
+  }
+
+  let html = `
+    <div class="range-summary">
+      <div class="range-summary-item"><div class="rs-label">Total War Days</div><div class="rs-value">${data.length}</div></div>
+    </div>
+    <div class="range-table-wrap"><table>
+    <tr><th>#</th><th>Date</th><th>Planet 1</th><th>Planet 2</th><th>Distance</th><th>Sign</th><th>Winner</th></tr>`;
+
+  data.forEach((r, i) => {
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${toIndianDate(r.date)}</td>
+      <td>${r.planet_1}</td>
+      <td>${r.planet_2}</td>
+      <td>${r.distance}°</td>
+      <td>${r.sign}</td>
+      <td><strong>${r.winner}</strong></td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table></div>';
+}
+
+function renderAllTransitsRange(data) {
+  const el = document.getElementById('rangeResults');
+  const list = data.chronological || [];
+
+  if (!list.length) {
+    el.innerHTML = '<p>No sign changes found in this range.</p>';
+    return;
+  }
+
+  // Count per planet
+  const perPlanet = {};
+  list.forEach(r => { perPlanet[r.planet] = (perPlanet[r.planet] || 0) + 1; });
+
+  let html = `
+    <div class="range-summary">
+      <div class="range-summary-item"><div class="rs-label">Total Transits</div><div class="rs-value">${data.total_transits}</div></div>
+      ${Object.entries(perPlanet).map(([p, c]) =>
+        `<div class="range-summary-item"><div class="rs-label">${p}</div><div class="rs-value">${c}</div></div>`
+      ).join('')}
+    </div>
+    <div class="range-table-wrap"><table>
+    <tr><th>#</th><th>Date</th><th>Planet</th><th>From Sign</th><th>To Sign</th><th>Nakshatra</th><th>Retro</th></tr>`;
+
+  list.forEach((r, i) => {
+    const retro = r.retrograde ? '<span class="badge badge-retro">R</span>' : '';
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${toIndianDate(r.date)}</td>
+      <td><strong>${r.planet}</strong></td>
+      <td>${r.from_sign}</td>
+      <td><strong>${r.to_sign}</strong></td>
+      <td>${r.nakshatra}</td>
+      <td>${retro}</td>
+    </tr>`;
+  });
+  el.innerHTML = html + '</table></div>';
+}
+</script>
+</body>
+</html>

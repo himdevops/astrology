@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dasha — Planetary Periods | Vedic Astrology Engine</title>
+<style>
+  :root {
+    --bg: #d4944c;
+    --card-bg: #f5deb3;
+    --header-bg: #8B0000;
+    --header-text: #fff;
+    --text: #333;
+    --border: #b8860b;
+    --accent: #8B0000;
+    --gold: #DAA520;
+    --table-header: #8B4513;
+    --table-alt: #faebd7;
+    --shadow: rgba(0,0,0,0.2);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { background:var(--header-bg); color:var(--header-text); padding:16px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px var(--shadow); }
+  .header h1 { font-size:1.6rem; letter-spacing:1px; }
+  .header h1 span { color:var(--gold); }
+  .nav-links { display:flex; gap:16px; }
+  .nav-links a { color:#fff; text-decoration:none; padding:6px 16px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; font-size:0.9rem; transition:background 0.2s; }
+  .nav-links a:hover { background:rgba(255,255,255,0.15); }
+  .nav-links a.active { background:var(--gold); color:#333; border-color:var(--gold); font-weight:600; }
+
+  .container { max-width:1400px; margin:0 auto; padding:20px; }
+
+  /* Birth form */
+  .birth-form { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .birth-form h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+  .form-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:0.8rem; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+  .form-field input, .form-field select { padding:8px 12px; border:1px solid var(--border); border-radius:4px; font-size:0.9rem; background:#fff; }
+  .btn { padding:10px 28px; background:var(--header-bg); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700; font-size:1rem; transition:background 0.2s; }
+  .btn:hover { background:#a00; }
+  .btn:disabled { background:#999; cursor:not-allowed; }
+
+  /* System tabs */
+  .system-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+  .system-tab { padding:10px 20px; background:#fff; border:2px solid var(--border); border-radius:6px; cursor:pointer; font-size:0.9rem; font-weight:600; transition:all 0.2s; text-align:center; }
+  .system-tab:hover { background:#ffe4b5; }
+  .system-tab.active { background:var(--header-bg); color:#fff; border-color:var(--header-bg); }
+  .system-tab .sys-desc { font-size:0.7rem; font-weight:400; opacity:0.8; display:block; margin-top:2px; }
+
+  /* Current dasha banner */
+  .current-banner { background:#fff3cd; border:2px solid var(--gold); border-radius:8px; padding:16px 24px; margin-bottom:20px; }
+  .current-banner h3 { color:var(--accent); margin-bottom:8px; font-size:1rem; }
+  .current-path { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .current-path .path-item { background:var(--header-bg); color:#fff; padding:6px 14px; border-radius:20px; font-weight:600; font-size:0.85rem; }
+  .current-path .path-arrow { color:var(--gold); font-size:1.2rem; font-weight:700; }
+
+  /* Dasha section */
+  .dasha-section { background:var(--card-bg); border:2px solid var(--border); border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 2px 8px var(--shadow); }
+  .dasha-section h2 { color:var(--accent); margin-bottom:16px; font-size:1.2rem; border-bottom:2px solid var(--border); padding-bottom:8px; }
+
+  /* Dasha tree */
+  .dasha-tree { margin:0; padding:0; }
+  .dasha-node { border-left:3px solid var(--border); margin-left:0; padding-left:16px; margin-bottom:2px; }
+  .dasha-node.level-0 { border-left:4px solid var(--accent); margin-bottom:4px; }
+  .dasha-node.level-1 { border-left-color:var(--gold); }
+  .dasha-node.level-2 { border-left-color:#8B4513; }
+  .dasha-node.level-3 { border-left-color:#999; }
+  .dasha-node.level-4 { border-left-color:#ccc; }
+
+  .dasha-header { display:flex; align-items:center; gap:10px; padding:6px 10px; border-radius:4px; cursor:pointer; transition:background 0.15s; user-select:none; }
+  .dasha-header:hover { background:rgba(139,0,0,0.08); }
+  .dasha-header.current { background:#fff3cd; border:1px solid var(--gold); }
+
+  .dasha-toggle { width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:var(--accent); flex-shrink:0; }
+
+  .dasha-lord { font-weight:700; font-size:0.9rem; color:var(--accent); min-width:70px; }
+  .dasha-dates { font-size:0.8rem; color:#666; }
+  .dasha-duration { font-size:0.75rem; color:#888; margin-left:auto; white-space:nowrap; }
+
+  .dasha-level-label { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px; color:#999; background:#f0e0c0; padding:1px 6px; border-radius:8px; }
+
+  .dasha-children { display:none; }
+  .dasha-children.open { display:block; }
+
+  /* Info banner */
+  .info-banner { background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px 20px; margin-bottom:16px; display:flex; gap:24px; flex-wrap:wrap; }
+  .info-item { text-align:center; }
+  .info-label { font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+  .info-value { font-size:0.95rem; font-weight:700; color:var(--accent); }
+
+  .loading { text-align:center; padding:40px; font-size:1.1rem; color:var(--accent); }
+  .loading::after { content:''; display:inline-block; width:20px; height:20px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:10px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .footer { text-align:center; padding:16px; color:#fff; font-size:0.8rem; background:var(--header-bg); margin-top:40px; }
+
+  /* Place autocomplete */
+  .loc-auto { position:relative; display:inline-block; }
+  .loc-dropdown { position:absolute; top:100%; left:0; width:100%; max-height:220px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; display:none; z-index:999; box-shadow:0 4px 8px var(--shadow); }
+
+  @media (max-width:768px) {
+    .header { flex-direction:column; gap:8px; }
+    .form-row { flex-direction:column; }
+    .system-tabs { gap:4px; }
+    .system-tab { padding:8px 12px; font-size:0.8rem; }
+    .current-path { gap:4px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>&#9788;</span> Dasha — Planetary Periods</h1>
+  <div class="nav-links">
+    <a href="/">Daily Panchang</a>
+    <a href="/kundali">Kundali</a>
+    <a href="/dasha" class="active">Dasha</a>
+    <a href="/ashtakavarga">Ashtakavarga</a>
+    <a href="/special-lagnas">Special Lagnas</a>
+    <a href="/nakshatra">Nakshatra</a>
+    <a href="/hora">Hora</a>
+    <a href="/sbc">SBC</a>
+    <a href="/market">Market</a>
+    <a href="/bhrigu">Bhrigu</a>
+    <a href="/docs">API Docs</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Birth Data Form -->
+  <div class="birth-form">
+    <h2 id="formTitle">Enter Birth Details</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date of Birth</label>
+        <input type="text" id="dobInput" placeholder="DD-MM-YYYY" maxlength="10" value="23-09-1992" />
+      </div>
+      <div class="form-field">
+        <label>Time of Birth</label>
+        <input type="text" id="tobInput" placeholder="HH:MM" maxlength="5" value="23:10" />
+      </div>
+      <div class="form-field">
+        <label>Birth Place</label>
+        <div class="loc-auto">
+          <input type="text" id="placeInput" placeholder="City name..." autocomplete="off" value="Ujjain" style="width:260px;" />
+          <div id="placeSuggestions" class="loc-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Latitude</label>
+        <input type="text" id="latInput" value="23.1765" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>Longitude</label>
+        <input type="text" id="lonInput" value="75.7885" style="width:90px;" />
+      </div>
+      <div class="form-field">
+        <label>TZ (UTC±)</label>
+        <input type="text" id="tzInput" value="5.5" style="width:60px;" />
+      </div>
+      <div class="form-field">
+        <label>Ayanamsa</label>
+        <select id="ayanInput">
+          <option value="lahiri" selected>Lahiri</option>
+          <option value="raman">Raman</option>
+          <option value="krishnamurti">KP</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Language</label>
+        <select id="langSelect" onchange="switchLanguage()">
+          <option value="en" selected>English</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <button class="btn" id="generateBtn" onclick="generateDasha()">Calculate Dasha</button>
+      <span id="genStatus" style="margin-left:16px;color:var(--accent);font-size:0.9rem;"></span>
+    </div>
+  </div>
+
+  <!-- Dasha System Tabs -->
+  <div id="systemTabsWrap" style="display:none;">
+    <div class="system-tabs" id="systemTabs"></div>
+  </div>
+
+  <!-- Current Dasha Banner -->
+  <div id="currentBanner" class="current-banner" style="display:none;"></div>
+
+  <!-- Info Banner -->
+  <div id="infoBanner" class="info-banner" style="display:none;"></div>
+
+  <!-- Dasha Tree -->
+  <div class="dasha-section" id="dashaSection" style="display:none;">
+    <h2 id="dashaSectionTitle">Dasha Periods</h2>
+    <div id="dashaTree"></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Vedic Astrology Engine v1.0 &middot; Dasha Module &middot; 5 Dasha Systems
+</div>
+
+<script>
+const API = '';
+let dashaData = null;
+let activeSystem = 'vimshottari';
+let currentLang = 'en';
+let placeTimer = null;
+
+// ─── Language ─────────────────────────
+const LANG = {
+  en: {
+    formTitle: 'Enter Birth Details',
+    calcBtn: 'Calculate Dasha',
+    planets: {Sun:'Sun',Moon:'Moon',Mars:'Mars',Mercury:'Mercury',Jupiter:'Jupiter',Venus:'Venus',Saturn:'Saturn',Rahu:'Rahu',Ketu:'Ketu'},
+    signs: ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'],
+    levels: ['Mahadasha','Antardasha','Pratyantardasha','Sookshma','Prana'],
+    currentTitle: 'Current Dasha Path',
+    sectionTitle: 'Dasha Periods',
+    birthNak: 'Birth Nakshatra',
+    nakLord: 'Nakshatra Lord',
+    balance: 'Balance',
+    totalYears: 'Total Cycle',
+    years: 'years',
+    yoginiNames: {Mangala:'Mangala',Pingala:'Pingala',Dhanya:'Dhanya',Bhramari:'Bhramari',Bhadrika:'Bhadrika',Ulka:'Ulka',Siddha:'Siddha',Sankata:'Sankata'},
+  },
+  hi: {
+    formTitle: 'जन्म विवरण दर्ज करें',
+    calcBtn: 'दशा गणना करें',
+    planets: {Sun:'सूर्य',Moon:'चन्द्र',Mars:'मंगल',Mercury:'बुध',Jupiter:'गुरु',Venus:'शुक्र',Saturn:'शनि',Rahu:'राहु',Ketu:'केतु'},
+    signs: ['मेष','वृषभ','मिथुन','कर्क','सिंह','कन्या','तुला','वृश्चिक','धनु','मकर','कुम्भ','मीन'],
+    levels: ['महादशा','अन्तर्दशा','प्रत्यन्तर्दशा','सूक्ष्म','प्राण'],
+    currentTitle: 'वर्तमान दशा',
+    sectionTitle: 'दशा काल',
+    birthNak: 'जन्म नक्षत्र',
+    nakLord: 'नक्षत्र स्वामी',
+    balance: 'शेष',
+    totalYears: 'कुल चक्र',
+    years: 'वर्ष',
+    yoginiNames: {Mangala:'मंगला',Pingala:'पिंगला',Dhanya:'धान्या',Bhramari:'भ्रामरी',Bhadrika:'भद्रिका',Ulka:'उल्का',Siddha:'सिद्धा',Sankata:'संकटा'},
+  },
+};
+
+const SYSTEM_INFO = {
+  en: {
+    vimshottari: { name:'Vimshottari', desc:'120-year nakshatra cycle' },
+    yogini:      { name:'Yogini', desc:'36-year cycle' },
+    ashtottari:  { name:'Ashtottari', desc:'108-year cycle' },
+    chara:       { name:'Chara', desc:'Jaimini sign-based' },
+    narayana:    { name:'Narayana', desc:'Jaimini from Lagna' },
+  },
+  hi: {
+    vimshottari: { name:'विंशोत्तरी', desc:'120 वर्ष नक्षत्र चक्र' },
+    yogini:      { name:'योगिनी', desc:'36 वर्ष चक्र' },
+    ashtottari:  { name:'अष्टोत्तरी', desc:'108 वर्ष चक्र' },
+    chara:       { name:'चर', desc:'जैमिनी राशि आधारित' },
+    narayana:    { name:'नारायण', desc:'जैमिनी लग्न आधारित' },
+  },
+};
+
+const SYSTEM_ORDER = ['vimshottari','yogini','ashtottari','chara','narayana'];
+
+function switchLanguage() {
+  currentLang = document.getElementById('langSelect').value;
+  const L = LANG[currentLang];
+  document.getElementById('formTitle').textContent = L.formTitle;
+  document.getElementById('generateBtn').textContent = L.calcBtn;
+  if (dashaData) {
+    renderSystemTabs();
+    renderDashaView(activeSystem);
+  }
+}
+
+// ─── Birth defaults ───────────────────
+(async function loadBirthDefaults() {
+  try {
+    const res = await fetch(`${API}/api/v1/birth-defaults`);
+    if (res.ok) {
+      const d = await res.json();
+      document.getElementById('dobInput').value = d.date;
+      document.getElementById('tobInput').value = d.time;
+      document.getElementById('placeInput').value = d.place;
+      document.getElementById('latInput').value = d.latitude;
+      document.getElementById('lonInput').value = d.longitude;
+      document.getElementById('tzInput').value = d.tz_offset;
+      document.getElementById('ayanInput').value = d.ayanamsa;
+    }
+  } catch (_) {}
+})();
+
+// ─── Place autocomplete ───────────────
+const placeInput = document.getElementById('placeInput');
+const placeDropdown = document.getElementById('placeSuggestions');
+
+placeInput.addEventListener('input', () => {
+  clearTimeout(placeTimer);
+  const q = placeInput.value.trim();
+  if (q.length < 2) { placeDropdown.style.display = 'none'; return; }
+  placeTimer = setTimeout(() => fetchPlaces(q), 250);
+});
+placeInput.addEventListener('focus', () => {
+  if (placeInput.value.trim().length >= 2) fetchPlaces(placeInput.value.trim());
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#placeInput') && !e.target.closest('#placeSuggestions'))
+    placeDropdown.style.display = 'none';
+});
+
+async function fetchPlaces(q) {
+  try {
+    // Try local DB first
+    const localRes = await fetch(`${API}/api/v1/city/search?q=${encodeURIComponent(q)}`);
+    const localData = await localRes.json();
+    if (localData.results && localData.results.length > 0) {
+      renderPlaceResults(localData.results.map(c => ({
+        display: c.display, name: c.name, lat: c.latitude, lon: c.longitude, tz: c.tz_offset,
+      })));
+      return;
+    }
+    // Fallback to Nominatim (OpenStreetMap) for global coverage
+    const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`);
+    const nData = await nRes.json();
+    if (nData && nData.length > 0) {
+      const results = nData.map(r => {
+        const parts = [];
+        if (r.address) {
+          if (r.address.city || r.address.town || r.address.village || r.address.hamlet) parts.push(r.address.city || r.address.town || r.address.village || r.address.hamlet);
+          if (r.address.state) parts.push(r.address.state);
+          if (r.address.country) parts.push(r.address.country);
+        }
+        const display = parts.length > 0 ? parts.join(', ') : r.display_name.split(',').slice(0,3).join(',');
+        return { display, name: parts[0] || r.display_name.split(',')[0], lat: parseFloat(r.lat), lon: parseFloat(r.lon), tz: null };
+      });
+      renderPlaceResults(results);
+    } else {
+      placeDropdown.innerHTML = '<div style="padding:8px 12px;color:#888;font-size:0.85rem;">No results found</div>';
+      placeDropdown.style.display = 'block';
+    }
+  } catch(e) { placeDropdown.style.display = 'none'; }
+}
+
+window._placeResults = [];
+function renderPlaceResults(results) {
+  window._placeResults = results;
+  placeDropdown.innerHTML = results.map((c, i) => {
+    const tzStr = c.tz !== null ? `UTC${c.tz>=0?'+':''}${c.tz}` : '';
+    return `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.9rem;"
+         onmouseover="this.style.background='#ffe4b5'" onmouseout="this.style.background='#fff'"
+         onclick="pickPlace(${i})">
+      <strong>${c.display}</strong>
+      ${tzStr ? `<span style="color:#888;font-size:0.8rem;margin-left:8px;">${tzStr}</span>` : '<span style="color:#aaa;font-size:0.75rem;margin-left:8px;">via OpenStreetMap</span>'}
+    </div>`;
+  }).join('');
+  placeDropdown.style.display = 'block';
+}
+
+function pickPlace(idx) {
+  const c = window._placeResults[idx];
+  placeInput.value = c.name;
+  document.getElementById('latInput').value = c.lat;
+  document.getElementById('lonInput').value = c.lon;
+  if (c.tz !== null) {
+    document.getElementById('tzInput').value = c.tz;
+  } else {
+    document.getElementById('tzInput').value = Math.round(c.lon / 15 * 2) / 2;
+  }
+  placeDropdown.style.display = 'none';
+}
+
+// ─── Generate Dasha ───────────────────
+async function generateDasha() {
+  const btn = document.getElementById('generateBtn');
+  const status = document.getElementById('genStatus');
+  btn.disabled = true;
+  status.innerHTML = '<span class="loading" style="padding:0;">Calculating...</span>';
+
+  try {
+    const body = {
+      date: document.getElementById('dobInput').value,
+      time: document.getElementById('tobInput').value,
+      latitude: parseFloat(document.getElementById('latInput').value),
+      longitude: parseFloat(document.getElementById('lonInput').value),
+      tz_offset: parseFloat(document.getElementById('tzInput').value),
+      ayanamsa: document.getElementById('ayanInput').value,
+      max_level: 5,
+    };
+
+    const res = await fetch(`${API}/api/v1/dasha`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    dashaData = await res.json();
+
+    activeSystem = 'vimshottari';
+    renderSystemTabs();
+    renderDashaView(activeSystem);
+
+    document.getElementById('systemTabsWrap').style.display = 'block';
+    document.getElementById('dashaSection').style.display = 'block';
+
+    status.textContent = 'Done!';
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── System Tabs ──────────────────────
+function renderSystemTabs() {
+  const sysInfo = SYSTEM_INFO[currentLang];
+  document.getElementById('systemTabs').innerHTML = SYSTEM_ORDER.filter(s =>
+    dashaData.dashas[s]
+  ).map(s => {
+    const info = sysInfo[s];
+    return `<div class="system-tab ${s===activeSystem?'active':''}" onclick="switchSystem('${s}')">
+      ${info.name}<span class="sys-desc">${info.desc}</span>
+    </div>`;
+  }).join('');
+}
+
+function switchSystem(sys) {
+  activeSystem = sys;
+  renderSystemTabs();
+  renderDashaView(sys);
+}
+
+// ─── Render Dasha View ────────────────
+function renderDashaView(sys) {
+  const dasha = dashaData.dashas[sys];
+  if (!dasha) return;
+
+  const L = LANG[currentLang];
+  const sysInfo = SYSTEM_INFO[currentLang][sys];
+
+  // Section title
+  document.getElementById('dashaSectionTitle').textContent =
+    `${sysInfo.name} — ${L.sectionTitle}`;
+
+  // Current dasha path
+  renderCurrentBanner(dasha, sys);
+
+  // Info banner
+  renderInfoBanner(dasha, sys);
+
+  // Dasha tree
+  const tree = document.getElementById('dashaTree');
+  tree.innerHTML = '';
+  dasha.periods.forEach((p, i) => {
+    tree.appendChild(buildDashaNode(p, 0, dasha.current_path || [], sys));
+  });
+}
+
+// ─── Current Banner ───────────────────
+function renderCurrentBanner(dasha, sys) {
+  const banner = document.getElementById('currentBanner');
+  const L = LANG[currentLang];
+  const path = dasha.current_path || [];
+
+  if (path.length === 0) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  const isSignBased = (sys === 'chara' || sys === 'narayana');
+  const items = path.map(lord => {
+    const display = translateLord(lord, sys);
+    return `<span class="path-item">${display}</span>`;
+  }).join('<span class="path-arrow">→</span>');
+
+  banner.innerHTML = `<h3>${L.currentTitle}</h3><div class="current-path">${items}</div>`;
+  banner.style.display = 'block';
+}
+
+// ─── Info Banner ──────────────────────
+function renderInfoBanner(dasha, sys) {
+  const banner = document.getElementById('infoBanner');
+  const L = LANG[currentLang];
+
+  let html = '';
+  if (dasha.birth_nakshatra) {
+    html += `<div class="info-item"><div class="info-label">${L.birthNak}</div><div class="info-value">${dasha.birth_nakshatra}</div></div>`;
+  }
+  if (dasha.birth_nakshatra_lord) {
+    html += `<div class="info-item"><div class="info-label">${L.nakLord}</div><div class="info-value">${translateLord(dasha.birth_nakshatra_lord, sys)}</div></div>`;
+  }
+  if (dasha.first_yogini) {
+    html += `<div class="info-item"><div class="info-label">Yogini</div><div class="info-value">${translateLord(dasha.first_yogini, sys)}</div></div>`;
+  }
+  if (dasha.balance !== undefined) {
+    html += `<div class="info-item"><div class="info-label">${L.balance}</div><div class="info-value">${dasha.balance} ${L.years}</div></div>`;
+  }
+  if (dasha.total_years) {
+    html += `<div class="info-item"><div class="info-label">${L.totalYears}</div><div class="info-value">${dasha.total_years} ${typeof dasha.total_years === 'number' ? L.years : ''}</div></div>`;
+  }
+  if (dasha.ascendant_sign) {
+    const signIdx = LANG.en.signs.indexOf(dasha.ascendant_sign);
+    const signName = signIdx >= 0 ? LANG[currentLang].signs[signIdx] : dasha.ascendant_sign;
+    html += `<div class="info-item"><div class="info-label">Lagna</div><div class="info-value">${signName}</div></div>`;
+  }
+
+  banner.innerHTML = html;
+  banner.style.display = html ? 'flex' : 'none';
+}
+
+// ─── Build Tree Node ──────────────────
+function buildDashaNode(period, level, currentPath, sys) {
+  const L = LANG[currentLang];
+  const node = document.createElement('div');
+  node.className = `dasha-node level-${level}`;
+
+  const hasChildren = period.sub_periods && period.sub_periods.length > 0;
+  const isCurrent = currentPath.length > level && currentPath[level] === period.lord;
+
+  const lordDisplay = translateLord(period.lord, sys);
+  const levelName = level < L.levels.length ? L.levels[level] : period.level;
+
+  // Duration display
+  let durDisplay = '';
+  if (period.duration_years !== undefined) {
+    const y = period.duration_years;
+    if (y >= 1) {
+      durDisplay = `${y.toFixed(2)} ${L.years}`;
+    } else {
+      durDisplay = `${period.duration_days.toFixed(0)} days`;
+    }
+  }
+
+  // Header
+  const header = document.createElement('div');
+  header.className = `dasha-header${isCurrent ? ' current' : ''}`;
+  header.innerHTML = `
+    <span class="dasha-toggle">${hasChildren ? '▶' : '•'}</span>
+    <span class="dasha-level-label">${levelName}</span>
+    <span class="dasha-lord">${lordDisplay}</span>
+    ${period.ruling_planet ? `<span style="font-size:0.75rem;color:#666;">(${translateLord(period.ruling_planet, 'vimshottari')})</span>` : ''}
+    ${period.sign_lord ? `<span style="font-size:0.75rem;color:#666;">(${translateLord(period.sign_lord, 'vimshottari')})</span>` : ''}
+    <span class="dasha-dates">${period.start} — ${period.end}</span>
+    <span class="dasha-duration">${durDisplay}</span>
+  `;
+  node.appendChild(header);
+
+  // Children container
+  if (hasChildren) {
+    const children = document.createElement('div');
+    children.className = 'dasha-children';
+
+    // Auto-expand current path and level-0
+    if (isCurrent || level === 0) {
+      // Lazy build: only build sub-periods when expanded for deeper levels
+    }
+
+    header.addEventListener('click', () => {
+      const isOpen = children.classList.contains('open');
+      if (isOpen) {
+        children.classList.remove('open');
+        header.querySelector('.dasha-toggle').textContent = '▶';
+      } else {
+        // Build children lazily
+        if (children.children.length === 0) {
+          period.sub_periods.forEach(sp => {
+            children.appendChild(buildDashaNode(sp, level + 1, currentPath, sys));
+          });
+        }
+        children.classList.add('open');
+        header.querySelector('.dasha-toggle').textContent = '▼';
+      }
+    });
+
+    // Auto-expand current dasha path
+    if (isCurrent && level < 2) {
+      period.sub_periods.forEach(sp => {
+        children.appendChild(buildDashaNode(sp, level + 1, currentPath, sys));
+      });
+      children.classList.add('open');
+      header.querySelector('.dasha-toggle').textContent = '▼';
+    }
+
+    node.appendChild(children);
+  }
+
+  return node;
+}
+
+// ─── Translate Lord Name ──────────────
+function translateLord(lord, sys) {
+  const L = LANG[currentLang];
+
+  // Yogini names
+  if (L.yoginiNames && L.yoginiNames[lord]) {
+    return L.yoginiNames[lord];
+  }
+
+  // Planet names
+  if (L.planets[lord]) {
+    return L.planets[lord];
+  }
+
+  // Sign names (for Chara/Narayana)
+  const signIdx = LANG.en.signs.indexOf(lord);
+  if (signIdx >= 0) {
+    return L.signs[signIdx];
+  }
+
+  return lord;
+}
+
+// ─── Auto-load from global profile ───
+(function() {
+  const raw = localStorage.getItem('vedic_astro_profile');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.dob) document.getElementById('dobInput').value = p.dob;
+    if (p.time) document.getElementById('tobInput').value = p.time;
+    if (p.place) document.getElementById('placeInput').value = p.place;
+    if (p.lat) document.getElementById('latInput').value = p.lat;
+    if (p.lon) document.getElementById('lonInput').value = p.lon;
+    if (p.tz !== undefined) document.getElementById('tzInput').value = p.tz;
+    if (p.ayanamsa) document.getElementById('ayanInput').value = p.ayanamsa;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
